@@ -22,6 +22,13 @@ function metCalories(met, weightKg, minutes) {
   return (met * 3.5 * weightKg / 200) * minutes;
 }
 
+// Sets/reps/weight exercises: weight can be entered as total load, or per arm/side
+// (e.g. a single dumbbell). This converts to a total-load figure for the calc.
+function effectiveLoadKg(entry) {
+  const w = Number(entry.weightKg) || 0;
+  return entry.weightIsPerSide ? w * 2 : w;
+}
+
 // Estimate an effective duration for strength sets (time under tension + rest)
 // ~ each rep takes ~3.5s of work, plus a portion of rest credited at low intensity.
 function estimateStrengthMinutes(sets, reps) {
@@ -32,7 +39,7 @@ function estimateStrengthMinutes(sets, reps) {
 }
 
 // Compute calories for a single logged exercise entry.
-// entry: { exerciseId, sets, reps, weightKg, durationMin, distanceKm }
+// entry: { exerciseId, sets, reps, weightKg, weightIsPerSide, durationMin, distanceKm }
 function calcExerciseCalories(entry, bodyWeightKg) {
   const ex = EXERCISE_LIBRARY.find(e => e.id === entry.exerciseId) || entry.custom;
   if (!ex || !bodyWeightKg) return 0;
@@ -42,8 +49,9 @@ function calcExerciseCalories(entry, bodyWeightKg) {
   } else if (ex.inputMode === 'setsRepsWeight' || ex.inputMode === 'setsReps') {
     minutes = estimateStrengthMinutes(Number(entry.sets), Number(entry.reps));
     // small intensity bump if lifting heavy relative to bodyweight
-    if (ex.inputMode === 'setsRepsWeight' && entry.weightKg) {
-      const ratio = Number(entry.weightKg) / bodyWeightKg;
+    if (ex.inputMode === 'setsRepsWeight') {
+      const totalLoad = effectiveLoadKg(entry);
+      const ratio = totalLoad / bodyWeightKg;
       if (ratio > 1) minutes *= 1.15;
     }
   } else if (ex.inputMode === 'distance') {
@@ -52,11 +60,28 @@ function calcExerciseCalories(entry, bodyWeightKg) {
   return metCalories(ex.met, bodyWeightKg, minutes);
 }
 
-// Calories burned from daily step count (rough: 0.04 kcal per step per kg body weight / 70kg baseline)
+// --- Step calories: baseline vs. bonus ---
+// Each activity level already assumes a "baseline" amount of daily walking is baked
+// into its multiplier. Counting all steps again on top of that would double count.
+// Instead, only steps ABOVE that baseline are converted to a calorie bonus.
+function calcBonusStepCalories(stepsPerDay, baselineSteps) {
+  const extra = Math.max(0, (Number(stepsPerDay) || 0) - (baselineSteps || 0));
+  return extra * 0.04; // ~0.04 kcal per step above baseline, a commonly used approximation
+}
+
+// Legacy full-step formula, kept for reference/possible future use (not used for totals
+// anymore, since it double counted against the activity multiplier).
 function calcStepCalories(steps, weightKg) {
   if (!steps || !weightKg) return 0;
-  // ~0.57 kcal per 1000 steps per kg bodyweight (approximation, ~30 kcal/1000 steps @70kg)
   return steps * 0.00057 * weightKg;
+}
+
+// --- Public-health-informed feedback bands ---
+function getSessionIntensityFeedback(kcal) {
+  return EXERCISE_INTENSITY_BANDS.session.find(b => kcal <= b.max);
+}
+function getWeeklyIntensityFeedback(kcal) {
+  return EXERCISE_INTENSITY_BANDS.weekly.find(b => kcal <= b.max);
 }
 
 // --- Auto-detect activity level from planner data ---

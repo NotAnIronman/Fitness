@@ -1,5 +1,5 @@
 /* ============================================================
-   APP — state, router, shell, and Home (profile/BMR/TDEE) view
+   APP - state, router, shell, and Home (profile/BMR/TDEE) view
    ============================================================ */
 
 let STATE = loadState();
@@ -12,6 +12,7 @@ let UI = {
   foodQuery: '',
   foodResults: [],
   foodSearchLoading: false,
+  showCustomFood: false,
 };
 
 function todayISO() {
@@ -39,6 +40,7 @@ function currentWeightKg() {
   return STATE.profile.weightKg;
 }
 
+// Raw plan stats only (no activity-level dependency, to avoid circularity)
 function weeklyPlanSummary() {
   const days = STATE.workoutPlan.days;
   const activeDays = days.filter(d => d.exercises.length > 0);
@@ -56,13 +58,10 @@ function weeklyPlanSummary() {
       totalKcal += calcExerciseCalories(e, bw);
     });
   });
-  const stepKcalPerDay = calcStepCalories(STATE.workoutPlan.stepsPerDay, bw);
-  const weeklyStepKcal = stepKcalPerDay * 7;
   return {
     workoutDaysPerWeek: activeDays.length,
     avgSessionMinutes: activeDays.length ? totalMinutes / activeDays.length : 0,
     totalWeeklyExerciseKcal: totalKcal,
-    weeklyStepKcal,
     stepsPerDay: STATE.workoutPlan.stepsPerDay,
   };
 }
@@ -83,6 +82,66 @@ function getTDEE() {
   return calcTDEE(bmr, lvl.multiplier);
 }
 
+// Steps walked above the baseline already assumed by the activity level, converted
+// to a calorie bonus so ordinary daily walking isn't double counted.
+function getStepBonus() {
+  const lvl = getActivityLevel();
+  const stepsPerDay = STATE.workoutPlan.stepsPerDay;
+  const dailyKcal = calcBonusStepCalories(stepsPerDay, lvl.baselineSteps);
+  return {
+    baselineSteps: lvl.baselineSteps,
+    stepsPerDay,
+    extraSteps: Math.max(0, stepsPerDay - lvl.baselineSteps),
+    dailyKcal,
+    weeklyKcal: dailyKcal * 7,
+  };
+}
+
+// TDEE plus the daily step bonus - this is the number used for goal/food-target math.
+function getEffectiveTDEE() {
+  const tdee = getTDEE();
+  if (!tdee) return null;
+  return tdee + getStepBonus().dailyKcal;
+}
+
+// ============================================================
+// FOCUS-PRESERVING RENDER
+// Every input that drives a live recalculation calls render() on
+// input/change. Since render() rebuilds the DOM from scratch, a naive
+// version would kick focus out of whatever field the person is typing
+// in (especially painful on mobile, where the keyboard closes too).
+// This wrapper remembers which field had focus (via data-focus-id) and
+// restores focus + cursor position after the rebuild.
+// ============================================================
+
+function render() {
+  const active = document.activeElement;
+  let focusMeta = null;
+  if (active && active.dataset && active.dataset.focusId) {
+    focusMeta = {
+      id: active.dataset.focusId,
+      selStart: typeof active.selectionStart === 'number' ? active.selectionStart : null,
+      selEnd: typeof active.selectionEnd === 'number' ? active.selectionEnd : null,
+    };
+  }
+
+  doRender();
+
+  if (focusMeta) {
+    const el = document.querySelector('[data-focus-id="' + cssEscape(focusMeta.id) + '"]');
+    if (el) {
+      el.focus({ preventScroll: true });
+      if (focusMeta.selStart != null && typeof el.setSelectionRange === 'function') {
+        try { el.setSelectionRange(focusMeta.selStart, focusMeta.selEnd); } catch (e) { /* not a text-selectable input */ }
+      }
+    }
+  }
+}
+
+function cssEscape(s) {
+  return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+}
+
 // ============================================================
 // SHELL / ROUTER
 // ============================================================
@@ -95,7 +154,7 @@ const NAV_ITEMS = [
   { key: 'themes', label: 'Themes', num: '05' },
 ];
 
-function render() {
+function doRender() {
   applyTheme(STATE.theme);
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -108,7 +167,7 @@ function render() {
           </button>
         `).join('')}
         <div class="sidebar-foot">
-          Data saved locally in this browser only.<br>No account, no sync — yet.
+          Data saved locally in this browser only. No account, no sync yet.
         </div>
       </div>
       <div class="main" id="main-content"></div>
@@ -143,9 +202,8 @@ function afterRenderHooks() {
   }
 }
 
-
 // ============================================================
-// HOME VIEW — profile + BMR/TDEE
+// HOME VIEW - profile + BMR/TDEE
 // ============================================================
 
 function renderHome() {
@@ -153,12 +211,10 @@ function renderHome() {
   const bmr = getBMR();
   const lvl = getActivityLevel();
   const tdee = getTDEE();
+  const stepBonus = getStepBonus();
   const summary = weeklyPlanSummary();
   const isImperial = p.unitSystem === 'imperial';
 
-  const heightDisplay = p.heightCm
-    ? (isImperial ? cmToFeetInches(p.heightCm) : `${p.heightCm} cm`)
-    : '';
   const weightDisplay = p.weightKg
     ? (isImperial ? kgToLb(p.weightKg).toFixed(1) : p.weightKg)
     : '';
@@ -167,7 +223,7 @@ function renderHome() {
     <div class="page-head">
       <p class="page-eyebrow">Profile</p>
       <h1 class="page-title">Your numbers</h1>
-      <p class="page-sub">Set your stats once — your activity level is inferred automatically from what you actually plan in the Workout Planner, not a guess you pick yourself.</p>
+      <p class="page-sub">Set your stats once. Your activity level is inferred automatically from what you actually plan in the Workout Planner, not a guess you pick yourself.</p>
     </div>
 
     <div class="grid grid-2">
@@ -181,19 +237,19 @@ function renderHome() {
         </div>
         <div class="field">
           <label>Name</label>
-          <input type="text" value="${escapeAttr(p.name)}" oninput="updateProfile('name', this.value)" placeholder="Optional">
+          <input type="text" data-focus-id="profile-name" value="${escapeAttr(p.name)}" oninput="updateProfile('name', this.value)" placeholder="Optional">
         </div>
         <div class="field-row">
           <div class="field">
             <label>Sex (for BMR formula)</label>
-            <select onchange="updateProfile('sex', this.value)">
+            <select data-focus-id="profile-sex" onchange="updateProfile('sex', this.value)">
               <option value="female" ${p.sex === 'female' ? 'selected' : ''}>Female</option>
               <option value="male" ${p.sex === 'male' ? 'selected' : ''}>Male</option>
             </select>
           </div>
           <div class="field">
             <label>Age</label>
-            <input type="number" min="10" max="100" value="${p.age ?? ''}" oninput="updateProfile('age', numOrNull(this.value))">
+            <input type="number" data-focus-id="profile-age" min="10" max="100" value="${p.age ?? ''}" oninput="updateProfile('age', numOrNull(this.value))">
           </div>
         </div>
         <div class="field-row">
@@ -201,16 +257,16 @@ function renderHome() {
             <label>Height ${isImperial ? '(ft / in)' : '(cm)'}</label>
             ${isImperial ? `
               <div class="field-row">
-                <input type="number" min="1" max="8" placeholder="ft" value="${p.heightCm ? Math.floor(cmToIn(p.heightCm) / 12) : ''}" oninput="updateHeightImperial(this.value, null)">
-                <input type="number" min="0" max="11" placeholder="in" value="${p.heightCm ? Math.round(cmToIn(p.heightCm) % 12) : ''}" oninput="updateHeightImperial(null, this.value)">
+                <input type="number" data-focus-id="profile-height-ft" min="1" max="8" placeholder="ft" value="${p.heightCm ? Math.floor(cmToIn(p.heightCm) / 12) : ''}" oninput="updateHeightImperial(this.value, null)">
+                <input type="number" data-focus-id="profile-height-in" min="0" max="11" placeholder="in" value="${p.heightCm ? Math.round(cmToIn(p.heightCm) % 12) : ''}" oninput="updateHeightImperial(null, this.value)">
               </div>
             ` : `
-              <input type="number" min="100" max="230" value="${p.heightCm ?? ''}" oninput="updateProfile('heightCm', numOrNull(this.value))">
+              <input type="number" data-focus-id="profile-height-cm" min="100" max="230" value="${p.heightCm ?? ''}" oninput="updateProfile('heightCm', numOrNull(this.value))">
             `}
           </div>
           <div class="field">
             <label>Weight ${isImperial ? '(lb)' : '(kg)'}</label>
-            <input type="number" step="0.1" value="${weightDisplay}" oninput="updateWeight(this.value)">
+            <input type="number" data-focus-id="profile-weight" step="0.1" value="${weightDisplay}" oninput="updateWeight(this.value)">
           </div>
         </div>
         <p class="hint">Weight updates here also log a new entry on the Weight Goals page.</p>
@@ -221,18 +277,18 @@ function renderHome() {
         ${bmr ? `
           <div class="grid grid-2" style="margin-bottom:16px;">
             <div class="stat">
-              <div class="stat-label">BMR — resting burn</div>
+              <div class="stat-label">BMR: resting burn</div>
               <div class="stat-value">${Math.round(bmr)}<span class="unit">kcal/day</span></div>
             </div>
             <div class="stat">
-              <div class="stat-label">TDEE — total daily burn</div>
+              <div class="stat-label">TDEE: total daily burn</div>
               <div class="stat-value accent">${Math.round(tdee)}<span class="unit">kcal/day</span></div>
             </div>
           </div>
           <hr class="div">
           <div class="stat" style="margin-bottom:10px;">
             <div class="stat-label">Auto-detected activity level</div>
-            <div style="font-family:var(--font-display); font-size:18px; font-weight:600; margin-top:4px;">${lvl.label} <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px; font-weight:400;">×${lvl.multiplier}</span></div>
+            <div style="font-family:var(--font-display); font-size:18px; font-weight:600; margin-top:4px;">${lvl.label} <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px; font-weight:400;">x${lvl.multiplier}</span></div>
             <div class="hint">${lvl.desc}</div>
           </div>
           <div class="hint">
@@ -240,9 +296,17 @@ function renderHome() {
             avg <strong style="color:var(--text)">${Math.round(summary.avgSessionMinutes)}</strong> min/session,
             <strong style="color:var(--text)">${summary.stepsPerDay.toLocaleString()}</strong> steps/day.
           </div>
+          ${stepBonus.extraSteps > 0 ? `
+            <hr class="div">
+            <div class="stat">
+              <div class="stat-label">Bonus from extra steps</div>
+              <div class="stat-value" style="font-size:18px;">+${Math.round(stepBonus.dailyKcal)}<span class="unit">kcal/day</span></div>
+              <div class="hint">${stepBonus.stepsPerDay.toLocaleString()} steps/day vs a ${stepBonus.baselineSteps.toLocaleString()}-step baseline already built into ${lvl.label.toLowerCase()}. See the Workout Planner page for the full breakdown.</div>
+            </div>
+          ` : ''}
         ` : `
           <div class="empty-state">
-            <div class="big">—</div>
+            <div class="big">-</div>
             Fill in your age, height, and weight to calculate BMR and TDEE.
           </div>
         `}
@@ -253,8 +317,8 @@ function renderHome() {
       <div class="card-title">Why this number matters</div>
       <p class="hint" style="font-size:13px; line-height:1.6;">
         Most calculators ask you to self-report "activity level," and people reliably overestimate it.
-        This app instead reads your actual <a href="#" onclick="navigate('workouts'); return false;">workout plan</a> —
-        how many days you train, how long sessions run, and your typical step count — and picks the closest activity
+        This app instead reads your actual <a href="#" onclick="navigate('workouts'); return false;">workout plan</a>:
+        how many days you train, how long sessions run, and your typical step count, and picks the closest activity
         multiplier for you. Build out your week on the Workout Planner page to sharpen this estimate.
       </p>
     </div>

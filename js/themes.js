@@ -1,5 +1,9 @@
 /* ============================================================
    THEMES + SETTINGS VIEW
+   Color pickers and the radius slider apply directly to the live
+   CSS variables and skip the full render() cycle, since rebuilding
+   the DOM mid-drag (color picker drag, slider drag) would cancel
+   the gesture the browser is tracking.
    ============================================================ */
 
 function renderThemes() {
@@ -54,15 +58,15 @@ function renderThemes() {
       <div class="card">
         <div class="card-title">Shape</div>
         <div class="field">
-          <label>Corner radius: ${t.radius}px</label>
-          <input type="range" min="0" max="24" value="${t.radius}" oninput="updateThemeField('radius', Number(this.value))">
+          <label>Corner radius: <span id="radius-label">${t.radius}</span>px</label>
+          <input type="range" id="radius-slider" min="0" max="24" value="${t.radius}" oninput="liveUpdateRadius(this.value)" onchange="commitRadius(this.value)">
         </div>
       </div>
       <div class="card">
         <div class="card-title">Typography</div>
         <div class="field">
           <label>Font pairing</label>
-          <select onchange="updateThemeField('font', this.value)">
+          <select data-focus-id="theme-font" onchange="updateThemeField('font', this.value)">
             ${fontOptions.map(f => `<option value="${f.key}" ${t.font === f.key ? 'selected' : ''}>${f.label}</option>`).join('')}
           </select>
         </div>
@@ -70,20 +74,23 @@ function renderThemes() {
     </div>
 
     <div class="card">
-      <div class="card-title">Nutritionix API (optional)</div>
-      <p class="hint" style="margin-bottom:12px;">Add your free Nutritionix keys to unlock full food search instead of the built-in offline list. Get keys at
-        <a href="https://www.nutritionix.com/business/api" target="_blank" rel="noopener">nutritionix.com/business/api</a>. Keys are stored only in this browser.</p>
-      <div class="field-row">
-        <div class="field"><label>App ID</label><input type="text" value="${escapeAttr(STATE.nutritionixKeys.appId)}" oninput="updateNutritionixKey('appId', this.value)"></div>
-        <div class="field"><label>App Key</label><input type="password" value="${escapeAttr(STATE.nutritionixKeys.appKey)}" oninput="updateNutritionixKey('appKey', this.value)"></div>
+      <div class="card-title">Food search API (optional)</div>
+      <p class="hint" style="margin-bottom:12px;">Food search uses the free <a href="https://fdc.nal.usda.gov/" target="_blank" rel="noopener">USDA FoodData Central</a> database, no pricing tiers.
+      It works out of the box on USDA's public demo key, which has light rate limits shared by everyone using it. For higher limits, grab your own free key at
+      <a href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank" rel="noopener">fdc.nal.usda.gov/api-key-signup.html</a> and paste it below. Stored only in this browser.</p>
+      <div class="field" style="max-width:360px;">
+        <label>USDA API key</label>
+        <input type="text" data-focus-id="usda-key" value="${escapeAttr(STATE.foodApiKey)}" placeholder="DEMO_KEY (default)" oninput="updateFoodApiKey(this.value)">
       </div>
     </div>
 
     <div class="card">
       <div class="card-title">Your data</div>
-      <p class="hint" style="margin-bottom:12px;">Everything lives in this browser's local storage — nothing is sent anywhere. Export a backup or wipe the slate clean.</p>
-      <div style="display:flex; gap:10px;">
+      <p class="hint" style="margin-bottom:12px;">Everything lives in this browser's local storage, nothing is sent anywhere except food searches. Export a backup to move data to another device, or import one back in.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" onclick="exportData()">Export backup (.json)</button>
+        <button class="btn" onclick="document.getElementById('import-file-input').click()">Import backup (.json)</button>
+        <input type="file" id="import-file-input" accept="application/json,.json" style="display:none;" onchange="importData(event)">
         <button class="btn btn-danger" onclick="resetAllData()">Reset all data</button>
       </div>
     </div>
@@ -94,7 +101,7 @@ function colorField(label, key, value) {
   return `
     <div class="field">
       <label>${label}</label>
-      <input type="color" value="${value}" oninput="updateThemeField('${key}', this.value)">
+      <input type="color" data-theme-key="${key}" value="${value}" oninput="liveUpdateColor('${key}', this.value)" onchange="commitColor('${key}', this.value)">
     </div>
   `;
 }
@@ -104,14 +111,40 @@ function applyPreset(key) {
   persist(); render();
 }
 
+// --- Live-apply while dragging (no render, keeps the native picker/slider gesture intact) ---
+function liveUpdateColor(key, value) {
+  STATE.theme[key] = value;
+  applyTheme(STATE.theme);
+}
+function commitColor(key, value) {
+  STATE.theme[key] = value;
+  STATE.theme.preset = 'custom';
+  applyTheme(STATE.theme);
+  persist();
+  // refresh preset "active" highlighting without disturbing focus
+  render();
+}
+
+function liveUpdateRadius(value) {
+  STATE.theme.radius = Number(value);
+  applyTheme(STATE.theme);
+  const label = document.getElementById('radius-label');
+  if (label) label.textContent = value;
+}
+function commitRadius(value) {
+  STATE.theme.radius = Number(value);
+  STATE.theme.preset = 'custom';
+  persist();
+}
+
 function updateThemeField(key, value) {
   STATE.theme[key] = value;
   STATE.theme.preset = 'custom';
   persist(); render();
 }
 
-function updateNutritionixKey(field, value) {
-  STATE.nutritionixKeys[field] = value;
+function updateFoodApiKey(value) {
+  STATE.foodApiKey = value;
   persist();
 }
 
@@ -123,6 +156,26 @@ function exportData() {
   a.download = `forge-backup-${todayISO()}.json`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      STATE = deepMerge(defaultState(), parsed);
+      persist();
+      render();
+      toast('Backup imported');
+    } catch (e) {
+      console.error(e);
+      alert('That file could not be read as a Forge backup. Make sure it is the .json file exported from this app.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 function resetAllData() {

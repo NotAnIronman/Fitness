@@ -8,6 +8,9 @@ function renderWorkouts() {
   const activeDay = days.find(d => d.id === UI.workoutDayId);
   const bw = currentWeightKg();
   const summary = weeklyPlanSummary();
+  const lvl = getActivityLevel();
+  const stepBonus = getStepBonus();
+  const weeklyFeedback = getWeeklyIntensityFeedback(summary.totalWeeklyExerciseKcal);
 
   return `
     <div class="page-head">
@@ -16,15 +19,37 @@ function renderWorkouts() {
       <p class="page-sub">Group exercises into training days. Each exercise's calorie burn is estimated from a MET-based formula scaled to your current bodyweight${bw ? ` (${Math.round(kgToLb(bw))} lb)` : ''}.</p>
     </div>
 
-    ${!bw ? `<div class="section-note">Set your weight on the Home page first — calorie estimates need it.</div>` : ''}
+    ${!bw ? `<div class="section-note">Set your weight on the Home page first. Calorie estimates need it.</div>` : ''}
 
     <div class="grid grid-3" style="margin-bottom:16px;">
       <div class="card"><div class="stat"><div class="stat-label">Training days / week</div><div class="stat-value">${summary.workoutDaysPerWeek}</div></div></div>
       <div class="card"><div class="stat"><div class="stat-label">Weekly exercise burn</div><div class="stat-value accent">${Math.round(summary.totalWeeklyExerciseKcal)}<span class="unit">kcal</span></div></div></div>
       <div class="card">
         <div class="stat-label">Avg. daily steps</div>
-        <input type="number" step="500" value="${STATE.workoutPlan.stepsPerDay}" oninput="updateSteps(this.value)" style="margin-top:6px;">
+        <input type="number" data-focus-id="steps-per-day" step="500" value="${STATE.workoutPlan.stepsPerDay}" oninput="updateSteps(this.value)" style="margin-top:6px;">
       </div>
+    </div>
+
+    ${summary.workoutDaysPerWeek > 0 ? `
+      <div class="card">
+        <div class="card-title">Weekly volume check <span class="badge ${weeklyFeedback.max <= 1000 ? 'badge-warn' : weeklyFeedback.max <= 2000 ? 'badge-ok' : 'badge-ok'}">${weeklyFeedback.label}</span></div>
+        <p class="hint" style="font-size:13px; line-height:1.6;">${weeklyFeedback.note}</p>
+      </div>
+    ` : ''}
+
+    <div class="card">
+      <div class="card-title">Steps: baseline vs. bonus</div>
+      <p class="hint" style="margin-bottom:10px;">
+        Your <strong style="color:var(--text)">${lvl.label.toLowerCase()}</strong> activity level already assumes about
+        <strong style="color:var(--text)">${stepBonus.baselineSteps.toLocaleString()}</strong> steps/day, that's baked into your TDEE multiplier already, so
+        counting it again would double count. Only steps above that baseline are added as a bonus.
+      </p>
+      <div class="grid grid-3">
+        <div class="stat"><div class="stat-label">Your avg steps/day</div><div class="stat-value" style="font-size:20px;">${stepBonus.stepsPerDay.toLocaleString()}</div></div>
+        <div class="stat"><div class="stat-label">Extra above baseline</div><div class="stat-value" style="font-size:20px;">${stepBonus.extraSteps.toLocaleString()}</div></div>
+        <div class="stat"><div class="stat-label">Bonus burn</div><div class="stat-value accent" style="font-size:20px;">+${Math.round(stepBonus.dailyKcal)}<span class="unit">kcal/day</span></div></div>
+      </div>
+      <p class="hint" style="margin-top:10px;">Example: ${stepBonus.baselineSteps.toLocaleString()} steps of baseline, walking to ${(stepBonus.baselineSteps*2).toLocaleString()} would add roughly ${Math.round(stepBonus.baselineSteps * 0.04)} bonus kcal (extra steps x ~0.04 kcal/step). This bonus is added to your goal and food targets automatically.</p>
     </div>
 
     <div class="day-tabs">
@@ -35,7 +60,7 @@ function renderWorkouts() {
     </div>
 
     ${activeDay ? renderDayCard(activeDay, bw) : `
-      <div class="card"><div class="empty-state"><div class="big">＋</div>Add a training day to start building your plan.</div></div>
+      <div class="card"><div class="empty-state"><div class="big">+</div>Add a training day to start building your plan.</div></div>
     `}
   `;
 }
@@ -46,28 +71,35 @@ function renderDayCard(day, bw) {
     const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId) || e.custom;
     const kcal = calcExerciseCalories(e, bw);
     dayKcal += kcal;
-    const meta = ex.inputMode === 'setsRepsWeight'
-      ? `${e.sets}×${e.reps} @ ${e.weightKg ? Math.round(kgToLb(e.weightKg)) + ' lb' : 'bw'}`
-      : ex.inputMode === 'setsReps'
-      ? `${e.sets}×${e.reps}`
-      : `${e.durationMin} min`;
+    let meta;
+    if (ex.inputMode === 'setsRepsWeight') {
+      const load = effectiveLoadKg(e);
+      const loadLb = Math.round(kgToLb(load));
+      meta = `${e.sets}x${e.reps} @ ${loadLb ? loadLb + ' lb total' : 'bodyweight'}${e.weightIsPerSide ? ' (per side x2)' : ''}`;
+    } else if (ex.inputMode === 'setsReps') {
+      meta = `${e.sets}x${e.reps}`;
+    } else {
+      meta = `${e.durationMin} min`;
+    }
     return `
       <div class="exercise-row">
         <div>
           <div class="name">${escapeAttr(ex.name)}</div>
-          <div class="meta">${meta} · ${ex.category || 'Custom'}</div>
+          <div class="meta">${meta} . ${ex.category || 'Custom'}</div>
         </div>
         <div class="kcal">${Math.round(kcal)} kcal</div>
-        <button class="icon-btn" onclick="removeExercise('${day.id}','${e.id}')" title="Remove">✕</button>
+        <button class="icon-btn" onclick="removeExercise('${day.id}','${e.id}')" title="Remove">x</button>
       </div>
     `;
   }).join('');
+
+  const sessionFeedback = day.exercises.length ? getSessionIntensityFeedback(dayKcal) : null;
 
   return `
     <div class="card">
       <div class="card-title">
         <span>
-          <input type="text" value="${escapeAttr(day.name)}" oninput="renameDay('${day.id}', this.value)"
+          <input type="text" data-focus-id="day-name-${day.id}" value="${escapeAttr(day.name)}" oninput="renameDay('${day.id}', this.value)"
             style="background:transparent;border:none;font-family:var(--font-display);font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:0.02em;color:var(--text-dim);padding:0;width:auto;">
         </span>
         <button class="btn btn-danger btn-sm" onclick="deleteDay('${day.id}')">Delete day</button>
@@ -76,9 +108,18 @@ function renderDayCard(day, bw) {
       ${day.exercises.length ? `<div class="row-list">${rows}</div>` : `<div class="empty-state">No exercises yet.</div>`}
 
       <hr class="div">
-      <div class="stat" style="margin-bottom:14px;">
-        <div class="stat-label">Estimated day total</div>
-        <div class="stat-value accent">${Math.round(dayKcal)}<span class="unit">kcal</span></div>
+      <div class="grid grid-2" style="align-items:end; margin-bottom:14px;">
+        <div class="stat">
+          <div class="stat-label">Estimated day total</div>
+          <div class="stat-value accent">${Math.round(dayKcal)}<span class="unit">kcal</span></div>
+        </div>
+        ${sessionFeedback ? `
+          <div class="stat">
+            <div class="stat-label">Session feedback</div>
+            <div style="font-size:13.5px; margin-top:4px;"><span class="badge badge-ok" style="margin-right:6px;">${sessionFeedback.label}</span></div>
+            <div class="hint" style="margin-top:4px;">${sessionFeedback.note}</div>
+          </div>
+        ` : ''}
       </div>
 
       ${UI.addExerciseOpenFor === day.id ? renderAddExerciseForm(day) : `
@@ -99,10 +140,14 @@ function renderAddExerciseForm(day) {
         <button class="${UI.addExerciseCategory === 'Custom' ? 'active' : ''}" onclick="setExerciseCategory('Custom')">Custom</button>
       </div>
 
+      ${UI.addExerciseCategory === 'Cardio' ? `
+        <div class="section-note">Running and walking overlap with your daily step count above. If this session is already reflected in your average steps/day, log it in one place only so it isn't counted twice.</div>
+      ` : ''}
+
       ${UI.addExerciseCategory === 'Custom' ? renderCustomExerciseForm(day) : `
         <div class="field">
           <label>Exercise</label>
-          <select id="ex-select">
+          <select id="ex-select" data-focus-id="ex-select">
             ${filtered.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
           </select>
         </div>
@@ -122,45 +167,64 @@ function renderExerciseInputFields(ex) {
     return `
       <div class="field">
         <label>Duration (minutes)</label>
-        <input type="number" id="f-duration" min="1" value="30">
+        <input type="number" id="f-duration" data-focus-id="f-duration" min="1" value="30">
       </div>
     `;
   }
   if (ex.inputMode === 'setsRepsWeight') {
     return `
       <div class="field-row">
-        <div class="field"><label>Sets</label><input type="number" id="f-sets" min="1" value="3"></div>
-        <div class="field"><label>Reps</label><input type="number" id="f-reps" min="1" value="10"></div>
-        <div class="field"><label>Weight (lb)</label><input type="number" id="f-weight" min="0" value="45"></div>
+        <div class="field"><label>Sets</label><input type="number" id="f-sets" data-focus-id="f-sets" min="1" value="3"></div>
+        <div class="field"><label>Reps</label><input type="number" id="f-reps" data-focus-id="f-reps" min="1" value="10"></div>
+        <div class="field"><label>Weight (lb)</label><input type="number" id="f-weight" data-focus-id="f-weight" min="0" value="45"></div>
+      </div>
+      <div class="field">
+        <label>Weight is</label>
+        <div class="pill-toggle">
+          <button type="button" id="f-weight-total-btn" class="active" onclick="setWeightMode(false)">Total (both sides)</button>
+          <button type="button" id="f-weight-perside-btn" onclick="setWeightMode(true)">Per arm / per side</button>
+        </div>
+        <p class="hint">Defaults to total combined weight (e.g. 90 lb loaded on a barbell). Switch this if you entered a single dumbbell or one-side number instead.</p>
       </div>
     `;
   }
   // setsReps (bodyweight)
   return `
     <div class="field-row">
-      <div class="field"><label>Sets</label><input type="number" id="f-sets" min="1" value="3"></div>
-      <div class="field"><label>Reps</label><input type="number" id="f-reps" min="1" value="10"></div>
+      <div class="field"><label>Sets</label><input type="number" id="f-sets" data-focus-id="f-sets" min="1" value="3"></div>
+      <div class="field"><label>Reps</label><input type="number" id="f-reps" data-focus-id="f-reps" min="1" value="10"></div>
     </div>
   `;
+}
+
+let _weightIsPerSide = false;
+function setWeightMode(perSide) {
+  _weightIsPerSide = perSide;
+  const totalBtn = document.getElementById('f-weight-total-btn');
+  const sideBtn = document.getElementById('f-weight-perside-btn');
+  if (totalBtn && sideBtn) {
+    totalBtn.classList.toggle('active', !perSide);
+    sideBtn.classList.toggle('active', perSide);
+  }
 }
 
 function renderCustomExerciseForm(day) {
   return `
     <div class="field">
       <label>Exercise name</label>
-      <input type="text" id="c-name" placeholder="e.g. Kettlebell flow">
+      <input type="text" id="c-name" data-focus-id="c-name" placeholder="e.g. Kettlebell flow">
     </div>
     <div class="field-row">
       <div class="field">
         <label>MET value (intensity)</label>
-        <input type="number" id="c-met" step="0.1" value="6.0">
+        <input type="number" id="c-met" data-focus-id="c-met" step="0.1" value="6.0">
       </div>
       <div class="field">
         <label>Duration (minutes)</label>
-        <input type="number" id="c-duration" min="1" value="30">
+        <input type="number" id="c-duration" data-focus-id="c-duration" min="1" value="30">
       </div>
     </div>
-    <p class="hint">Not sure of MET value? 3 = light, 6 = moderate, 9 = vigorous, 12+ = very intense. <a href="https://sites.google.com/site/compendiumofphysicalactivities/" target="_blank" rel="noopener">Reference chart ↗</a></p>
+    <p class="hint">Not sure of MET value? 3 = light, 6 = moderate, 9 = vigorous, 12+ = very intense. <a href="https://sites.google.com/site/compendiumofphysicalactivities/" target="_blank" rel="noopener">Reference chart</a></p>
     <div style="display:flex; gap:8px; margin-top:10px;">
       <button class="btn btn-primary" onclick="submitAddCustomExercise('${day.id}')">Add to day</button>
       <button class="btn btn-ghost" onclick="closeAddExercise()">Cancel</button>
@@ -203,6 +267,7 @@ function updateSteps(val) {
 function openAddExercise(dayId) {
   UI.addExerciseOpenFor = dayId;
   UI.addExerciseCategory = 'Cardio';
+  _weightIsPerSide = false;
   render();
 }
 function closeAddExercise() {
@@ -211,6 +276,7 @@ function closeAddExercise() {
 }
 function setExerciseCategory(cat) {
   UI.addExerciseCategory = cat;
+  _weightIsPerSide = false;
   render();
 }
 
@@ -231,6 +297,7 @@ function submitAddExercise(dayId) {
     entry.sets = Number(document.getElementById('f-sets').value) || 0;
     entry.reps = Number(document.getElementById('f-reps').value) || 0;
     entry.weightKg = lbToKg(Number(document.getElementById('f-weight').value) || 0);
+    entry.weightIsPerSide = _weightIsPerSide;
   } else {
     entry.sets = Number(document.getElementById('f-sets').value) || 0;
     entry.reps = Number(document.getElementById('f-reps').value) || 0;

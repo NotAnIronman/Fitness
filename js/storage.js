@@ -34,7 +34,9 @@ function defaultState() {
     foodLog: {
       // 'YYYY-MM-DD': [ {name, kcal, protein, carbs, fat, qty} ]
     },
-    nutritionixKeys: { appId: '', appKey: '' },
+    // Free USDA FoodData Central key. Optional: the app works out of the box using
+    // USDA's public DEMO_KEY, this just raises the rate limit if someone wants it.
+    foodApiKey: '',
     theme: {
       preset: 'forge',
       bg: '#0B0F14',
