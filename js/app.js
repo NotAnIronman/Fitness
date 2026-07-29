@@ -7,12 +7,18 @@ let UI = {
   route: 'home',
   workoutDayId: null,
   addExerciseOpenFor: null,
-  addExerciseCategory: 'Cardio',
+  copyDayOpenFor: null,
+  addExerciseCategory: 'Chest',
   foodDate: todayISO(),
   foodQuery: '',
   foodResults: [],
   foodSearchLoading: false,
+  foodAdjustDraft: null,
   showCustomFood: false,
+  logDate: todayISO(),
+  logAddOpen: false,
+  logCopyOpen: false,
+  progressExerciseId: null,
 };
 
 function todayISO() {
@@ -30,6 +36,35 @@ function toast(msg) {
   el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 2200);
+}
+
+// ---------- Tooltip component ----------
+// Hover shows it on desktop for free (CSS :hover). Tap toggles it on mobile via
+// the delegated click listener below, since touch devices have no hover state.
+function tip(label, title, bodyHtml) {
+  return `<span class="tip">${label}<span class="tip-box"><span class="tip-title">${escapeAttr(title)}</span>${bodyHtml}</span></span>`;
+}
+document.addEventListener('click', (e) => {
+  const target = e.target.closest ? e.target.closest('.tip') : null;
+  document.querySelectorAll('.tip.tip-open').forEach(t => { if (t !== target) t.classList.remove('tip-open'); });
+  if (target) target.classList.toggle('tip-open');
+});
+
+// ---------- Dismissible / collapsible notice component ----------
+// Used for one-time explanatory tips that would otherwise clutter the page.
+// Collapses to a small pill; state persists per notice id.
+function notice(id, bodyHtml) {
+  const collapsed = STATE.uiPrefs.collapsedNotices.includes(id);
+  if (collapsed) {
+    return `<div class="notice-pill" onclick="toggleNotice('${id}')"><span class="plus">+</span> Show tip</div>`;
+  }
+  return `<div class="notice"><div class="notice-body">${bodyHtml}</div><button class="notice-collapse-btn" onclick="toggleNotice('${id}')" title="Collapse this tip">-</button></div>`;
+}
+function toggleNotice(id) {
+  const list = STATE.uiPrefs.collapsedNotices;
+  const idx = list.indexOf(id);
+  if (idx >= 0) list.splice(idx, 1); else list.push(id);
+  persist(); render();
 }
 
 // ---------- Derived helpers shared across views ----------
@@ -104,6 +139,77 @@ function getEffectiveTDEE() {
   return tdee + getStepBonus().dailyKcal;
 }
 
+// Weekly exercise burn, contextualized against the person's goal direction (used
+// by the hover tooltip on the weekly-burn stat).
+function assessWeeklyBurnForGoal(weeklyKcal) {
+  const band = getWeeklyIntensityFeedback(weeklyKcal);
+  const g = STATE.goal;
+  let goalNote = '';
+  if (g.targetWeightKg != null && g.startWeightKg != null) {
+    if (g.targetWeightKg < g.startWeightKg) {
+      goalNote = ' Your goal is weight loss, so more structured exercise volume can help, alongside your food target.';
+    } else if (g.targetWeightKg > g.startWeightKg) {
+      goalNote = ' Your goal is weight gain, so this mostly supports strength/fitness; food intake drives the weight side more.';
+    }
+  }
+  return { ...band, goalNote };
+}
+
+// How well recent logged workouts match the weekly plan (used on the Log page).
+function getWorkoutComplianceCheck() {
+  const plannedDays = STATE.workoutPlan.days.filter(d => d.exercises.length > 0).length;
+  if (!plannedDays) return null;
+  const today = new Date(todayISO());
+  let loggedCount = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    if (STATE.workoutLog[iso] && STATE.workoutLog[iso].length > 0) loggedCount++;
+  }
+  const ratio = loggedCount / plannedDays;
+  let status = 'good';
+  let message = `You've logged ${loggedCount} of ${plannedDays} planned workout day(s) in the last 7 days. Good pace.`;
+  if (ratio < 0.5) {
+    status = 'way-behind';
+    message = `Only ${loggedCount} of ${plannedDays} planned workout day(s) logged this week. That's a big gap from your plan, worth catching up, or adjusting the plan to match what's realistic right now.`;
+  } else if (ratio < 0.85) {
+    status = 'behind';
+    message = `${loggedCount} of ${plannedDays} planned workout day(s) logged this week. A bit behind pace, still catchable.`;
+  }
+  return { status, message, loggedCount, plannedDays };
+}
+
+// How well recent logged food intake matches the calorie target (used on the Food page).
+function getFoodComplianceCheck() {
+  const target = getFoodTargetCalories();
+  if (!target) return null;
+  const today = new Date(todayISO());
+  const days = [];
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    const entries = STATE.foodLog[iso];
+    if (entries && entries.length) {
+      days.push(entries.reduce((s, e) => s + e.kcal * e.qty, 0));
+    }
+  }
+  if (days.length < 3) return null; // not enough history yet
+  const avg = days.reduce((a, b) => a + b, 0) / days.length;
+  const diffPct = ((avg - target) / target) * 100;
+  let status = 'good';
+  let message = `Your average logged intake over the last ${days.length} day(s) is ${Math.round(avg)} kcal, close to your ${Math.round(target)} kcal target.`;
+  if (Math.abs(diffPct) > 25) {
+    status = 'way-off';
+    message = diffPct > 0
+      ? `Averaging ${Math.round(avg)} kcal/day over ${days.length} logged days, about ${Math.round(diffPct)}% above your ${Math.round(target)} kcal target. That gap will slow or stall progress toward your goal date, worth tightening up portions or cutting back on extras.`
+      : `Averaging ${Math.round(avg)} kcal/day over ${days.length} logged days, about ${Math.round(Math.abs(diffPct))}% below your ${Math.round(target)} kcal target. That's a large enough gap to be hard to sustain, double check you're logging everything (not under-logging).`;
+  } else if (Math.abs(diffPct) > 10) {
+    status = 'off';
+    message = `Averaging ${Math.round(avg)} kcal/day over ${days.length} logged days vs a ${Math.round(target)} kcal target (${diffPct > 0 ? '+' : ''}${Math.round(diffPct)}%). Somewhat off pace, worth keeping an eye on.`;
+  }
+  return { status, message, avg, target, diffPct, sampleDays: days.length };
+}
+
 // ============================================================
 // FOCUS-PRESERVING RENDER
 // Every input that drives a live recalculation calls render() on
@@ -148,10 +254,13 @@ function cssEscape(s) {
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home & BMR', num: '01' },
-  { key: 'workouts', label: 'Workout Planner', num: '02' },
-  { key: 'goals', label: 'Weight Goals', num: '03' },
-  { key: 'food', label: 'Food Tracking', num: '04' },
-  { key: 'themes', label: 'Themes', num: '05' },
+  { key: 'workouts', label: 'Workout Plan', num: '02' },
+  { key: 'log', label: 'Workout Log', num: '03' },
+  { key: 'progress', label: 'Progress', num: '04' },
+  { key: 'goals', label: 'Weight Goals', num: '05' },
+  { key: 'food', label: 'Food Tracking', num: '06' },
+  { key: 'bodyfat', label: 'Body Fat', num: '07' },
+  { key: 'themes', label: 'Themes', num: '08' },
 ];
 
 function doRender() {
@@ -176,8 +285,11 @@ function doRender() {
   const main = document.getElementById('main-content');
   if (UI.route === 'home') main.innerHTML = renderHome();
   else if (UI.route === 'workouts') main.innerHTML = renderWorkouts();
+  else if (UI.route === 'log') main.innerHTML = renderLog();
+  else if (UI.route === 'progress') main.innerHTML = renderProgress();
   else if (UI.route === 'goals') main.innerHTML = renderGoals();
   else if (UI.route === 'food') main.innerHTML = renderFood();
+  else if (UI.route === 'bodyfat') main.innerHTML = renderBodyFat();
   else if (UI.route === 'themes') main.innerHTML = renderThemes();
 
   afterRenderHooks();
@@ -190,7 +302,8 @@ function navigate(route) {
 
 function afterRenderHooks() {
   if (UI.route === 'goals') drawGoalChart();
-  if (UI.route === 'workouts') {
+  if (UI.route === 'progress') drawProgressChart();
+  if (UI.route === 'workouts' || UI.route === 'log') {
     const sel = document.getElementById('ex-select');
     if (sel) {
       sel.addEventListener('change', function () {
@@ -223,7 +336,7 @@ function renderHome() {
     <div class="page-head">
       <p class="page-eyebrow">Profile</p>
       <h1 class="page-title">Your numbers</h1>
-      <p class="page-sub">Set your stats once. Your activity level is inferred automatically from what you actually plan in the Workout Planner, not a guess you pick yourself.</p>
+      <p class="page-sub">Set your stats once. Your activity level is inferred automatically from what you actually plan in the Workout Plan, not a guess you pick yourself.</p>
     </div>
 
     <div class="grid grid-2">
@@ -301,7 +414,7 @@ function renderHome() {
             <div class="stat">
               <div class="stat-label">Bonus from extra steps</div>
               <div class="stat-value" style="font-size:18px;">+${Math.round(stepBonus.dailyKcal)}<span class="unit">kcal/day</span></div>
-              <div class="hint">${stepBonus.stepsPerDay.toLocaleString()} steps/day vs a ${stepBonus.baselineSteps.toLocaleString()}-step baseline already built into ${lvl.label.toLowerCase()}. See the Workout Planner page for the full breakdown.</div>
+              <div class="hint">${stepBonus.stepsPerDay.toLocaleString()} steps/day vs a ${stepBonus.baselineSteps.toLocaleString()}-step baseline already built into ${lvl.label.toLowerCase()}. See the Workout Plan page for the full breakdown.</div>
             </div>
           ` : ''}
         ` : `
@@ -314,14 +427,47 @@ function renderHome() {
     </div>
 
     <div class="card">
-      <div class="card-title">Why this number matters</div>
-      <p class="hint" style="font-size:13px; line-height:1.6;">
-        Most calculators ask you to self-report "activity level," and people reliably overestimate it.
-        This app instead reads your actual <a href="#" onclick="navigate('workouts'); return false;">workout plan</a>:
-        how many days you train, how long sessions run, and your typical step count, and picks the closest activity
-        multiplier for you. Build out your week on the Workout Planner page to sharpen this estimate.
-      </p>
+      ${(() => {
+        const breakdown = getEnergyBreakdown({ bmr, tdee, dailyExerciseKcal: summary.totalWeeklyExerciseKcal / 7 });
+        if (!breakdown) return `<div class="card-title">Where your calories go</div><div class="empty-state">Fill in your profile above to see the breakdown.</div>`;
+        const segs = [
+          { key: 'bmr', label: 'BMR', color: 'var(--accent)', pct: breakdown.bmrPct, val: breakdown.bmr,
+            title: 'BMR: Basal Metabolic Rate',
+            body: 'Calories your body burns just existing: breathing, circulation, cell repair. This happens whether you move or not, and is usually the biggest single piece of your day.' },
+          { key: 'neat', label: 'NEAT', color: 'var(--accent-2)', pct: breakdown.neatPct, val: breakdown.neat,
+            title: 'NEAT: Non-Exercise Activity',
+            body: 'Walking around, fidgeting, chores, standing up, taking the stairs: all the movement that is not a planned workout. This is often the most underestimated part of someone\u2019s day.' },
+          { key: 'eat', label: 'EAT', color: '#7FD87A', pct: breakdown.eatPct, val: breakdown.eat,
+            title: 'EAT: Exercise Activity',
+            body: 'Calories burned specifically from the planned workouts in your log, an average of your weekly training spread across each day.' },
+          { key: 'tef', label: 'TEF', color: '#F5C64C', pct: breakdown.tefPct, val: breakdown.tef,
+            title: 'TEF: Thermic Effect of Food',
+            body: 'Energy your body spends digesting and processing what you eat. Roughly 10% of intake for most diets; protein costs more to digest than fat or carbs.' },
+        ];
+        return `
+          <div class="card-title">Where your calories go</div>
+          <div class="energy-bar">
+            ${segs.map(s => `<span class="energy-bar-seg" style="width:${Math.max(s.pct, 0.5)}%; background:${s.color};">${s.pct >= 6 ? Math.round(s.pct) + '%' : ''}</span>`).join('')}
+          </div>
+          <div class="energy-legend">
+            ${segs.map(s => `
+              <div class="energy-legend-item">
+                <span class="energy-legend-dot" style="background:${s.color};"></span>
+                ${tip(`<strong>${s.label}</strong> ${Math.round(s.val)} kcal`, s.title, s.body)}
+              </div>
+            `).join('')}
+          </div>
+          <p class="hint" style="margin-top:12px;">Tap or hover any label for what it means. BMR is typically 60-70% of total burn for most people; the rest comes from how much you move and eat.</p>
+        `;
+      })()}
     </div>
+
+    ${notice('home-why-activity', `
+      Most calculators ask you to self-report "activity level," and people reliably overestimate it.
+      This app instead reads your actual <a href="#" onclick="navigate('workouts'); return false;">workout plan</a>:
+      how many days you train, how long sessions run, and your typical step count, and picks the closest activity
+      multiplier for you. Build out your week on the Workout Plan page to sharpen this estimate.
+    `)}
   `;
 }
 

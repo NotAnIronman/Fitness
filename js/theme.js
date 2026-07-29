@@ -39,6 +39,30 @@ const THEME_PRESETS = {
     text: '#E4F3FA', textDim: '#7FAAC0', accent: '#38BDF8', accent2: '#FBBF24',
     radius: 10, font: 'grotesk',
   },
+  rosewater: {
+    label: 'Rosewater',
+    bg: '#FDF4F2', surface: '#FFFFFF', surface2: '#FBE8E4', border: '#F2D2CB',
+    text: '#4A2E2A', textDim: '#9C7A73', accent: '#E0796B', accent2: '#C9A15C',
+    radius: 16, font: 'serif',
+  },
+  orchid: {
+    label: 'Orchid',
+    bg: '#F8F5FB', surface: '#FFFFFF', surface2: '#EDE3F5', border: '#DCC8EA',
+    text: '#3A2B47', textDim: '#8B7A9B', accent: '#9B5DE0', accent2: '#E0A6D8',
+    radius: 16, font: 'serif',
+  },
+  peony: {
+    label: 'Peony Garden',
+    bg: '#FFF6F8', surface: '#FFFFFF', surface2: '#FBE3EA', border: '#F3C9D6',
+    text: '#4A2438', textDim: '#9C6E85', accent: '#EC5C88', accent2: '#7FA894',
+    radius: 20, font: 'rounded',
+  },
+  blushgold: {
+    label: 'Blush & Gold',
+    bg: '#FBF8F3', surface: '#FFFFFF', surface2: '#F3E7D8', border: '#E8D5B8',
+    text: '#3D3226', textDim: '#93826B', accent: '#D4A24C', accent2: '#E8A2A8',
+    radius: 12, font: 'serif',
+  },
 };
 
 const FONT_STACKS = {

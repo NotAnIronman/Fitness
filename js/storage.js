@@ -31,12 +31,29 @@ function defaultState() {
       ],
       stepsPerDay: 6000,
     },
+    // Dated workout history, separate from the weekly workoutPlan template above.
+    // Lets someone log what they actually did (or backfill a missed day, or plan
+    // ahead) without disturbing the reusable weekly plan, and is what the Progress
+    // page reads to chart strength/volume over time.
+    workoutLog: {
+      // 'YYYY-MM-DD': [ {id, exerciseId, sets, reps, weightKg, weightIsPerSide, durationMin} ]
+    },
     foodLog: {
       // 'YYYY-MM-DD': [ {name, kcal, protein, carbs, fat, qty} ]
     },
     // Free USDA FoodData Central key. Optional: the app works out of the box using
     // USDA's public DEMO_KEY, this just raises the rate limit if someone wants it.
     foodApiKey: '',
+    // Last-used body-fat measurements (US Navy method), kept so the calculator
+    // doesn't reset every visit.
+    bodyFat: {
+      waistCm: null,
+      neckCm: null,
+      hipCm: null, // used for the female formula only
+    },
+    uiPrefs: {
+      collapsedNotices: [], // notice ids the person has collapsed to a pill
+    },
     theme: {
       preset: 'forge',
       bg: '#0B0F14',

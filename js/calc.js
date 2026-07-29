@@ -46,6 +46,12 @@ function calcExerciseCalories(entry, bodyWeightKg) {
   let minutes = 0;
   if (ex.inputMode === 'duration') {
     minutes = Number(entry.durationMin) || 0;
+    // Duration-based STRENGTH entries (e.g. "general gym session") are mostly rest
+    // between sets, not continuous effort - scale down unless the exercise says
+    // otherwise (restAdjust defaults to 1, i.e. no adjustment, for cardio/mobility).
+    if (ex.category === 'Strength' && typeof ex.restAdjust === 'number') {
+      minutes *= ex.restAdjust;
+    }
   } else if (ex.inputMode === 'setsRepsWeight' || ex.inputMode === 'setsReps') {
     minutes = estimateStrengthMinutes(Number(entry.sets), Number(entry.reps));
     // small intensity bump if lifting heavy relative to bodyweight
@@ -149,4 +155,77 @@ function goalProgressPct(startWeightKg, currentWeightKg, targetWeightKg) {
   if (total === 0) return 100;
   const done = currentWeightKg - startWeightKg;
   return Math.max(0, Math.min(100, (done / total) * 100));
+}
+
+// --- Body fat %: US Navy circumference method ---
+// A widely used tape-measure estimate (not as accurate as DEXA/BodPod, but free,
+// repeatable, and good enough to track trend over time). Constants are calibrated
+// for inches, so cm inputs are converted internally.
+function calcNavyBodyFat({ sex, waistCm, neckCm, hipCm, heightCm }) {
+  if (!waistCm || !neckCm || !heightCm) return null;
+  if (sex === 'female' && !hipCm) return null;
+  const waist = cmToIn(waistCm), neck = cmToIn(neckCm), height = cmToIn(heightCm);
+  const hip = hipCm ? cmToIn(hipCm) : 0;
+  let bf;
+  if (sex === 'male') {
+    const diff = waist - neck;
+    if (diff <= 0) return null;
+    bf = 86.010 * Math.log10(diff) - 70.041 * Math.log10(height) + 36.76;
+  } else {
+    const diff = waist + hip - neck;
+    if (diff <= 0) return null;
+    bf = 163.205 * Math.log10(diff) - 97.684 * Math.log10(height) - 78.387;
+  }
+  return Math.max(2, Math.min(60, bf));
+}
+
+function getBodyFatCategory(bf, sex) {
+  const bands = BODY_FAT_CATEGORIES[sex] || BODY_FAT_CATEGORIES.female;
+  return bands.find(b => bf >= b.min && bf <= b.max) || bands[bands.length - 1];
+}
+// Finds the current band and how much more (in kcal) would reach the next one up.
+function getNextTierGap(kcal, bands) {
+  const idx = bands.findIndex(b => kcal <= b.max);
+  if (idx === -1 || idx === bands.length - 1) return null; // already at the top band
+  const next = bands[idx + 1];
+  const gapKcal = Math.max(1, Math.ceil(bands[idx].max - kcal + 1));
+  return { nextLabel: next.label, gapKcal };
+}
+
+// --- Energy expenditure breakdown: BMR / NEAT / TEF / EAT ---
+// A commonly cited rough split of total daily energy expenditure:
+//  - BMR is usually ~60-70% of TDEE for most people
+//  - TEF (thermic effect of food, digesting/processing what you eat) is
+//    approximated here as ~10% of TDEE, a widely used rule of thumb
+//  - EAT (exercise activity thermogenesis) is calories from planned workouts
+//  - NEAT (non-exercise activity thermogenesis: walking around, fidgeting,
+//    chores, standing) is whatever's left over, this is often the most
+//    under-counted piece of someone's day
+function getEnergyBreakdown({ bmr, tdee, dailyExerciseKcal }) {
+  if (!bmr || !tdee) return null;
+  const tef = tdee * 0.10;
+  const eat = Math.min(dailyExerciseKcal || 0, tdee - bmr); // can't exceed remaining budget
+  const neat = Math.max(0, tdee - bmr - tef - eat);
+  return {
+    bmr, tef, eat, neat, tdee,
+    bmrPct: (bmr / tdee) * 100,
+    tefPct: (tef / tdee) * 100,
+    eatPct: (eat / tdee) * 100,
+    neatPct: (neat / tdee) * 100,
+  };
+}
+
+// --- Food intake safety check ---
+// Flags dangerously low logged intake. This is a coarse rule-of-thumb floor, not
+// personalized medical advice, intended to catch clearly-too-low days (e.g. a few
+// hundred calories) rather than fine-tune anyone's specific target.
+function checkIntakeSafety(loggedKcal, sex) {
+  const floor = MIN_SAFE_INTAKE[sex] || MIN_SAFE_INTAKE.female;
+  if (loggedKcal > 0 && loggedKcal < floor) {
+    return {
+      severe: loggedKcal < floor * 0.6,
+      floor,
+    };
+  }
+  return null;
 }

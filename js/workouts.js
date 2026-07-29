@@ -1,5 +1,5 @@
 /* ============================================================
-   WORKOUT PLANNER VIEW
+   WORKOUT PLAN VIEW (weekly template)
    ============================================================ */
 
 function renderWorkouts() {
@@ -10,20 +10,27 @@ function renderWorkouts() {
   const summary = weeklyPlanSummary();
   const lvl = getActivityLevel();
   const stepBonus = getStepBonus();
-  const weeklyFeedback = getWeeklyIntensityFeedback(summary.totalWeeklyExerciseKcal);
+  const weeklyAssessment = assessWeeklyBurnForGoal(summary.totalWeeklyExerciseKcal);
 
   return `
     <div class="page-head">
-      <p class="page-eyebrow">Planner</p>
+      <p class="page-eyebrow">Plan</p>
       <h1 class="page-title">Workout plan</h1>
-      <p class="page-sub">Group exercises into training days. Each exercise's calorie burn is estimated from a MET-based formula scaled to your current bodyweight${bw ? ` (${Math.round(kgToLb(bw))} lb)` : ''}.</p>
+      <p class="page-sub">This is your reusable weekly template. Group exercises into training days here, then use the Workout Log to check off what you actually did on specific dates.</p>
     </div>
 
     ${!bw ? `<div class="section-note">Set your weight on the Home page first. Calorie estimates need it.</div>` : ''}
 
     <div class="grid grid-3" style="margin-bottom:16px;">
       <div class="card"><div class="stat"><div class="stat-label">Training days / week</div><div class="stat-value">${summary.workoutDaysPerWeek}</div></div></div>
-      <div class="card"><div class="stat"><div class="stat-label">Weekly exercise burn</div><div class="stat-value accent">${Math.round(summary.totalWeeklyExerciseKcal)}<span class="unit">kcal</span></div></div></div>
+      <div class="card">
+        <div class="stat">
+          <div class="stat-label">Weekly exercise burn</div>
+          <div class="stat-value accent">
+            ${tip(`${Math.round(summary.totalWeeklyExerciseKcal)}<span class="unit">kcal</span>`, `${weeklyAssessment.label} for the week`, `${weeklyAssessment.note}${weeklyAssessment.goalNote}`)}
+          </div>
+        </div>
+      </div>
       <div class="card">
         <div class="stat-label">Avg. daily steps</div>
         <input type="number" data-focus-id="steps-per-day" step="500" value="${STATE.workoutPlan.stepsPerDay}" oninput="updateSteps(this.value)" style="margin-top:6px;">
@@ -32,25 +39,27 @@ function renderWorkouts() {
 
     ${summary.workoutDaysPerWeek > 0 ? `
       <div class="card">
-        <div class="card-title">Weekly volume check <span class="badge ${weeklyFeedback.max <= 1000 ? 'badge-warn' : weeklyFeedback.max <= 2000 ? 'badge-ok' : 'badge-ok'}">${weeklyFeedback.label}</span></div>
-        <p class="hint" style="font-size:13px; line-height:1.6;">${weeklyFeedback.note}</p>
+        <div class="card-title">
+          Weekly volume check
+          ${tip(`<span class="badge ${weeklyAssessment.tier === 1 ? 'badge-warn' : 'badge-ok'}">${weeklyAssessment.label}</span>`, 'What this means', weeklyAssessment.note + weeklyAssessment.goalNote)}
+        </div>
+        <p class="hint">${summary.workoutDaysPerWeek} day(s)/week, ${Math.round(summary.totalWeeklyExerciseKcal)} kcal total. Tap the badge for details.</p>
       </div>
     ` : ''}
 
     <div class="card">
-      <div class="card-title">Steps: baseline vs. bonus</div>
-      <p class="hint" style="margin-bottom:10px;">
-        Your <strong style="color:var(--text)">${lvl.label.toLowerCase()}</strong> activity level already assumes about
-        <strong style="color:var(--text)">${stepBonus.baselineSteps.toLocaleString()}</strong> steps/day, that's baked into your TDEE multiplier already, so
-        counting it again would double count. Only steps above that baseline are added as a bonus.
-      </p>
+      <div class="card-title">
+        Steps: baseline vs. bonus
+        ${tip('ⓘ', 'Why steps are split this way', `Your activity level already assumes a baseline step count is happening every day, that's part of what sets your TDEE multiplier. Counting all your steps again on top of that would double count. Only steps above the baseline convert to a bonus.`)}
+      </div>
       <div class="grid grid-3">
         <div class="stat"><div class="stat-label">Your avg steps/day</div><div class="stat-value" style="font-size:20px;">${stepBonus.stepsPerDay.toLocaleString()}</div></div>
-        <div class="stat"><div class="stat-label">Extra above baseline</div><div class="stat-value" style="font-size:20px;">${stepBonus.extraSteps.toLocaleString()}</div></div>
+        <div class="stat"><div class="stat-label">Baseline for ${lvl.label.toLowerCase()}</div><div class="stat-value" style="font-size:20px;">${stepBonus.baselineSteps.toLocaleString()}</div></div>
         <div class="stat"><div class="stat-label">Bonus burn</div><div class="stat-value accent" style="font-size:20px;">+${Math.round(stepBonus.dailyKcal)}<span class="unit">kcal/day</span></div></div>
       </div>
-      <p class="hint" style="margin-top:10px;">Example: ${stepBonus.baselineSteps.toLocaleString()} steps of baseline, walking to ${(stepBonus.baselineSteps*2).toLocaleString()} would add roughly ${Math.round(stepBonus.baselineSteps * 0.04)} bonus kcal (extra steps x ~0.04 kcal/step). This bonus is added to your goal and food targets automatically.</p>
     </div>
+
+    ${notice('cardio-step-overlap-general', `Logging running or walking as a workout below can overlap with the step count above. If a walk/run is already part of your normal daily steps, log it in one place only.`)}
 
     <div class="day-tabs">
       ${days.map(d => `
@@ -79,13 +88,13 @@ function renderDayCard(day, bw) {
     } else if (ex.inputMode === 'setsReps') {
       meta = `${e.sets}x${e.reps}`;
     } else {
-      meta = `${e.durationMin} min`;
+      meta = `${e.durationMin} min${ex.category === 'Strength' && ex.restAdjust && ex.restAdjust < 1 ? ` (~${Math.round(ex.restAdjust * 100)}% counted as active)` : ''}`;
     }
     return `
       <div class="exercise-row">
         <div>
           <div class="name">${escapeAttr(ex.name)}</div>
-          <div class="meta">${meta} . ${ex.category || 'Custom'}</div>
+          <div class="meta">${meta} . ${ex.bodyPart || ex.category || 'Custom'}</div>
         </div>
         <div class="kcal">${Math.round(kcal)} kcal</div>
         <button class="icon-btn" onclick="removeExercise('${day.id}','${e.id}')" title="Remove">x</button>
@@ -94,6 +103,7 @@ function renderDayCard(day, bw) {
   }).join('');
 
   const sessionFeedback = day.exercises.length ? getSessionIntensityFeedback(dayKcal) : null;
+  const nextTier = sessionFeedback ? getNextTierGap(dayKcal, EXERCISE_INTENSITY_BANDS.session) : null;
 
   return `
     <div class="card">
@@ -102,8 +112,13 @@ function renderDayCard(day, bw) {
           <input type="text" data-focus-id="day-name-${day.id}" value="${escapeAttr(day.name)}" oninput="renameDay('${day.id}', this.value)"
             style="background:transparent;border:none;font-family:var(--font-display);font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:0.02em;color:var(--text-dim);padding:0;width:auto;">
         </span>
-        <button class="btn btn-danger btn-sm" onclick="deleteDay('${day.id}')">Delete day</button>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-sm" onclick="openCopyDayMenu('${day.id}')">Copy from...</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteDay('${day.id}')">Delete</button>
+        </div>
       </div>
+
+      ${UI.copyDayOpenFor === day.id ? renderCopyDayMenu(day) : ''}
 
       ${day.exercises.length ? `<div class="row-list">${rows}</div>` : `<div class="empty-state">No exercises yet.</div>`}
 
@@ -116,35 +131,54 @@ function renderDayCard(day, bw) {
         ${sessionFeedback ? `
           <div class="stat">
             <div class="stat-label">Session feedback</div>
-            <div style="font-size:13.5px; margin-top:4px;"><span class="badge badge-ok" style="margin-right:6px;">${sessionFeedback.label}</span></div>
-            <div class="hint" style="margin-top:4px;">${sessionFeedback.note}</div>
+            <div style="font-size:13.5px; margin-top:4px;">
+              ${tip(`<span class="badge badge-ok">${sessionFeedback.label}</span>`, sessionFeedback.label, `${sessionFeedback.note}${nextTier ? ` Add about ${nextTier.gapKcal} more kcal of work to reach "${nextTier.nextLabel}."` : ' This is the top band already.'}`)}
+            </div>
           </div>
         ` : ''}
       </div>
 
-      ${UI.addExerciseOpenFor === day.id ? renderAddExerciseForm(day) : `
+      ${UI.addExerciseOpenFor === day.id ? renderAddExerciseForm(day, 'workout') : `
         <button class="btn btn-primary" onclick="openAddExercise('${day.id}')">+ Add exercise</button>
       `}
     </div>
   `;
 }
 
-function renderAddExerciseForm(day) {
-  const categories = [...new Set(EXERCISE_LIBRARY.map(e => e.category))];
-  const filtered = EXERCISE_LIBRARY.filter(e => e.category === UI.addExerciseCategory);
+function renderCopyDayMenu(day) {
+  const otherDays = STATE.workoutPlan.days.filter(d => d.id !== day.id && d.exercises.length > 0);
+  if (!otherDays.length) {
+    return `<div class="section-note">No other days with exercises to copy from yet.</div>`;
+  }
+  return `
+    <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:12px; margin-bottom:14px;">
+      <p class="hint" style="margin-bottom:8px;">Copy all exercises from:</p>
+      <div class="chip-row">
+        ${otherDays.map(d => `<button class="chip" onclick="copyDayInto('${d.id}', '${day.id}')">${escapeAttr(d.name)}</button>`).join('')}
+        <button class="chip" onclick="closeCopyDayMenu()">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderAddExerciseForm(day, mode) {
+  // mode: 'workout' (template day) or 'log' (dated log entry) - both share this UI,
+  // log.js supplies its own submit handlers via the same field ids.
+  const filtered = EXERCISE_LIBRARY.filter(e => e.bodyPart === UI.addExerciseCategory);
 
   return `
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px; margin-top:6px;">
-      <div class="pill-toggle" style="margin-bottom:12px; flex-wrap:wrap;">
-        ${categories.map(c => `<button class="${UI.addExerciseCategory === c ? 'active' : ''}" onclick="setExerciseCategory('${c}')">${c}</button>`).join('')}
-        <button class="${UI.addExerciseCategory === 'Custom' ? 'active' : ''}" onclick="setExerciseCategory('Custom')">Custom</button>
+      <p class="hint" style="margin-bottom:8px;">Filter by body part:</p>
+      <div class="chip-row" style="margin-bottom:12px;">
+        ${BODY_PARTS.map(c => `<button class="chip ${UI.addExerciseCategory === c ? 'active' : ''}" onclick="setExerciseCategory('${c}')">${c}</button>`).join('')}
+        <button class="chip ${UI.addExerciseCategory === 'Custom' ? 'active' : ''}" onclick="setExerciseCategory('Custom')">Custom</button>
       </div>
 
       ${UI.addExerciseCategory === 'Cardio' ? `
-        <div class="section-note">Running and walking overlap with your daily step count above. If this session is already reflected in your average steps/day, log it in one place only so it isn't counted twice.</div>
+        <div class="section-note">Running and walking overlap with your daily step count. If this session is already reflected in your average steps/day, log it in one place only.</div>
       ` : ''}
 
-      ${UI.addExerciseCategory === 'Custom' ? renderCustomExerciseForm(day) : `
+      ${UI.addExerciseCategory === 'Custom' ? renderCustomExerciseForm(day, mode) : `
         <div class="field">
           <label>Exercise</label>
           <select id="ex-select" data-focus-id="ex-select">
@@ -153,8 +187,8 @@ function renderAddExerciseForm(day) {
         </div>
         <div id="ex-input-fields">${renderExerciseInputFields(filtered[0])}</div>
         <div style="display:flex; gap:8px; margin-top:10px;">
-          <button class="btn btn-primary" onclick="submitAddExercise('${day.id}')">Add to day</button>
-          <button class="btn btn-ghost" onclick="closeAddExercise()">Cancel</button>
+          <button class="btn btn-primary" onclick="${mode === 'log' ? `submitAddExerciseLog()` : `submitAddExercise('${day.id}')`}">Add</button>
+          <button class="btn btn-ghost" onclick="${mode === 'log' ? `closeAddExerciseLog()` : `closeAddExercise()`}">Cancel</button>
         </div>
       `}
     </div>
@@ -164,11 +198,15 @@ function renderAddExerciseForm(day) {
 function renderExerciseInputFields(ex) {
   if (!ex) return '';
   if (ex.inputMode === 'duration' || ex.inputMode === 'distance') {
+    const restNote = ex.category === 'Strength' && ex.restAdjust && ex.restAdjust < 1
+      ? `<p class="hint">Heads up: gym-session time is mostly rest between sets. We count about ${Math.round(ex.restAdjust * 100)}% of this as active effort so the estimate isn't inflated. For a more accurate number, log individual exercises with sets/reps/weight instead.</p>`
+      : '';
     return `
       <div class="field">
         <label>Duration (minutes)</label>
         <input type="number" id="f-duration" data-focus-id="f-duration" min="1" value="30">
       </div>
+      ${restNote}
     `;
   }
   if (ex.inputMode === 'setsRepsWeight') {
@@ -208,7 +246,7 @@ function setWeightMode(perSide) {
   }
 }
 
-function renderCustomExerciseForm(day) {
+function renderCustomExerciseForm(day, mode) {
   return `
     <div class="field">
       <label>Exercise name</label>
@@ -226,8 +264,8 @@ function renderCustomExerciseForm(day) {
     </div>
     <p class="hint">Not sure of MET value? 3 = light, 6 = moderate, 9 = vigorous, 12+ = very intense. <a href="https://sites.google.com/site/compendiumofphysicalactivities/" target="_blank" rel="noopener">Reference chart</a></p>
     <div style="display:flex; gap:8px; margin-top:10px;">
-      <button class="btn btn-primary" onclick="submitAddCustomExercise('${day.id}')">Add to day</button>
-      <button class="btn btn-ghost" onclick="closeAddExercise()">Cancel</button>
+      <button class="btn btn-primary" onclick="${mode === 'log' ? `submitAddCustomExerciseLog()` : `submitAddCustomExercise('${day.id}')`}">Add</button>
+      <button class="btn btn-ghost" onclick="${mode === 'log' ? `closeAddExerciseLog()` : `closeAddExercise()`}">Cancel</button>
     </div>
   `;
 }
@@ -244,6 +282,7 @@ function addDay() {
 function selectDay(id) {
   UI.workoutDayId = id;
   UI.addExerciseOpenFor = null;
+  UI.copyDayOpenFor = null;
   render();
 }
 
@@ -251,6 +290,7 @@ function renameDay(id, name) {
   const d = STATE.workoutPlan.days.find(x => x.id === id);
   if (d) d.name = name;
   persist();
+  render(); // reflect the new name in the day-tab pill immediately (focus is preserved)
 }
 
 function deleteDay(id) {
@@ -266,7 +306,7 @@ function updateSteps(val) {
 
 function openAddExercise(dayId) {
   UI.addExerciseOpenFor = dayId;
-  UI.addExerciseCategory = 'Cardio';
+  UI.addExerciseCategory = 'Chest';
   _weightIsPerSide = false;
   render();
 }
@@ -288,6 +328,23 @@ function removeExercise(dayId, exId) {
 
 function submitAddExercise(dayId) {
   const day = STATE.workoutPlan.days.find(d => d.id === dayId);
+  const entry = buildExerciseEntryFromForm();
+  if (!entry) return;
+  day.exercises.push(entry);
+  UI.addExerciseOpenFor = null;
+  persist(); render();
+}
+
+function submitAddCustomExercise(dayId) {
+  const day = STATE.workoutPlan.days.find(d => d.id === dayId);
+  const entry = buildCustomExerciseEntryFromForm();
+  day.exercises.push(entry);
+  UI.addExerciseOpenFor = null;
+  persist(); render();
+}
+
+// Shared by both the Plan and Log add-exercise forms.
+function buildExerciseEntryFromForm() {
   const selectEl = document.getElementById('ex-select');
   const ex = EXERCISE_LIBRARY.find(x => x.id === selectEl.value);
   const entry = { id: uid(), exerciseId: ex.id };
@@ -302,23 +359,37 @@ function submitAddExercise(dayId) {
     entry.sets = Number(document.getElementById('f-sets').value) || 0;
     entry.reps = Number(document.getElementById('f-reps').value) || 0;
   }
-  day.exercises.push(entry);
-  UI.addExerciseOpenFor = null;
-  persist(); render();
+  return entry;
 }
-
-function submitAddCustomExercise(dayId) {
-  const day = STATE.workoutPlan.days.find(d => d.id === dayId);
+function buildCustomExerciseEntryFromForm() {
   const name = document.getElementById('c-name').value.trim() || 'Custom exercise';
   const met = Number(document.getElementById('c-met').value) || 5;
   const duration = Number(document.getElementById('c-duration').value) || 30;
-  const entry = {
+  return {
     id: uid(),
     exerciseId: null,
     custom: { name, met, inputMode: 'duration', category: 'Custom' },
     durationMin: duration,
   };
-  day.exercises.push(entry);
+}
+
+// ---------- Copy day ----------
+function openCopyDayMenu(dayId) {
+  UI.copyDayOpenFor = dayId;
   UI.addExerciseOpenFor = null;
+  render();
+}
+function closeCopyDayMenu() {
+  UI.copyDayOpenFor = null;
+  render();
+}
+function copyDayInto(sourceDayId, targetDayId) {
+  const source = STATE.workoutPlan.days.find(d => d.id === sourceDayId);
+  const target = STATE.workoutPlan.days.find(d => d.id === targetDayId);
+  if (!source || !target) return;
+  const copied = source.exercises.map(e => ({ ...e, id: uid() }));
+  target.exercises = target.exercises.concat(copied);
+  UI.copyDayOpenFor = null;
   persist(); render();
+  toast(`Copied ${copied.length} exercise(s) from ${source.name}`);
 }
