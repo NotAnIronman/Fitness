@@ -4,7 +4,7 @@
    CSS custom properties on :root, set live by js/theme.js
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Space+Grotesk:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&family=Cormorant+Garamond:wght@500;600;700&family=Quicksand:wght@500;600;700&family=Nunito:wght@400;500;600;700&family=Bebas+Neue&family=Work+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&family=Baloo+2:wght@500;600;700&display=swap');
 
 :root {
   --bg: #0B0F14;
