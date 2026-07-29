@@ -18,6 +18,7 @@ let UI = {
   logDate: todayISO(),
   logAddOpen: false,
   logCopyOpen: false,
+  logCopyMode: 'add',
   progressExerciseId: null,
   editingExercise: null, // { scope: 'workout'|'log', dayId, entryId }
   mealBuilderOpen: false,
@@ -49,10 +50,38 @@ function toast(msg) {
 function tip(label, title, bodyHtml) {
   return `<span class="tip">${label}<span class="tip-box"><span class="tip-title">${escapeAttr(title)}</span>${bodyHtml}</span></span>`;
 }
+
+// Tooltips default to centering under their trigger, which can push them off
+// the left/right edge of the screen for triggers near the edge (e.g. sidebar-
+// adjacent cards, or mobile). This nudges an already-open tooltip back into
+// the viewport instead of letting it get clipped.
+function clampTipToViewport(tipEl) {
+  const box = tipEl.querySelector('.tip-box');
+  if (!box) return;
+  box.style.transform = '';
+  requestAnimationFrame(() => {
+    const rect = box.getBoundingClientRect();
+    const margin = 10;
+    let shift = 0;
+    if (rect.left < margin) shift = margin - rect.left;
+    else if (rect.right > window.innerWidth - margin) shift = (window.innerWidth - margin) - rect.right;
+    if (shift !== 0) box.style.transform = `translateX(calc(-50% + ${shift}px))`;
+  });
+}
+
 document.addEventListener('click', (e) => {
   const target = e.target.closest ? e.target.closest('.tip') : null;
   document.querySelectorAll('.tip.tip-open').forEach(t => { if (t !== target) t.classList.remove('tip-open'); });
-  if (target) target.classList.toggle('tip-open');
+  if (target) {
+    target.classList.toggle('tip-open');
+    if (target.classList.contains('tip-open')) clampTipToViewport(target);
+  }
+});
+// mouseover/mouseout bubble (unlike mouseenter/mouseleave), so this works via
+// delegation even though tooltips are recreated on every render.
+document.addEventListener('mouseover', (e) => {
+  const target = e.target.closest ? e.target.closest('.tip') : null;
+  if (target) clampTipToViewport(target);
 });
 
 // ---------- Dismissible / collapsible notice component ----------
@@ -382,7 +411,7 @@ function renderHome() {
         </div>
         <div class="field">
           <label>Name</label>
-          <input type="text" data-focus-id="profile-name" value="${escapeAttr(p.name)}" oninput="updateProfile('name', this.value)" placeholder="Optional">
+          <input type="text" data-focus-id="profile-name" value="${escapeAttr(p.name)}" onchange="updateProfile('name', this.value)" onkeydown="if(event.key==='Enter') this.blur()" placeholder="Optional">
         </div>
         <div class="field-row">
           <div class="field">
@@ -394,7 +423,7 @@ function renderHome() {
           </div>
           <div class="field">
             <label>Age</label>
-            <input type="number" data-focus-id="profile-age" min="10" max="100" value="${p.age ?? ''}" oninput="updateProfile('age', numOrNull(this.value))">
+            <input type="number" data-focus-id="profile-age" min="10" max="100" value="${p.age ?? ''}" onchange="updateProfile('age', numOrNull(this.value))" onkeydown="if(event.key==='Enter') this.blur()">
           </div>
         </div>
         <div class="field-row">
@@ -402,16 +431,16 @@ function renderHome() {
             <label>Height ${isImperial ? '(ft / in)' : '(cm)'}</label>
             ${isImperial ? `
               <div class="field-row">
-                <input type="number" data-focus-id="profile-height-ft" min="1" max="8" placeholder="ft" value="${p.heightCm ? Math.floor(cmToIn(p.heightCm) / 12) : ''}" oninput="updateHeightImperial(this.value, null)">
-                <input type="number" data-focus-id="profile-height-in" min="0" max="11" placeholder="in" value="${p.heightCm ? Math.round(cmToIn(p.heightCm) % 12) : ''}" oninput="updateHeightImperial(null, this.value)">
+                <input type="number" data-focus-id="profile-height-ft" min="1" max="8" placeholder="ft" value="${p.heightCm ? Math.floor(cmToIn(p.heightCm) / 12) : ''}" onchange="updateHeightImperial(this.value, null)" onkeydown="if(event.key==='Enter') this.blur()">
+                <input type="number" data-focus-id="profile-height-in" min="0" max="11" placeholder="in" value="${p.heightCm ? Math.round(cmToIn(p.heightCm) % 12) : ''}" onchange="updateHeightImperial(null, this.value)" onkeydown="if(event.key==='Enter') this.blur()">
               </div>
             ` : `
-              <input type="number" data-focus-id="profile-height-cm" min="100" max="230" value="${p.heightCm ?? ''}" oninput="updateProfile('heightCm', numOrNull(this.value))">
+              <input type="number" data-focus-id="profile-height-cm" min="100" max="230" value="${p.heightCm ?? ''}" onchange="updateProfile('heightCm', numOrNull(this.value))" onkeydown="if(event.key==='Enter') this.blur()">
             `}
           </div>
           <div class="field">
             <label>Weight ${isImperial ? '(lb)' : '(kg)'}</label>
-            <input type="number" data-focus-id="profile-weight" step="0.1" value="${weightDisplay}" oninput="updateWeight(this.value)">
+            <input type="number" data-focus-id="profile-weight" step="0.1" value="${weightDisplay}" onchange="updateWeight(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
           </div>
         </div>
         <p class="hint">Weight updates here also log a new entry on the Weight Goals page.</p>
@@ -527,7 +556,7 @@ function setUnitSystem(sys) {
 
 function updateProfile(field, value) {
   STATE.profile[field] = value;
-  persist(); renderSoon();
+  persist(); render();
 }
 
 function updateHeightImperial(ft, inch) {
@@ -538,7 +567,7 @@ function updateHeightImperial(ft, inch) {
   const newFt = ft !== null ? Number(ft) || 0 : curFt;
   const newIn = inch !== null ? Number(inch) || 0 : curIn;
   p.heightCm = inToCm(newFt * 12 + newIn);
-  persist(); renderSoon();
+  persist(); render();
 }
 
 function updateWeight(value) {
@@ -548,7 +577,7 @@ function updateWeight(value) {
   if (kg != null) {
     logWeightEntry(kg);
   }
-  persist(); renderSoon();
+  persist(); render();
 }
 
 function logWeightEntry(kg) {

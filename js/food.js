@@ -130,7 +130,7 @@ function renderFood() {
                 <div class="meta">P ${Math.round(e.protein * e.qty)}g . C ${Math.round(e.carbs * e.qty)}g . F ${Math.round(e.fat * e.qty)}g</div>
                 <div class="chip-row" style="margin-top:6px;">
                   ${[0.5, 1, 1.5, 2].map(q => `<button class="chip ${e.qty === q ? 'active' : ''}" onclick="setFoodQty(${i}, ${q})">${formatQty(q)}x</button>`).join('')}
-                  <input type="number" data-focus-id="qty-${i}" step="0.25" min="0.25" value="${e.qty}" oninput="setFoodQty(${i}, this.value)" style="width:70px; display:inline-block;">
+                  <input type="number" data-focus-id="qty-${i}" step="0.25" min="0.25" value="${e.qty}" onchange="setFoodQty(${i}, this.value)" onkeydown="if(event.key==='Enter') this.blur()" style="width:70px; display:inline-block;">
                 </div>
               </div>
               <div class="kcal">${Math.round(e.kcal * e.qty)} kcal</div>
@@ -192,7 +192,7 @@ function renderFoodAdjustForm() {
       <p class="hint" style="margin-bottom:10px;"><strong style="color:var(--text)">${escapeAttr(d.name)}</strong>${isEdit ? ' (editing)' : ''}. Pick a serving size, the numbers below update to match automatically, then correct anything that doesn't match your package.</p>
       <div class="field">
         <label>Servings</label>
-        <input type="number" id="fa-qty" data-focus-id="fa-qty" step="0.25" min="0.25" value="${d.qty}" oninput="onAdjustQtyInput(this.value)">
+        <input type="number" id="fa-qty" data-focus-id="fa-qty" step="0.25" min="0.25" value="${d.qty}" onchange="onAdjustQtyInput(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
         <div class="chip-row">
           ${[0.25, 0.5, 1, 1.5, 2, 3].map(q => `<button class="chip ${d.qty === q ? 'active' : ''}" onclick="setAdjustQty(${q})">${formatQty(q)}x</button>`).join('')}
         </div>
@@ -279,11 +279,15 @@ function toggleCustomFood() {
   render();
 }
 
-// ---------- USDA search, with a persistent local cache so repeated/similar
-// searches don't re-hit the API every time (we can't realistically download
-// USDA's entire multi-million-item database client-side, so this caches what's
-// actually been searched instead, which covers the common case of re-searching
-// the same handful of foods). ----------
+// ---------- USDA search ----------
+// Two layers of caching so repeated/similar searches stop hitting USDA's rate
+// limit: an exact-query cache (usdaCache), and a growing local pool of every
+// food item ever returned (foodIndexPool). New searches check the pool via
+// substring match FIRST; only if it doesn't have enough matches does this fall
+// through to the network. Every successful network search adds its results to
+// the pool, so the more the app gets used, the more searches get answered
+// entirely locally over time.
+const POOL_MATCH_THRESHOLD = 5; // if the local pool already has this many matches, skip the network entirely
 let _foodSearchTimer = null;
 function onFoodSearchInput(val) {
   UI.foodQuery = val;
@@ -293,11 +297,43 @@ function onFoodSearchInput(val) {
     renderSoon();
     return;
   }
-  _foodSearchTimer = setTimeout(() => runFoodSearch(val), 400);
+  _foodSearchTimer = setTimeout(() => runFoodSearch(val), 550);
+}
+
+function searchLocalPool(query) {
+  const q = query.trim().toLowerCase();
+  const fromPool = STATE.foodIndexPool.filter(f => f.name.toLowerCase().includes(q));
+  const fromFallback = FOOD_FALLBACK_DB.filter(f => f.name.toLowerCase().includes(q));
+  // de-dupe by name, pool first since it's more likely to match what was actually searched before
+  const seen = new Set();
+  const combined = [];
+  [...fromPool, ...fromFallback].forEach(f => {
+    if (!seen.has(f.name)) { seen.add(f.name); combined.push(f); }
+  });
+  return combined;
+}
+
+function mergeIntoFoodIndexPool(results) {
+  const existingNames = new Set(STATE.foodIndexPool.map(f => f.name));
+  let added = 0;
+  results.forEach(f => {
+    if (!existingNames.has(f.name)) {
+      STATE.foodIndexPool.push(f);
+      existingNames.add(f.name);
+      added++;
+    }
+  });
+  // cap so this doesn't grow forever - keep the most recently seen items
+  if (STATE.foodIndexPool.length > 600) {
+    STATE.foodIndexPool = STATE.foodIndexPool.slice(-600);
+  }
+  return added;
 }
 
 async function runFoodSearch(query) {
   const cacheKey = query.trim().toLowerCase();
+
+  // Layer 1: exact repeat of a query we've already made.
   const cached = STATE.usdaCache[cacheKey];
   if (cached) {
     UI.foodResults = cached.results;
@@ -305,24 +341,45 @@ async function runFoodSearch(query) {
     return;
   }
 
+  // Layer 2: the growing local pool, answered instantly with no network call.
+  const poolMatches = searchLocalPool(query);
+  if (poolMatches.length >= POOL_MATCH_THRESHOLD) {
+    UI.foodResults = poolMatches.slice(0, 10);
+    render();
+    return;
+  }
+
+  // Layer 3: network, only when the local pool doesn't have enough yet.
   UI.foodSearchLoading = true;
   render();
   try {
     const apiKey = STATE.foodApiKey || 'DEMO_KEY';
     const url = `${USDA_SEARCH_URL}?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&pageSize=10&dataType=Branded,Foundation,SR%20Legacy`;
     const res = await fetch(url);
+    if (res.status === 429 || res.status === 403) {
+      throw new Error('rate-limited');
+    }
     if (!res.ok) throw new Error('USDA request failed: ' + res.status);
     const data = await res.json();
     const results = (data.foods || []).map(parseUsdaFood).filter(Boolean);
-    UI.foodResults = results.length ? results : searchFallbackDb(query);
     if (results.length) {
+      mergeIntoFoodIndexPool(results);
       STATE.usdaCache[cacheKey] = { results, ts: Date.now() };
       persist();
+      UI.foodResults = results;
+    } else {
+      UI.foodResults = poolMatches.length ? poolMatches : searchFallbackDb(query);
     }
   } catch (e) {
     console.error(e);
-    if (STATE.foodApiKey) toast('USDA search failed, check your API key in Themes. Using offline list.');
-    UI.foodResults = searchFallbackDb(query);
+    if (e.message === 'rate-limited') {
+      toast(STATE.foodApiKey
+        ? "USDA's rate limit was hit, showing what's cached locally instead."
+        : "USDA's shared demo key hit its rate limit, add your own free key in Themes for higher limits. Showing what's cached locally.");
+    } else if (STATE.foodApiKey) {
+      toast('USDA search failed, check your API key in Themes. Using local results.');
+    }
+    UI.foodResults = poolMatches.length ? poolMatches : searchFallbackDb(query);
   }
   UI.foodSearchLoading = false;
   render();
@@ -428,7 +485,7 @@ function setAdjustQty(q) {
 function onAdjustQtyInput(val) {
   const q = Number(val) || 0.25;
   rescaleAdjustDraft(q);
-  renderSoon();
+  render();
 }
 
 function confirmFoodAdjust() {
@@ -495,7 +552,7 @@ function setFoodQty(index, value) {
   if (!entry) return;
   const n = Number(value);
   entry.qty = n > 0 ? n : 0.25;
-  persist(); renderSoon();
+  persist(); render();
 }
 
 function removeFoodEntry(index) {
@@ -521,7 +578,7 @@ function renderMealBuilder() {
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px;">
       <div class="field">
         <label>Meal name</label>
-        <input type="text" id="mb-name" data-focus-id="mb-name" placeholder="e.g. Spaghetti night" value="${escapeAttr(UI.mealBuilderName)}" oninput="onMealNameInput(this.value)">
+        <input type="text" id="mb-name" data-focus-id="mb-name" placeholder="e.g. Spaghetti night" value="${escapeAttr(UI.mealBuilderName)}" onchange="onMealNameInput(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
       </div>
 
       <p class="hint" style="margin-bottom:6px;">Add items:</p>
@@ -548,7 +605,7 @@ function renderMealBuilder() {
                 <div class="name">${escapeAttr(it.name)}</div>
                 <div class="meta">P ${Math.round(it.protein * it.qty)}g . C ${Math.round(it.carbs * it.qty)}g . F ${Math.round(it.fat * it.qty)}g</div>
               </div>
-              <input type="number" step="0.25" min="0.25" value="${it.qty}" oninput="setMealItemQty(${i}, this.value)" style="width:60px;">
+              <input type="number" step="0.25" min="0.25" value="${it.qty}" onchange="setMealItemQty(${i}, this.value)" onkeydown="if(event.key==='Enter') this.blur()" style="width:60px;">
               <div class="kcal">${Math.round(it.kcal * it.qty)} kcal</div>
               <button class="icon-btn" onclick="removeMealItem(${i})">x</button>
             </div>
@@ -586,7 +643,7 @@ function closeMealBuilder() {
 }
 function onMealNameInput(val) {
   UI.mealBuilderName = val;
-  renderSoon();
+  render();
 }
 function addItemToMeal(index) {
   const f = UI.foodResults[index];
@@ -599,7 +656,7 @@ function addItemToMeal(index) {
 function setMealItemQty(index, val) {
   const n = Number(val);
   UI.mealBuilderItems[index].qty = n > 0 ? n : 0.25;
-  renderSoon();
+  render();
 }
 function removeMealItem(index) {
   UI.mealBuilderItems.splice(index, 1);

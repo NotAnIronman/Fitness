@@ -250,6 +250,29 @@ function checkIntakeSafety(loggedKcal, sex) {
   return null;
 }
 
+// Explains, in plain language with the actual numbers plugged in, how a specific
+// logged exercise's calorie estimate was reached. Shown as a tap/hover tooltip so
+// it doesn't clutter the row itself.
+function explainExerciseCalc(entry, ex, bodyWeightKg) {
+  if (!ex || !bodyWeightKg) return 'Add your weight on Home to see this breakdown.';
+  const bwRound = Math.round(bodyWeightKg);
+  if (ex.inputMode === 'duration' || ex.inputMode === 'distance') {
+    const rawMin = Number(entry.durationMin) || 0;
+    const adj = (ex.category === 'Strength' && typeof ex.restAdjust === 'number') ? ex.restAdjust : 1;
+    const minutes = rawMin * adj;
+    const kcal = metCalories(ex.met, bodyWeightKg, minutes);
+    let text = `MET ${ex.met} x 3.5 x ${bwRound}kg bodyweight / 200 x ${minutes.toFixed(1)} min = ${Math.round(kcal)} kcal.`;
+    if (adj < 1) text += ` (${rawMin} min logged, only ${Math.round(adj * 100)}% counted as active time since most of a gym session is rest between sets, not continuous effort.)`;
+    return text;
+  }
+  const minutes = estimateStrengthMinutesFromEntry(entry);
+  const kcal = metCalories(ex.met, bodyWeightKg, minutes);
+  const totalReps = entry.perSetWeights
+    ? entry.perSetWeights.reduce((s, st) => s + (Number(st.reps) || 0), 0)
+    : (Number(entry.sets) || 0) * (Number(entry.reps) || 0);
+  return `Each rep is assumed to take about 3.5 seconds of active effort, plus a share of the rest between sets, ${totalReps} total reps works out to roughly ${minutes.toFixed(1)} min of estimated active time. At MET ${ex.met} for a ${bwRound}kg bodyweight, that's MET ${ex.met} x 3.5 x ${bwRound}kg / 200 x ${minutes.toFixed(1)} min = ${Math.round(kcal)} kcal.`;
+}
+
 // --- Strength standard ranking ---
 // exerciseId must be a key in STRENGTH_STANDARDS (load-based, pass valueKg) or
 // STRENGTH_STANDARDS_REPS (rep-based bodyweight moves, pass reps). Returns null

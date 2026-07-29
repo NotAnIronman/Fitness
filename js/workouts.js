@@ -42,7 +42,7 @@ function renderWorkouts() {
       </div>
       <div class="card">
         <div class="stat-label">Avg. daily steps</div>
-        <input type="number" data-focus-id="steps-per-day" step="500" value="${STATE.workoutPlan.stepsPerDay}" oninput="updateSteps(this.value)" style="margin-top:6px;">
+        <input type="number" data-focus-id="steps-per-day" step="500" value="${STATE.workoutPlan.stepsPerDay}" onchange="updateSteps(this.value)" onkeydown="if(event.key==='Enter') this.blur()" style="margin-top:6px;">
       </div>
     </div>
 
@@ -70,6 +70,15 @@ function renderWorkouts() {
 
     ${notice('cardio-step-overlap-general', `Logging running or walking as a workout below can overlap with the step count above. If a walk/run is already part of your normal daily steps, log it in one place only.`)}
 
+    ${notice('weight-vs-calories-tip', `
+      <strong>Heads up on what "burning more calories" actually depends on:</strong> lifting heavier doesn't directly burn a lot
+      more calories, the extra effort mostly builds strength, not calorie burn. Our estimate scales mainly with how long you're
+      actively working (time under load), not how much weight is on the bar. It's also worth knowing that most of your daily
+      calorie burn happens outside the gym, workouts are usually a smaller slice of the day than people assume (see the energy
+      breakdown on Home). And muscle itself is built during recovery, not during the set, your body repairs and grows tissue in
+      the hours and days after training, which is part of why rest and protein matter as much as the workout itself.
+    `)}
+
     <div class="day-tabs">
       ${days.map(d => `
         <button class="day-tab ${d.id === UI.workoutDayId ? 'active' : ''}" onclick="selectDay('${d.id}')">${escapeAttr(d.name)}</button>
@@ -95,7 +104,7 @@ function renderDayCard(day, bw) {
     <div class="card">
       <div class="card-title">
         <span>
-          <input type="text" data-focus-id="day-name-${day.id}" value="${escapeAttr(day.name)}" oninput="renameDay('${day.id}', this.value)"
+          <input type="text" data-focus-id="day-name-${day.id}" value="${escapeAttr(day.name)}" onchange="renameDay('${day.id}', this.value)" onkeydown="if(event.key==='Enter') this.blur()"
             style="background:transparent;border:none;font-family:var(--font-display);font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:0.02em;color:var(--text-dim);padding:0;width:auto;">
         </span>
         <div style="display:flex; gap:6px;">
@@ -137,27 +146,52 @@ function renderDayCard(day, bw) {
 function renderExerciseRow(e, bw, target, showCheckbox) {
   const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId) || e.custom;
   const kcal = calcExerciseCalories(e, bw);
-  let meta;
-  if (ex.inputMode === 'setsRepsWeight') {
-    if (e.perSetWeights && e.perSetWeights.length) {
-      const parts = e.perSetWeights.map(s => `${s.reps}@${Math.round(kgToLb(s.weightIsPerSide ? s.weightKg * 2 : s.weightKg))}lb`);
-      meta = parts.join(', ');
-    } else {
-      const load = effectiveLoadKg(e);
-      const loadLb = Math.round(kgToLb(load));
-      meta = `${e.sets}x${e.reps} @ ${loadLb ? loadLb + ' lb total' : 'bodyweight'}${e.weightIsPerSide ? ' (per side x2)' : ''}`;
-    }
-  } else if (ex.inputMode === 'setsReps') {
-    meta = `${e.sets}x${e.reps}`;
-  } else {
-    meta = `${e.durationMin} min${ex.category === 'Strength' && ex.restAdjust && ex.restAdjust < 1 ? ` (~${Math.round(ex.restAdjust * 100)}% counted as active)` : ''}`;
-  }
+  const kcalTip = tip(`${Math.round(kcal)} kcal`, 'How this is calculated', explainExerciseCalc(e, ex, bw));
   const editAttr = target.scope === 'workout'
     ? `openEditExercise('${target.dayId}', '${e.id}')`
     : `openEditExerciseLog('${e.id}')`;
   const removeAttr = target.scope === 'workout'
     ? `removeExercise('${target.dayId}', '${e.id}')`
     : `removeLogExercise('${e.id}')`;
+
+  // Ramping/per-set weights get their own block with one line per set, instead
+  // of being crammed into a single hard-to-read row.
+  if (ex.inputMode === 'setsRepsWeight' && e.perSetWeights && e.perSetWeights.length) {
+    const allDone = e.perSetWeights.every(s => s.completed);
+    const setRows = e.perSetWeights.map((s, i) => {
+      const loadLb = Math.round(kgToLb(s.weightIsPerSide ? s.weightKg * 2 : s.weightKg));
+      const checkboxAttr = target.scope === 'log' ? `onchange="toggleLogSetDone('${e.id}', ${i})"` : 'disabled';
+      return `
+        <div class="set-row ${s.completed ? 'set-done' : ''}">
+          <span class="set-label">SET ${i + 1}</span>
+          ${showCheckbox ? `<input type="checkbox" ${s.completed ? 'checked' : ''} ${checkboxAttr}>` : ''}
+          <span class="set-detail">${s.reps} reps @ ${loadLb} lb${s.weightIsPerSide ? ' per side' : ''}</span>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="exercise-block">
+        <div class="exercise-block-header">
+          <div class="name" style="${allDone ? 'opacity:0.55;' : ''}">${escapeAttr(ex.name)}${allDone ? ' \u2713' : ''}</div>
+          <div class="kcal">${kcalTip}</div>
+          <button class="icon-btn" onclick="${editAttr}" title="Edit">\u270E</button>
+          <button class="icon-btn" onclick="${removeAttr}" title="Remove">x</button>
+        </div>
+        ${setRows}
+      </div>
+    `;
+  }
+
+  let meta;
+  if (ex.inputMode === 'setsRepsWeight') {
+    const load = effectiveLoadKg(e);
+    const loadLb = Math.round(kgToLb(load));
+    meta = `${e.sets}x${e.reps} @ ${loadLb ? loadLb + ' lb total' : 'bodyweight'}${e.weightIsPerSide ? ' (per side x2)' : ''}`;
+  } else if (ex.inputMode === 'setsReps') {
+    meta = `${e.sets}x${e.reps}`;
+  } else {
+    meta = `${e.durationMin} min${ex.category === 'Strength' && ex.restAdjust && ex.restAdjust < 1 ? ` (~${Math.round(ex.restAdjust * 100)}% counted as active)` : ''}`;
+  }
   return `
     <div class="exercise-row">
       ${showCheckbox ? `<input type="checkbox" ${e.completed ? 'checked' : ''} onchange="toggleLogExerciseDone('${e.id}')" style="width:auto; flex-shrink:0;" title="Mark done">` : ''}
@@ -165,7 +199,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
         <div class="name">${escapeAttr(ex.name)}${e.completed ? ' \u2713' : ''}</div>
         <div class="meta">${meta} . ${ex.bodyPart || ex.category || 'Custom'}</div>
       </div>
-      <div class="kcal">${Math.round(kcal)} kcal</div>
+      <div class="kcal">${kcalTip}</div>
       <button class="icon-btn" onclick="${editAttr}" title="Edit">\u270E</button>
       <button class="icon-btn" onclick="${removeAttr}" title="Remove">x</button>
     </div>
@@ -366,7 +400,7 @@ function renameDay(id, name) {
   const d = STATE.workoutPlan.days.find(x => x.id === id);
   if (d) d.name = name;
   persist();
-  renderSoon();
+  render();
 }
 function deleteDay(id) {
   STATE.workoutPlan.days = STATE.workoutPlan.days.filter(d => d.id !== id);
@@ -375,7 +409,7 @@ function deleteDay(id) {
 }
 function updateSteps(val) {
   STATE.workoutPlan.stepsPerDay = Number(val) || 0;
-  persist(); renderSoon();
+  persist(); render();
 }
 
 // ---------- Actions: add/edit exercise (shared by Plan + Log) ----------

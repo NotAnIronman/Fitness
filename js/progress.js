@@ -71,7 +71,7 @@ function renderStandingCard(standing, exerciseId) {
     <div class="card">
       <div class="card-title">
         Where you rank
-        ${tip('ⓘ', 'About these standards', 'Rough bodyweight-ratio reference points, not pulled from any live database, we do not have licensed access to one (strengthlevel.com\u2019s terms explicitly disallow automated access). Treat this as a general motivator, not a precise ranking.')}
+        ${tip('ⓘ', 'About these standards', 'These are rough bodyweight-ratio reference points, not a measured fact about you. Use them as motivation and a general sense of direction, not a precise ranking, individual factors (training history, limb length, age) shift things a lot.')}
       </div>
       <div class="stat" style="margin-bottom:10px;">
         <div class="stat-label">Estimated level</div>

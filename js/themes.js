@@ -84,10 +84,11 @@ function renderThemes() {
       <div class="card-title">Food search API (optional)</div>
       <p class="hint" style="margin-bottom:12px;">Food search uses the free <a href="https://fdc.nal.usda.gov/" target="_blank" rel="noopener">USDA FoodData Central</a> database, no pricing tiers.
       It works out of the box on USDA's public demo key, which has light rate limits shared by everyone using it. For higher limits, grab your own free key at
-      <a href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank" rel="noopener">fdc.nal.usda.gov/api-key-signup.html</a> and paste it below. Stored only in this browser.</p>
+      <a href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank" rel="noopener">fdc.nal.usda.gov/api-key-signup.html</a> and paste it below. Stored only in this browser.
+      The app also keeps a growing local cache of everything you've searched before (${STATE.foodIndexPool.length} item${STATE.foodIndexPool.length === 1 ? '' : 's'} cached so far), so the more you use it, the fewer searches need to hit USDA at all.</p>
       <div class="field" style="max-width:360px;">
         <label>USDA API key</label>
-        <input type="text" data-focus-id="usda-key" value="${escapeAttr(STATE.foodApiKey)}" placeholder="DEMO_KEY (default)" oninput="updateFoodApiKey(this.value)">
+        <input type="text" data-focus-id="usda-key" value="${escapeAttr(STATE.foodApiKey)}" placeholder="DEMO_KEY (default)" onchange="updateFoodApiKey(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
       </div>
     </div>
 

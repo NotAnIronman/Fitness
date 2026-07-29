@@ -70,6 +70,12 @@ function defaultState() {
     usdaCache: {
       // 'querylowercase': { results: [...], ts: 169... }
     },
+    // A growing pool of every food item ever returned by a USDA search, kept
+    // separately from usdaCache (which is keyed per exact query string). New
+    // searches check this pool first via substring match before hitting the
+    // network, so the more you search, the more gets answered locally and the
+    // less USDA's rate limit gets hit, this fills in over time as you use the app.
+    foodIndexPool: [],
     theme: {
       preset: 'forge',
       bg: '#0B0F14',

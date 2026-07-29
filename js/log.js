@@ -51,7 +51,10 @@ function renderLog() {
     <div class="card">
       <div class="card-title">
         Exercises this day
-        <button class="btn btn-sm" onclick="openCopyIntoLog()">Copy from...</button>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-sm" onclick="openCopyIntoLog('add')">Copy from...</button>
+          <button class="btn btn-sm" onclick="openCopyIntoLog('replace')">Replace with...</button>
+        </div>
       </div>
 
       ${UI.logCopyOpen ? renderCopyIntoLogMenu() : ''}
@@ -96,16 +99,19 @@ function renderCopyIntoLogMenu() {
   yesterday.setDate(yesterday.getDate() - 1);
   const yIso = yesterday.toISOString().slice(0, 10);
   const hasYesterday = STATE.workoutLog[yIso] && STATE.workoutLog[yIso].length > 0;
+  const isReplace = UI.logCopyMode === 'replace';
 
   if (!planDays.length && !hasYesterday) {
     return `<div class="section-note">No plan days or previous logs to copy from yet.</div>`;
   }
+  const planFn = isReplace ? 'replacePlanDayIntoLog' : 'copyPlanDayIntoLog';
+  const logFn = isReplace ? 'replaceLogDateIntoLog' : 'copyLogDateIntoLog';
   return `
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:12px; margin-bottom:14px;">
-      <p class="hint" style="margin-bottom:8px;">Copy exercises from:</p>
+      <p class="hint" style="margin-bottom:8px;">${isReplace ? 'Replace everything logged today with:' : 'Copy exercises from:'}${isReplace ? ' <strong style="color:var(--danger);">This clears what\'s currently logged for this day.</strong>' : ''}</p>
       <div class="chip-row">
-        ${planDays.map(d => `<button class="chip" onclick="copyPlanDayIntoLog('${d.id}')">Plan: ${escapeAttr(d.name)}</button>`).join('')}
-        ${hasYesterday ? `<button class="chip" onclick="copyLogDateIntoLog('${yIso}')">Previous day's log</button>` : ''}
+        ${planDays.map(d => `<button class="chip" onclick="${planFn}('${d.id}')">Plan: ${escapeAttr(d.name)}</button>`).join('')}
+        ${hasYesterday ? `<button class="chip" onclick="${logFn}('${yIso}')">Previous day's log</button>` : ''}
         <button class="chip" onclick="closeCopyIntoLog()">Cancel</button>
       </div>
     </div>
@@ -166,8 +172,16 @@ function toggleLogExerciseDone(entryId) {
   persist(); render();
 }
 
-function openCopyIntoLog() {
+function toggleLogSetDone(entryId, setIndex) {
+  const entry = (STATE.workoutLog[UI.logDate] || []).find(e => e.id === entryId);
+  if (!entry || !entry.perSetWeights || !entry.perSetWeights[setIndex]) return;
+  entry.perSetWeights[setIndex].completed = !entry.perSetWeights[setIndex].completed;
+  persist(); render();
+}
+
+function openCopyIntoLog(mode) {
   UI.logCopyOpen = true;
+  UI.logCopyMode = mode || 'add';
   UI.logAddOpen = false;
   render();
 }
@@ -191,4 +205,25 @@ function copyLogDateIntoLog(sourceDate) {
   UI.logCopyOpen = false;
   persist(); render();
   toast(`Copied ${copied.length} exercise(s)`);
+}
+function replacePlanDayIntoLog(planDayId) {
+  const existing = STATE.workoutLog[UI.logDate] || [];
+  if (existing.length && !confirm(`This clears the ${existing.length} exercise(s) already logged today and replaces them. This can't be undone. Continue?`)) return;
+  const planDay = STATE.workoutPlan.days.find(d => d.id === planDayId);
+  if (!planDay) return;
+  const copied = planDay.exercises.map(e => ({ ...e, id: uid(), completed: false }));
+  STATE.workoutLog[UI.logDate] = copied;
+  UI.logCopyOpen = false;
+  persist(); render();
+  toast(`Replaced today's log with ${planDay.name}`);
+}
+function replaceLogDateIntoLog(sourceDate) {
+  const existing = STATE.workoutLog[UI.logDate] || [];
+  if (existing.length && !confirm(`This clears the ${existing.length} exercise(s) already logged today and replaces them. This can't be undone. Continue?`)) return;
+  const source = STATE.workoutLog[sourceDate] || [];
+  const copied = source.map(e => ({ ...e, id: uid(), completed: false }));
+  STATE.workoutLog[UI.logDate] = copied;
+  UI.logCopyOpen = false;
+  persist(); render();
+  toast(`Replaced today's log`);
 }

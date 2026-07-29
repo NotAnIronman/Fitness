@@ -40,16 +40,16 @@ function renderBodyFat() {
       <div class="grid grid-3">
         <div class="field">
           <label>Neck ${isImperial ? '(in)' : '(cm)'} <span class="hint" style="display:inline;">below the larynx</span></label>
-          <input type="number" data-focus-id="bf-neck" step="0.1" value="${toDisplay(bf.neckCm)}" oninput="updateBodyFatField('neckCm', this.value)">
+          <input type="number" data-focus-id="bf-neck" step="0.1" value="${toDisplay(bf.neckCm)}" onchange="updateBodyFatField('neckCm', this.value)" onkeydown="if(event.key==='Enter') this.blur()">
         </div>
         <div class="field">
           <label>Waist ${isImperial ? '(in)' : '(cm)'} <span class="hint" style="display:inline;">at the navel</span></label>
-          <input type="number" data-focus-id="bf-waist" step="0.1" value="${toDisplay(bf.waistCm)}" oninput="updateBodyFatField('waistCm', this.value)">
+          <input type="number" data-focus-id="bf-waist" step="0.1" value="${toDisplay(bf.waistCm)}" onchange="updateBodyFatField('waistCm', this.value)" onkeydown="if(event.key==='Enter') this.blur()">
         </div>
         ${p.sex === 'female' ? `
           <div class="field">
             <label>Hip ${isImperial ? '(in)' : '(cm)'} <span class="hint" style="display:inline;">widest point</span></label>
-            <input type="number" data-focus-id="bf-hip" step="0.1" value="${toDisplay(bf.hipCm)}" oninput="updateBodyFatField('hipCm', this.value)">
+            <input type="number" data-focus-id="bf-hip" step="0.1" value="${toDisplay(bf.hipCm)}" onchange="updateBodyFatField('hipCm', this.value)" onkeydown="if(event.key==='Enter') this.blur()">
           </div>
         ` : ''}
       </div>
@@ -102,5 +102,5 @@ function updateBodyFatField(field, value) {
   const n = numOrNull(value);
   const isImperial = STATE.profile.unitSystem === 'imperial';
   STATE.bodyFat[field] = n != null ? (isImperial ? inToCm(n) : n) : null;
-  persist(); renderSoon();
+  persist(); render();
 }

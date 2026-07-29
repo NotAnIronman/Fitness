@@ -40,7 +40,7 @@ function renderGoals() {
         <div class="card-title">Set your goal</div>
         <div class="field">
           <label>Target weight (${unit})</label>
-          <input type="number" data-focus-id="goal-target-weight" step="0.1" value="${toDisplay(g.targetWeightKg)}" oninput="updateGoalTargetWeight(this.value)">
+          <input type="number" data-focus-id="goal-target-weight" step="0.1" value="${toDisplay(g.targetWeightKg)}" onchange="updateGoalTargetWeight(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
         </div>
         <div class="field">
           <label>Target date</label>
@@ -115,42 +115,72 @@ function drawGoalChart() {
   const canvas = document.getElementById('goal-chart');
   if (!canvas || typeof Chart === 'undefined') return;
   const log = STATE.weightLog;
+  const g = STATE.goal;
   const isImperial = STATE.profile.unitSystem === 'imperial';
   const toDisplay = kg => isImperial ? +kgToLb(kg).toFixed(1) : +kg.toFixed(1);
+  const hasGoal = g.targetWeightKg != null && g.targetDate && g.startWeightKg != null && g.startDate;
 
-  const labels = log.map(e => e.date);
-  const data = log.map(e => toDisplay(e.weightKg));
+  // Build a single shared, sorted set of date labels: every date you've actually
+  // logged, plus the goal's start/target dates so the trajectory line has
+  // somewhere to start and end.
+  const labelSet = new Set(log.map(e => e.date));
+  if (hasGoal) { labelSet.add(g.startDate); labelSet.add(g.targetDate); }
+  const labels = Array.from(labelSet).sort();
 
-  const points = [...data];
-  const pointLabels = [...labels];
-  if (STATE.goal.targetWeightKg && STATE.goal.targetDate) {
-    pointLabels.push(STATE.goal.targetDate);
-    points.push(null); // goal shown via annotation line instead of forcing scale
+  const actualByDate = {};
+  log.forEach(e => { actualByDate[e.date] = toDisplay(e.weightKg); });
+  const actualData = labels.map(d => (d in actualByDate ? actualByDate[d] : null));
+
+  let trajectoryData = null;
+  if (hasGoal) {
+    const startMs = new Date(g.startDate).getTime();
+    const targetMs = new Date(g.targetDate).getTime();
+    const span = targetMs - startMs;
+    trajectoryData = labels.map(d => {
+      const t = span > 0 ? (new Date(d).getTime() - startMs) / span : 0;
+      if (t < 0) return null;
+      const val = g.startWeightKg + (g.targetWeightKg - g.startWeightKg) * Math.min(t, 1.15); // let it run a little past target
+      return toDisplay(val);
+    });
   }
 
   if (_goalChart) { _goalChart.destroy(); }
   const styles = getComputedStyle(document.documentElement);
   const accent = styles.getPropertyValue('--accent').trim();
+  const accent2 = styles.getPropertyValue('--accent-2').trim();
   const textDim = styles.getPropertyValue('--text-dim').trim();
   const border = styles.getPropertyValue('--border').trim();
 
+  const datasets = [{
+    label: `Actual weight (${isImperial ? 'lb' : 'kg'})`,
+    data: actualData,
+    borderColor: accent,
+    backgroundColor: accent + '33',
+    tension: 0.3,
+    fill: true,
+    pointRadius: 3,
+    spanGaps: true,
+  }];
+  if (trajectoryData) {
+    datasets.push({
+      label: 'Target pace',
+      data: trajectoryData,
+      borderColor: accent2,
+      backgroundColor: 'transparent',
+      borderDash: [6, 4],
+      tension: 0,
+      fill: false,
+      pointRadius: 0,
+      spanGaps: true,
+    });
+  }
+
   _goalChart = new Chart(canvas, {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: `Weight (${isImperial ? 'lb' : 'kg'})`,
-        data,
-        borderColor: accent,
-        backgroundColor: accent + '33',
-        tension: 0.3,
-        fill: true,
-        pointRadius: 3,
-      }],
-    },
+    data: { labels, datasets },
     options: {
       responsive: true,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: !!trajectoryData, labels: { color: textDim, boxWidth: 12, font: { size: 11 } } } },
       scales: {
         x: { ticks: { color: textDim }, grid: { color: border } },
         y: { ticks: { color: textDim }, grid: { color: border } },
@@ -164,7 +194,7 @@ function updateGoalTargetWeight(val) {
   const kg = n != null ? (STATE.profile.unitSystem === 'imperial' ? lbToKg(n) : n) : null;
   ensureGoalStart();
   STATE.goal.targetWeightKg = kg;
-  persist(); renderSoon();
+  persist(); render();
 }
 
 function updateGoalField(field, val) {
