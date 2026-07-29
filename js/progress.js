@@ -49,6 +49,39 @@ function getExerciseHistory(key) {
   return points;
 }
 
+// Finds the most recent full entry (not just its chart value) logged for an
+// exercise key, used for the strength-standard comparison below.
+function getMostRecentEntryForExercise(key) {
+  const dates = Object.keys(STATE.workoutLog).sort().reverse();
+  for (const date of dates) {
+    const match = (STATE.workoutLog[date] || []).find(e =>
+      key.startsWith('id:') ? e.exerciseId === key.slice(3) : (e.custom && e.custom.name === key.slice(7))
+    );
+    if (match) return { entry: match, date };
+  }
+  return null;
+}
+
+function renderStandingCard(standing, exerciseId) {
+  const isLoadBased = !!STRENGTH_STANDARDS[exerciseId];
+  const nextTargetText = standing.nextTargetDisplay != null
+    ? (isLoadBased ? `${Math.round(kgToLb(standing.nextTargetDisplay))} lb` : `${Math.round(standing.nextTargetDisplay)} reps`)
+    : null;
+  return `
+    <div class="card">
+      <div class="card-title">
+        Where you rank
+        ${tip('ⓘ', 'About these standards', 'Rough bodyweight-ratio reference points, not pulled from any live database, we do not have licensed access to one (strengthlevel.com\u2019s terms explicitly disallow automated access). Treat this as a general motivator, not a precise ranking.')}
+      </div>
+      <div class="stat" style="margin-bottom:10px;">
+        <div class="stat-label">Estimated level</div>
+        <div class="stat-value accent" style="font-size:24px;">${standing.label}</div>
+      </div>
+      ${standing.nextLabel ? `<p class="hint">Reach about ${nextTargetText} to hit "${standing.nextLabel}."</p>` : `<p class="hint">Already at the top reference tier here, nice work.</p>`}
+    </div>
+  `;
+}
+
 function renderProgress() {
   const options = getLoggedExerciseOptions();
   if (!UI.progressExerciseId && options.length) UI.progressExerciseId = options[0].key;
@@ -58,6 +91,25 @@ function renderProgress() {
   const first = history[0];
   const last = history[history.length - 1];
   const change = first && last && history.length > 1 ? last.value - first.value : null;
+
+  let standingCard = '';
+  if (UI.progressExerciseId && UI.progressExerciseId.startsWith('id:')) {
+    const exerciseId = UI.progressExerciseId.slice(3);
+    const hasStandard = STRENGTH_STANDARDS[exerciseId] || STRENGTH_STANDARDS_REPS[exerciseId];
+    const bw = currentWeightKg();
+    if (hasStandard && bw) {
+      const recent = getMostRecentEntryForExercise(UI.progressExerciseId);
+      if (recent) {
+        let standing = null;
+        if (STRENGTH_STANDARDS[exerciseId]) {
+          standing = getStrengthStanding({ exerciseId, valueKg: effectiveLoadKg(recent.entry), bodyweightKg: bw, sex: STATE.profile.sex });
+        } else if (recent.entry.reps != null) {
+          standing = getStrengthStanding({ exerciseId, reps: Number(recent.entry.reps) || 0, bodyweightKg: bw, sex: STATE.profile.sex });
+        }
+        if (standing) standingCard = renderStandingCard(standing, exerciseId);
+      }
+    }
+  }
 
   return `
     <div class="page-head">
@@ -89,6 +141,8 @@ function renderProgress() {
           <canvas id="progress-chart" height="90"></canvas>
         ` : `<div class="empty-state">No history yet for "${escapeAttr(selectedLabel || '')}".</div>`}
       </div>
+
+      ${standingCard}
     `}
   `;
 }

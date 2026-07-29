@@ -1,5 +1,14 @@
 /* ============================================================
    WORKOUT PLAN VIEW (weekly template)
+
+   Model: the Plan is a reusable weekly template with base/starting
+   numbers. The Log (js/log.js) is where you record what you actually
+   did on a specific date, and can be copied in from the Plan then
+   edited freely, that's what makes the Progress chart meaningful
+   instead of a flat line.
+
+   This file also holds the shared exercise add/edit form used by
+   both the Plan and the Log (mode: 'workout' | 'log').
    ============================================================ */
 
 function renderWorkouts() {
@@ -16,7 +25,7 @@ function renderWorkouts() {
     <div class="page-head">
       <p class="page-eyebrow">Plan</p>
       <h1 class="page-title">Workout plan</h1>
-      <p class="page-sub">This is your reusable weekly template. Group exercises into training days here, then use the Workout Log to check off what you actually did on specific dates.</p>
+      <p class="page-sub">Your reusable weekly template with base weights and set/rep targets. Head to the <a href="#" onclick="navigate('log'); return false;">Workout Log</a> to record what you actually did on a given day (you can copy a plan day in, then adjust it).</p>
     </div>
 
     ${!bw ? `<div class="section-note">Set your weight on the Home page first. Calorie estimates need it.</div>` : ''}
@@ -76,31 +85,8 @@ function renderWorkouts() {
 
 function renderDayCard(day, bw) {
   let dayKcal = 0;
-  const rows = day.exercises.map(e => {
-    const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId) || e.custom;
-    const kcal = calcExerciseCalories(e, bw);
-    dayKcal += kcal;
-    let meta;
-    if (ex.inputMode === 'setsRepsWeight') {
-      const load = effectiveLoadKg(e);
-      const loadLb = Math.round(kgToLb(load));
-      meta = `${e.sets}x${e.reps} @ ${loadLb ? loadLb + ' lb total' : 'bodyweight'}${e.weightIsPerSide ? ' (per side x2)' : ''}`;
-    } else if (ex.inputMode === 'setsReps') {
-      meta = `${e.sets}x${e.reps}`;
-    } else {
-      meta = `${e.durationMin} min${ex.category === 'Strength' && ex.restAdjust && ex.restAdjust < 1 ? ` (~${Math.round(ex.restAdjust * 100)}% counted as active)` : ''}`;
-    }
-    return `
-      <div class="exercise-row">
-        <div>
-          <div class="name">${escapeAttr(ex.name)}</div>
-          <div class="meta">${meta} . ${ex.bodyPart || ex.category || 'Custom'}</div>
-        </div>
-        <div class="kcal">${Math.round(kcal)} kcal</div>
-        <button class="icon-btn" onclick="removeExercise('${day.id}','${e.id}')" title="Remove">x</button>
-      </div>
-    `;
-  }).join('');
+  const rows = day.exercises.map(e => renderExerciseRow(e, bw, { scope: 'workout', dayId: day.id })).join('');
+  day.exercises.forEach(e => { dayKcal += calcExerciseCalories(e, bw); });
 
   const sessionFeedback = day.exercises.length ? getSessionIntensityFeedback(dayKcal) : null;
   const nextTier = sessionFeedback ? getNextTierGap(dayKcal, EXERCISE_INTENSITY_BANDS.session) : null;
@@ -138,9 +124,50 @@ function renderDayCard(day, bw) {
         ` : ''}
       </div>
 
-      ${UI.addExerciseOpenFor === day.id ? renderAddExerciseForm(day, 'workout') : `
+      ${UI.addExerciseOpenFor === day.id ? renderAddExerciseForm({ scope: 'workout', dayId: day.id }) : `
         <button class="btn btn-primary" onclick="openAddExercise('${day.id}')">+ Add exercise</button>
       `}
+    </div>
+  `;
+}
+
+// Shared exercise row renderer, used by both the Plan and the Log. `target`
+// identifies where edits/removals should apply: {scope:'workout',dayId} or
+// {scope:'log', date}. `showCheckbox` (Log only) adds a "did I do this" toggle.
+function renderExerciseRow(e, bw, target, showCheckbox) {
+  const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId) || e.custom;
+  const kcal = calcExerciseCalories(e, bw);
+  let meta;
+  if (ex.inputMode === 'setsRepsWeight') {
+    if (e.perSetWeights && e.perSetWeights.length) {
+      const parts = e.perSetWeights.map(s => `${s.reps}@${Math.round(kgToLb(s.weightIsPerSide ? s.weightKg * 2 : s.weightKg))}lb`);
+      meta = parts.join(', ');
+    } else {
+      const load = effectiveLoadKg(e);
+      const loadLb = Math.round(kgToLb(load));
+      meta = `${e.sets}x${e.reps} @ ${loadLb ? loadLb + ' lb total' : 'bodyweight'}${e.weightIsPerSide ? ' (per side x2)' : ''}`;
+    }
+  } else if (ex.inputMode === 'setsReps') {
+    meta = `${e.sets}x${e.reps}`;
+  } else {
+    meta = `${e.durationMin} min${ex.category === 'Strength' && ex.restAdjust && ex.restAdjust < 1 ? ` (~${Math.round(ex.restAdjust * 100)}% counted as active)` : ''}`;
+  }
+  const editAttr = target.scope === 'workout'
+    ? `openEditExercise('${target.dayId}', '${e.id}')`
+    : `openEditExerciseLog('${e.id}')`;
+  const removeAttr = target.scope === 'workout'
+    ? `removeExercise('${target.dayId}', '${e.id}')`
+    : `removeLogExercise('${e.id}')`;
+  return `
+    <div class="exercise-row">
+      ${showCheckbox ? `<input type="checkbox" ${e.completed ? 'checked' : ''} onchange="toggleLogExerciseDone('${e.id}')" style="width:auto; flex-shrink:0;" title="Mark done">` : ''}
+      <div style="${e.completed ? 'opacity:0.55;' : ''}">
+        <div class="name">${escapeAttr(ex.name)}${e.completed ? ' \u2713' : ''}</div>
+        <div class="meta">${meta} . ${ex.bodyPart || ex.category || 'Custom'}</div>
+      </div>
+      <div class="kcal">${Math.round(kcal)} kcal</div>
+      <button class="icon-btn" onclick="${editAttr}" title="Edit">\u270E</button>
+      <button class="icon-btn" onclick="${removeAttr}" title="Remove">x</button>
     </div>
   `;
 }
@@ -161,13 +188,27 @@ function renderCopyDayMenu(day) {
   `;
 }
 
-function renderAddExerciseForm(day, mode) {
-  // mode: 'workout' (template day) or 'log' (dated log entry) - both share this UI,
-  // log.js supplies its own submit handlers via the same field ids.
+// ============================================================
+// SHARED ADD/EDIT EXERCISE FORM
+// ============================================================
+
+function renderAddExerciseForm(target) {
+  const editing = UI.editingExercise;
+  const editingEntry = editing ? findExerciseEntry(editing) : null;
   const filtered = EXERCISE_LIBRARY.filter(e => e.bodyPart === UI.addExerciseCategory);
+  const recents = STATE.recentExercises;
 
   return `
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px; margin-top:6px;">
+      ${editing ? `<p class="hint" style="margin-bottom:10px; color:var(--accent);">Editing existing entry</p>` : ''}
+
+      ${!editing && recents.length ? `
+        <p class="hint" style="margin-bottom:8px;">Recent:</p>
+        <div class="chip-row" style="margin-bottom:14px;">
+          ${recents.map(r => `<button class="chip" onclick="quickAddRecent('${escapeAttr(r.key)}', '${target.scope}', '${target.dayId || ''}')">${escapeAttr(r.label)}</button>`).join('')}
+        </div>
+      ` : ''}
+
       <p class="hint" style="margin-bottom:8px;">Filter by body part:</p>
       <div class="chip-row" style="margin-bottom:12px;">
         ${BODY_PARTS.map(c => `<button class="chip ${UI.addExerciseCategory === c ? 'active' : ''}" onclick="setExerciseCategory('${c}')">${c}</button>`).join('')}
@@ -178,25 +219,26 @@ function renderAddExerciseForm(day, mode) {
         <div class="section-note">Running and walking overlap with your daily step count. If this session is already reflected in your average steps/day, log it in one place only.</div>
       ` : ''}
 
-      ${UI.addExerciseCategory === 'Custom' ? renderCustomExerciseForm(day, mode) : `
+      ${UI.addExerciseCategory === 'Custom' ? renderCustomExerciseForm(target, editingEntry) : `
         <div class="field">
           <label>Exercise</label>
           <select id="ex-select" data-focus-id="ex-select">
-            ${filtered.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
+            ${filtered.map(e => `<option value="${e.id}" ${editingEntry && editingEntry.exerciseId === e.id ? 'selected' : ''}>${e.name}</option>`).join('')}
           </select>
         </div>
-        <div id="ex-input-fields">${renderExerciseInputFields(filtered[0])}</div>
+        <div id="ex-input-fields">${renderExerciseInputFields(filtered.find(e => editingEntry && e.id === editingEntry.exerciseId) || filtered[0], editingEntry)}</div>
         <div style="display:flex; gap:8px; margin-top:10px;">
-          <button class="btn btn-primary" onclick="${mode === 'log' ? `submitAddExerciseLog()` : `submitAddExercise('${day.id}')`}">Add</button>
-          <button class="btn btn-ghost" onclick="${mode === 'log' ? `closeAddExerciseLog()` : `closeAddExercise()`}">Cancel</button>
+          <button class="btn btn-primary" onclick="submitExerciseForm('${target.scope}', '${target.dayId || ''}')">${editing ? 'Save changes' : 'Add'}</button>
+          <button class="btn btn-ghost" onclick="closeExerciseForm('${target.scope}')">Cancel</button>
         </div>
       `}
     </div>
   `;
 }
 
-function renderExerciseInputFields(ex) {
+function renderExerciseInputFields(ex, existingEntry) {
   if (!ex) return '';
+  const perSet = existingEntry && existingEntry.perSetWeights && existingEntry.perSetWeights.length;
   if (ex.inputMode === 'duration' || ex.inputMode === 'distance') {
     const restNote = ex.category === 'Strength' && ex.restAdjust && ex.restAdjust < 1
       ? `<p class="hint">Heads up: gym-session time is mostly rest between sets. We count about ${Math.round(ex.restAdjust * 100)}% of this as active effort so the estimate isn't inflated. For a more accurate number, log individual exercises with sets/reps/weight instead.</p>`
@@ -204,33 +246,54 @@ function renderExerciseInputFields(ex) {
     return `
       <div class="field">
         <label>Duration (minutes)</label>
-        <input type="number" id="f-duration" data-focus-id="f-duration" min="1" value="30">
+        <input type="number" id="f-duration" data-focus-id="f-duration" min="1" value="${existingEntry ? existingEntry.durationMin : 30}">
       </div>
       ${restNote}
     `;
   }
   if (ex.inputMode === 'setsRepsWeight') {
+    const sets = existingEntry ? (existingEntry.sets || (existingEntry.perSetWeights || []).length) : 3;
+    const reps = existingEntry ? existingEntry.reps : 10;
+    const weightLb = existingEntry && !perSet ? Math.round(kgToLb(existingEntry.weightKg || 0)) : 45;
+    _weightIsPerSide = existingEntry ? !!existingEntry.weightIsPerSide : false;
     return `
       <div class="field-row">
-        <div class="field"><label>Sets</label><input type="number" id="f-sets" data-focus-id="f-sets" min="1" value="3"></div>
-        <div class="field"><label>Reps</label><input type="number" id="f-reps" data-focus-id="f-reps" min="1" value="10"></div>
-        <div class="field"><label>Weight (lb)</label><input type="number" id="f-weight" data-focus-id="f-weight" min="0" value="45"></div>
+        <div class="field"><label>Sets</label><input type="number" id="f-sets" data-focus-id="f-sets" min="1" value="${sets}"></div>
+        <div class="field"><label>Reps (if same across sets)</label><input type="number" id="f-reps" data-focus-id="f-reps" min="1" value="${reps}"></div>
+        <div class="field"><label>Weight (lb, if same across sets)</label><input type="number" id="f-weight" data-focus-id="f-weight" min="0" value="${weightLb}"></div>
       </div>
       <div class="field">
         <label>Weight is</label>
         <div class="pill-toggle">
-          <button type="button" id="f-weight-total-btn" class="active" onclick="setWeightMode(false)">Total (both sides)</button>
-          <button type="button" id="f-weight-perside-btn" onclick="setWeightMode(true)">Per arm / per side</button>
+          <button type="button" id="f-weight-total-btn" class="${!_weightIsPerSide ? 'active' : ''}" onclick="setWeightMode(false)">Total (both sides)</button>
+          <button type="button" id="f-weight-perside-btn" class="${_weightIsPerSide ? 'active' : ''}" onclick="setWeightMode(true)">Per arm / per side</button>
         </div>
-        <p class="hint">Defaults to total combined weight (e.g. 90 lb loaded on a barbell). Switch this if you entered a single dumbbell or one-side number instead.</p>
       </div>
+      <div class="field">
+        <button type="button" class="btn btn-sm" onclick="togglePerSetWeights(${sets})">${perSet ? 'Edit per-set weights below' : 'Use a different weight per set (e.g. ramping sets)'}</button>
+      </div>
+      <div id="per-set-container">${perSet ? renderPerSetRows(existingEntry.perSetWeights) : ''}</div>
+      <p class="hint">Defaults to the same reps/weight for every set. Use the button above if, say, set 1 was 25 lb, set 2 was 35 lb, set 3 was 45 lb.</p>
     `;
   }
   // setsReps (bodyweight)
   return `
     <div class="field-row">
-      <div class="field"><label>Sets</label><input type="number" id="f-sets" data-focus-id="f-sets" min="1" value="3"></div>
-      <div class="field"><label>Reps</label><input type="number" id="f-reps" data-focus-id="f-reps" min="1" value="10"></div>
+      <div class="field"><label>Sets</label><input type="number" id="f-sets" data-focus-id="f-sets" min="1" value="${existingEntry ? existingEntry.sets : 3}"></div>
+      <div class="field"><label>Reps</label><input type="number" id="f-reps" data-focus-id="f-reps" min="1" value="${existingEntry ? existingEntry.reps : 10}"></div>
+    </div>
+  `;
+}
+
+function renderPerSetRows(rows) {
+  return `
+    <div class="row-list" style="margin-bottom:8px;">
+      ${rows.map((s, i) => `
+        <div class="field-row" style="align-items:end;">
+          <div class="field" style="margin-bottom:0;"><label>Set ${i + 1} reps</label><input type="number" class="per-set-reps" min="1" value="${s.reps}"></div>
+          <div class="field" style="margin-bottom:0;"><label>Set ${i + 1} weight (lb)</label><input type="number" class="per-set-weight" min="0" value="${Math.round(kgToLb(s.weightKg || 0))}"></div>
+        </div>
+      `).join('')}
     </div>
   `;
 }
@@ -246,31 +309,46 @@ function setWeightMode(perSide) {
   }
 }
 
-function renderCustomExerciseForm(day, mode) {
+function togglePerSetWeights(defaultSets) {
+  const container = document.getElementById('per-set-container');
+  if (!container) return;
+  if (container.innerHTML.trim()) {
+    container.innerHTML = '';
+    return;
+  }
+  const sets = Number(document.getElementById('f-sets')?.value) || defaultSets || 3;
+  const reps = Number(document.getElementById('f-reps')?.value) || 10;
+  const weightLb = Number(document.getElementById('f-weight')?.value) || 45;
+  const rows = Array.from({ length: sets }, () => ({ reps, weightKg: lbToKg(weightLb) }));
+  container.innerHTML = renderPerSetRows(rows);
+}
+
+function renderCustomExerciseForm(target, existingEntry) {
+  const custom = existingEntry ? existingEntry.custom : null;
   return `
     <div class="field">
       <label>Exercise name</label>
-      <input type="text" id="c-name" data-focus-id="c-name" placeholder="e.g. Kettlebell flow">
+      <input type="text" id="c-name" data-focus-id="c-name" placeholder="e.g. Kettlebell flow" value="${custom ? escapeAttr(custom.name) : ''}">
     </div>
     <div class="field-row">
       <div class="field">
         <label>MET value (intensity)</label>
-        <input type="number" id="c-met" data-focus-id="c-met" step="0.1" value="6.0">
+        <input type="number" id="c-met" data-focus-id="c-met" step="0.1" value="${custom ? custom.met : 6.0}">
       </div>
       <div class="field">
         <label>Duration (minutes)</label>
-        <input type="number" id="c-duration" data-focus-id="c-duration" min="1" value="30">
+        <input type="number" id="c-duration" data-focus-id="c-duration" min="1" value="${existingEntry ? existingEntry.durationMin : 30}">
       </div>
     </div>
     <p class="hint">Not sure of MET value? 3 = light, 6 = moderate, 9 = vigorous, 12+ = very intense. <a href="https://sites.google.com/site/compendiumofphysicalactivities/" target="_blank" rel="noopener">Reference chart</a></p>
     <div style="display:flex; gap:8px; margin-top:10px;">
-      <button class="btn btn-primary" onclick="${mode === 'log' ? `submitAddCustomExerciseLog()` : `submitAddCustomExercise('${day.id}')`}">Add</button>
-      <button class="btn btn-ghost" onclick="${mode === 'log' ? `closeAddExerciseLog()` : `closeAddExercise()`}">Cancel</button>
+      <button class="btn btn-primary" onclick="submitExerciseForm('${target.scope}', '${target.dayId || ''}')">${UI.editingExercise ? 'Save changes' : 'Add'}</button>
+      <button class="btn btn-ghost" onclick="closeExerciseForm('${target.scope}')">Cancel</button>
     </div>
   `;
 }
 
-// ---------- Actions ----------
+// ---------- Actions: day management ----------
 
 function addDay() {
   const day = { id: uid(), name: `Day ${STATE.workoutPlan.days.length + 1}`, exercises: [] };
@@ -278,45 +356,64 @@ function addDay() {
   UI.workoutDayId = day.id;
   persist(); render();
 }
-
 function selectDay(id) {
   UI.workoutDayId = id;
   UI.addExerciseOpenFor = null;
   UI.copyDayOpenFor = null;
   render();
 }
-
 function renameDay(id, name) {
   const d = STATE.workoutPlan.days.find(x => x.id === id);
   if (d) d.name = name;
   persist();
-  render(); // reflect the new name in the day-tab pill immediately (focus is preserved)
+  renderSoon();
 }
-
 function deleteDay(id) {
   STATE.workoutPlan.days = STATE.workoutPlan.days.filter(d => d.id !== id);
   if (UI.workoutDayId === id) UI.workoutDayId = STATE.workoutPlan.days[0]?.id || null;
   persist(); render();
 }
-
 function updateSteps(val) {
   STATE.workoutPlan.stepsPerDay = Number(val) || 0;
-  persist(); render();
+  persist(); renderSoon();
 }
+
+// ---------- Actions: add/edit exercise (shared by Plan + Log) ----------
 
 function openAddExercise(dayId) {
   UI.addExerciseOpenFor = dayId;
+  UI.editingExercise = null;
   UI.addExerciseCategory = 'Chest';
   _weightIsPerSide = false;
   render();
 }
-function closeAddExercise() {
+function closeExerciseForm(scope) {
   UI.addExerciseOpenFor = null;
+  UI.logAddOpen = false;
+  UI.editingExercise = null;
   render();
 }
 function setExerciseCategory(cat) {
   UI.addExerciseCategory = cat;
-  _weightIsPerSide = false;
+  if (!UI.editingExercise) _weightIsPerSide = false;
+  render();
+}
+
+function findExerciseEntry(editing) {
+  if (!editing) return null;
+  const list = editing.scope === 'workout'
+    ? STATE.workoutPlan.days.find(d => d.id === editing.dayId)?.exercises
+    : STATE.workoutLog[editing.date];
+  return (list || []).find(e => e.id === editing.entryId) || null;
+}
+
+function openEditExercise(dayId, entryId) {
+  const entry = STATE.workoutPlan.days.find(d => d.id === dayId)?.exercises.find(e => e.id === entryId);
+  if (!entry) return;
+  const ex = EXERCISE_LIBRARY.find(x => x.id === entry.exerciseId);
+  UI.editingExercise = { scope: 'workout', dayId, entryId };
+  UI.addExerciseOpenFor = dayId;
+  UI.addExerciseCategory = ex ? ex.bodyPart : 'Custom';
   render();
 }
 
@@ -326,24 +423,43 @@ function removeExercise(dayId, exId) {
   persist(); render();
 }
 
-function submitAddExercise(dayId) {
-  const day = STATE.workoutPlan.days.find(d => d.id === dayId);
-  const entry = buildExerciseEntryFromForm();
+// Reads the currently-open form (works for both Plan and Log, editing or adding).
+function submitExerciseForm(scope, dayId) {
+  const isCustom = UI.addExerciseCategory === 'Custom';
+  const entry = isCustom ? buildCustomExerciseEntryFromForm() : buildExerciseEntryFromForm();
   if (!entry) return;
-  day.exercises.push(entry);
+
+  const editing = UI.editingExercise;
+  if (editing) {
+    entry.id = editing.entryId; // preserve identity so progress history stays continuous
+    entry.completed = findExerciseEntry(editing)?.completed || false;
+    if (editing.scope === 'workout') {
+      const day = STATE.workoutPlan.days.find(d => d.id === editing.dayId);
+      const idx = day.exercises.findIndex(e => e.id === editing.entryId);
+      if (idx >= 0) day.exercises[idx] = entry;
+    } else {
+      const list = STATE.workoutLog[editing.date];
+      const idx = list.findIndex(e => e.id === editing.entryId);
+      if (idx >= 0) list[idx] = entry;
+    }
+  } else if (scope === 'workout') {
+    STATE.workoutPlan.days.find(d => d.id === dayId).exercises.push(entry);
+  } else {
+    ensureLogDate(UI.logDate).push(entry);
+  }
+
+  const ex = EXERCISE_LIBRARY.find(x => x.id === entry.exerciseId);
+  const label = ex ? ex.name : (entry.custom ? entry.custom.name : 'Exercise');
+  const key = entry.exerciseId || ('custom:' + (entry.custom ? entry.custom.name : label));
+  recordRecentExercise(key, label, entry);
+
   UI.addExerciseOpenFor = null;
+  UI.logAddOpen = false;
+  UI.editingExercise = null;
   persist(); render();
 }
 
-function submitAddCustomExercise(dayId) {
-  const day = STATE.workoutPlan.days.find(d => d.id === dayId);
-  const entry = buildCustomExerciseEntryFromForm();
-  day.exercises.push(entry);
-  UI.addExerciseOpenFor = null;
-  persist(); render();
-}
-
-// Shared by both the Plan and Log add-exercise forms.
+// Shared field-reading helpers.
 function buildExerciseEntryFromForm() {
   const selectEl = document.getElementById('ex-select');
   const ex = EXERCISE_LIBRARY.find(x => x.id === selectEl.value);
@@ -351,10 +467,21 @@ function buildExerciseEntryFromForm() {
   if (ex.inputMode === 'duration' || ex.inputMode === 'distance') {
     entry.durationMin = Number(document.getElementById('f-duration').value) || 0;
   } else if (ex.inputMode === 'setsRepsWeight') {
-    entry.sets = Number(document.getElementById('f-sets').value) || 0;
-    entry.reps = Number(document.getElementById('f-reps').value) || 0;
-    entry.weightKg = lbToKg(Number(document.getElementById('f-weight').value) || 0);
-    entry.weightIsPerSide = _weightIsPerSide;
+    const perSetContainer = document.getElementById('per-set-container');
+    const perSetRows = perSetContainer ? perSetContainer.querySelectorAll('.field-row') : [];
+    if (perSetRows.length) {
+      entry.perSetWeights = Array.from(perSetRows).map(row => ({
+        reps: Number(row.querySelector('.per-set-reps').value) || 0,
+        weightKg: lbToKg(Number(row.querySelector('.per-set-weight').value) || 0),
+        weightIsPerSide: _weightIsPerSide,
+      }));
+      entry.sets = entry.perSetWeights.length;
+    } else {
+      entry.sets = Number(document.getElementById('f-sets').value) || 0;
+      entry.reps = Number(document.getElementById('f-reps').value) || 0;
+      entry.weightKg = lbToKg(Number(document.getElementById('f-weight').value) || 0);
+      entry.weightIsPerSide = _weightIsPerSide;
+    }
   } else {
     entry.sets = Number(document.getElementById('f-sets').value) || 0;
     entry.reps = Number(document.getElementById('f-reps').value) || 0;
@@ -373,7 +500,23 @@ function buildCustomExerciseEntryFromForm() {
   };
 }
 
-// ---------- Copy day ----------
+// ---------- Recent-item quick add ----------
+function quickAddRecent(key, scope, dayId) {
+  const recent = STATE.recentExercises.find(r => r.key === key);
+  if (!recent) return;
+  const entry = { ...recent.snapshot, id: uid(), completed: false };
+  if (scope === 'workout') {
+    STATE.workoutPlan.days.find(d => d.id === dayId).exercises.push(entry);
+  } else {
+    ensureLogDate(UI.logDate).push(entry);
+  }
+  UI.addExerciseOpenFor = null;
+  UI.logAddOpen = false;
+  persist(); render();
+  toast(`Added ${recent.label}`);
+}
+
+// ---------- Copy day (Plan) ----------
 function openCopyDayMenu(dayId) {
   UI.copyDayOpenFor = dayId;
   UI.addExerciseOpenFor = null;

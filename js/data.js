@@ -184,6 +184,24 @@ const BODY_FAT_CATEGORIES = {
 // kcal/day for women and 1,500 kcal/day for men as a general floor for unsupervised
 // dieting). This is a coarse rule of thumb, not personalized medical advice.
 const MIN_SAFE_INTAKE = { female: 1200, male: 1500 };
+
+// Rough strength-standard reference points (1RM as a multiple of bodyweight, and
+// bodyweight-rep counts for pull-ups/push-ups), commonly-cited general figures used
+// as an approximate "where do I rank" reference. We don't have access to a licensed
+// strength-standards API (strengthlevel.com's terms explicitly prohibit automated
+// access), so this is a simplified local approximation using bodyweight ratio only
+// (no age adjustment), meant as a rough motivator, not a precise ranking.
+const STRENGTH_STANDARDS = {
+  squat:    { male: [0.75, 1.0, 1.5, 2.0, 2.5], female: [0.5, 0.75, 1.0, 1.5, 1.9] },
+  bench:    { male: [0.5, 0.75, 1.0, 1.5, 2.0], female: [0.3, 0.45, 0.6, 0.9, 1.2] },
+  deadlift: { male: [1.0, 1.25, 1.75, 2.25, 2.75], female: [0.65, 0.9, 1.25, 1.75, 2.2] },
+  ohp:      { male: [0.35, 0.5, 0.7, 1.0, 1.3], female: [0.2, 0.3, 0.4, 0.6, 0.8] },
+};
+const STRENGTH_STANDARDS_REPS = {
+  pullup: { male: [1, 3, 8, 15, 25], female: [1, 2, 5, 10, 18] },
+  pushup: { male: [5, 15, 30, 50, 70], female: [2, 8, 20, 35, 50] },
+};
+const STRENGTH_TIER_LABELS = ['Beginner', 'Novice', 'Intermediate', 'Advanced', 'Elite'];
 // (e.g. no network, or the request is rate-limited). Values are per typical serving.
 const FOOD_FALLBACK_DB = [
   { name: 'Chicken breast, grilled (100g)', kcal: 165, protein: 31, carbs: 0, fat: 3.6 },

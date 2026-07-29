@@ -19,6 +19,11 @@ let UI = {
   logAddOpen: false,
   logCopyOpen: false,
   progressExerciseId: null,
+  editingExercise: null, // { scope: 'workout'|'log', dayId, entryId }
+  mealBuilderOpen: false,
+  mealBuilderName: '',
+  mealBuilderItems: [], // [{name,kcal,protein,carbs,fat,qty}]
+  editingFoodIndex: null,
 };
 
 function todayISO() {
@@ -221,17 +226,32 @@ function getFoodComplianceCheck() {
 // ============================================================
 
 function render() {
+  clearTimeout(_renderSoonTimer);
+  _renderSoonTimer = null;
+
   const active = document.activeElement;
   let focusMeta = null;
   if (active && active.dataset && active.dataset.focusId) {
-    focusMeta = {
-      id: active.dataset.focusId,
-      selStart: typeof active.selectionStart === 'number' ? active.selectionStart : null,
-      selEnd: typeof active.selectionEnd === 'number' ? active.selectionEnd : null,
-    };
+    // Reading selectionStart/End throws on input types that don't support text
+    // selection (number, date, etc.) in some browsers - this was unguarded before
+    // and would silently abort the entire render before doRender() even ran,
+    // which is why typing in those fields looked broken/disabled.
+    let selStart = null, selEnd = null;
+    try {
+      if (typeof active.selectionStart === 'number') {
+        selStart = active.selectionStart;
+        selEnd = active.selectionEnd;
+      }
+    } catch (e) { /* selection not supported on this input type, that's fine */ }
+    focusMeta = { id: active.dataset.focusId, selStart, selEnd };
   }
 
-  doRender();
+  try {
+    doRender();
+  } catch (e) {
+    console.error('Render failed:', e);
+    return;
+  }
 
   if (focusMeta) {
     const el = document.querySelector('[data-focus-id="' + cssEscape(focusMeta.id) + '"]');
@@ -242,6 +262,18 @@ function render() {
       }
     }
   }
+}
+
+// Debounced render for continuous-typing fields (text/number inputs on 'oninput').
+// Rebuilding the whole page on every keystroke is what made typing feel broken,
+// especially as the page grew. STATE is still updated/persisted immediately (no
+// data loss), only the DOM rebuild is deferred until a short pause in typing.
+// Discrete interactions (select, checkbox, date via 'onchange', buttons) still
+// call render() directly, they fire once per interaction, not once per keystroke.
+let _renderSoonTimer = null;
+function renderSoon(delay) {
+  clearTimeout(_renderSoonTimer);
+  _renderSoonTimer = setTimeout(() => { _renderSoonTimer = null; render(); }, delay || 450);
 }
 
 function cssEscape(s) {
@@ -495,7 +527,7 @@ function setUnitSystem(sys) {
 
 function updateProfile(field, value) {
   STATE.profile[field] = value;
-  persist(); render();
+  persist(); renderSoon();
 }
 
 function updateHeightImperial(ft, inch) {
@@ -506,7 +538,7 @@ function updateHeightImperial(ft, inch) {
   const newFt = ft !== null ? Number(ft) || 0 : curFt;
   const newIn = inch !== null ? Number(inch) || 0 : curIn;
   p.heightCm = inToCm(newFt * 12 + newIn);
-  persist(); render();
+  persist(); renderSoon();
 }
 
 function updateWeight(value) {
@@ -516,7 +548,7 @@ function updateWeight(value) {
   if (kg != null) {
     logWeightEntry(kg);
   }
-  persist(); render();
+  persist(); renderSoon();
 }
 
 function logWeightEntry(kg) {
@@ -526,4 +558,18 @@ function logWeightEntry(kg) {
   if (existingIdx >= 0) log[existingIdx].weightKg = kg;
   else log.push({ date: today, weightKg: kg });
   log.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ---------- Recent items (most-requested feature: quick re-add) ----------
+// Exercises remember the last entry used (weight/reps/etc) so tapping a recent
+// chip re-logs it exactly as before, not just the exercise name.
+function recordRecentExercise(key, label, snapshot) {
+  const list = STATE.recentExercises.filter(r => r.key !== key);
+  list.unshift({ key, label, snapshot });
+  STATE.recentExercises = list.slice(0, 8);
+}
+function recordRecentFood(food) {
+  const list = STATE.recentFoods.filter(r => !(r.name === food.name && r.kcal === food.kcal));
+  list.unshift({ name: food.name, kcal: food.kcal, protein: food.protein, carbs: food.carbs, fat: food.fat });
+  STATE.recentFoods = list.slice(0, 10);
 }

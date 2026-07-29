@@ -54,6 +54,22 @@ function defaultState() {
     uiPrefs: {
       collapsedNotices: [], // notice ids the person has collapsed to a pill
     },
+    // Most-recent-first quick-pick lists, since "recent items" was the most
+    // requested feature: exercise ids (or 'custom:Name' for custom ones), and
+    // food snapshots {name,kcal,protein,carbs,fat}. Capped in the code that
+    // writes to these, not here.
+    recentExercises: [],
+    recentFoods: [],
+    // User-built combo meals (e.g. "spaghetti night" = noodles + sauce + bread),
+    // saved as a single loggable item with an editable item breakdown.
+    savedMeals: [
+      // { id, name, items: [{name,kcal,protein,carbs,fat,qty}], kcal, protein, carbs, fat }
+    ],
+    // Cache of USDA search results so repeated/similar searches don't re-hit the
+    // API every time, see js/food.js for how this is used.
+    usdaCache: {
+      // 'querylowercase': { results: [...], ts: 169... }
+    },
     theme: {
       preset: 'forge',
       bg: '#0B0F14',

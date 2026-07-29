@@ -1,8 +1,9 @@
 /* ============================================================
    WORKOUT LOG VIEW
    Dated history, separate from the reusable weekly Plan template.
-   Lets someone log what they actually did, backfill a missed day,
-   or plan ahead, and feeds the Progress page's per-exercise charts.
+   Copy a Plan day in (or a previous day's log), check items off as
+   you complete them, and edit anything after the fact, that's what
+   makes the Progress page's charts meaningful instead of a flat line.
    ============================================================ */
 
 function renderLog() {
@@ -15,31 +16,9 @@ function renderLog() {
   const dateLabel = dateObj.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
   let dayKcal = 0;
-  const rows = entries.map((e, i) => {
-    const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId) || e.custom;
-    const kcal = calcExerciseCalories(e, bw);
-    dayKcal += kcal;
-    let meta;
-    if (ex.inputMode === 'setsRepsWeight') {
-      const load = effectiveLoadKg(e);
-      const loadLb = Math.round(kgToLb(load));
-      meta = `${e.sets}x${e.reps} @ ${loadLb ? loadLb + ' lb total' : 'bodyweight'}${e.weightIsPerSide ? ' (per side x2)' : ''}`;
-    } else if (ex.inputMode === 'setsReps') {
-      meta = `${e.sets}x${e.reps}`;
-    } else {
-      meta = `${e.durationMin} min`;
-    }
-    return `
-      <div class="exercise-row">
-        <div>
-          <div class="name">${escapeAttr(ex.name)}</div>
-          <div class="meta">${meta} . ${ex.bodyPart || ex.category || 'Custom'}</div>
-        </div>
-        <div class="kcal">${Math.round(kcal)} kcal</div>
-        <button class="icon-btn" onclick="removeLogExercise(${i})" title="Remove">x</button>
-      </div>
-    `;
-  }).join('');
+  entries.forEach(e => { dayKcal += calcExerciseCalories(e, bw); });
+  const completedCount = entries.filter(e => e.completed).length;
+  const rows = entries.map(e => renderExerciseRow(e, bw, { scope: 'log', date }, true)).join('');
 
   const sessionFeedback = entries.length ? getSessionIntensityFeedback(dayKcal) : null;
 
@@ -47,7 +26,7 @@ function renderLog() {
     <div class="page-head">
       <p class="page-eyebrow">Log</p>
       <h1 class="page-title">Workout log</h1>
-      <p class="page-sub">Log what you actually did on a given day. Move backward to backfill missed days, or forward to plan ahead.</p>
+      <p class="page-sub">What you actually did on a given day. Copy a plan day in, check items off as you go, and edit anything that doesn't match reality.</p>
     </div>
 
     ${compliance ? renderComplianceCard(compliance) : ''}
@@ -57,13 +36,13 @@ function renderLog() {
         <button class="day-nav-btn" onclick="shiftLogDate(-1)" title="Previous day">‹</button>
         <div class="day-nav-label">
           ${dateLabel}${isToday ? ' (today)' : ''}
-          <span class="sub">${entries.length} exercise(s) logged, ${Math.round(dayKcal)} kcal</span>
+          <span class="sub">${entries.length} exercise(s)${entries.length ? `, ${completedCount}/${entries.length} checked off` : ''}, ${Math.round(dayKcal)} kcal</span>
         </div>
         <button class="day-nav-btn" onclick="shiftLogDate(1)" title="Next day">›</button>
       </div>
       <div class="field-row" style="margin-top:12px;">
         <div class="field" style="margin-bottom:0;">
-          <input type="date" data-focus-id="log-date" value="${date}" oninput="setLogDate(this.value)">
+          <input type="date" data-focus-id="log-date" value="${date}" onchange="setLogDate(this.value)">
         </div>
         ${!isToday ? `<button class="btn btn-sm" onclick="setLogDate('${todayISO()}')" style="flex:0;">Jump to today</button>` : ''}
       </div>
@@ -93,7 +72,7 @@ function renderLog() {
         ` : ''}
       </div>
 
-      ${UI.logAddOpen ? renderAddExerciseForm(null, 'log') : `
+      ${UI.logAddOpen ? renderAddExerciseForm({ scope: 'log' }) : `
         <button class="btn btn-primary" onclick="openAddExerciseLog()">+ Add exercise</button>
       `}
     </div>
@@ -141,6 +120,7 @@ function shiftLogDate(days) {
   UI.logDate = d.toISOString().slice(0, 10);
   UI.logAddOpen = false;
   UI.logCopyOpen = false;
+  UI.editingExercise = null;
   render();
 }
 
@@ -158,31 +138,31 @@ function ensureLogDate(date) {
 
 function openAddExerciseLog() {
   UI.logAddOpen = true;
+  UI.editingExercise = null;
   UI.addExerciseCategory = 'Chest';
   _weightIsPerSide = false;
   render();
 }
-function closeAddExerciseLog() {
-  UI.logAddOpen = false;
+
+function openEditExerciseLog(entryId) {
+  const entry = (STATE.workoutLog[UI.logDate] || []).find(e => e.id === entryId);
+  if (!entry) return;
+  const ex = EXERCISE_LIBRARY.find(x => x.id === entry.exerciseId);
+  UI.editingExercise = { scope: 'log', date: UI.logDate, entryId };
+  UI.logAddOpen = true;
+  UI.addExerciseCategory = ex ? ex.bodyPart : 'Custom';
   render();
 }
 
-function submitAddExerciseLog() {
-  const entry = buildExerciseEntryFromForm();
-  if (!entry) return;
-  ensureLogDate(UI.logDate).push(entry);
-  UI.logAddOpen = false;
-  persist(); render();
-}
-function submitAddCustomExerciseLog() {
-  const entry = buildCustomExerciseEntryFromForm();
-  ensureLogDate(UI.logDate).push(entry);
-  UI.logAddOpen = false;
+function removeLogExercise(entryId) {
+  STATE.workoutLog[UI.logDate] = (STATE.workoutLog[UI.logDate] || []).filter(e => e.id !== entryId);
   persist(); render();
 }
 
-function removeLogExercise(index) {
-  STATE.workoutLog[UI.logDate].splice(index, 1);
+function toggleLogExerciseDone(entryId) {
+  const entry = (STATE.workoutLog[UI.logDate] || []).find(e => e.id === entryId);
+  if (!entry) return;
+  entry.completed = !entry.completed;
   persist(); render();
 }
 
@@ -198,15 +178,15 @@ function closeCopyIntoLog() {
 function copyPlanDayIntoLog(planDayId) {
   const planDay = STATE.workoutPlan.days.find(d => d.id === planDayId);
   if (!planDay) return;
-  const copied = planDay.exercises.map(e => ({ ...e, id: uid() }));
+  const copied = planDay.exercises.map(e => ({ ...e, id: uid(), completed: false }));
   ensureLogDate(UI.logDate).push(...copied);
   UI.logCopyOpen = false;
   persist(); render();
-  toast(`Copied ${copied.length} exercise(s) from ${planDay.name}`);
+  toast(`Copied ${copied.length} exercise(s) from ${planDay.name}. Check them off as you complete them, or edit if actual weights differ.`);
 }
 function copyLogDateIntoLog(sourceDate) {
   const source = STATE.workoutLog[sourceDate] || [];
-  const copied = source.map(e => ({ ...e, id: uid() }));
+  const copied = source.map(e => ({ ...e, id: uid(), completed: false }));
   ensureLogDate(UI.logDate).push(...copied);
   UI.logCopyOpen = false;
   persist(); render();

@@ -23,8 +23,15 @@ function metCalories(met, weightKg, minutes) {
 }
 
 // Sets/reps/weight exercises: weight can be entered as total load, or per arm/side
-// (e.g. a single dumbbell). This converts to a total-load figure for the calc.
+// (e.g. a single dumbbell), or as a different weight per set (e.g. ramping sets).
+// This converts to a single "top load" figure used for the calc and progress chart.
 function effectiveLoadKg(entry) {
+  if (entry.perSetWeights && entry.perSetWeights.length) {
+    return Math.max(...entry.perSetWeights.map(s => {
+      const w = Number(s.weightKg) || 0;
+      return s.weightIsPerSide ? w * 2 : w;
+    }));
+  }
   const w = Number(entry.weightKg) || 0;
   return entry.weightIsPerSide ? w * 2 : w;
 }
@@ -38,8 +45,21 @@ function estimateStrengthMinutes(sets, reps) {
   return (workSeconds + restSeconds) / 60;
 }
 
+// Same idea, but reading per-set rep counts when the entry uses different
+// weights/reps per set instead of one aggregate sets x reps figure.
+function estimateStrengthMinutesFromEntry(entry) {
+  if (entry.perSetWeights && entry.perSetWeights.length) {
+    let totalSeconds = 0;
+    entry.perSetWeights.forEach(set => {
+      totalSeconds += (Number(set.reps) || 0) * 3.5 + 60 * 0.4;
+    });
+    return totalSeconds / 60;
+  }
+  return estimateStrengthMinutes(Number(entry.sets), Number(entry.reps));
+}
+
 // Compute calories for a single logged exercise entry.
-// entry: { exerciseId, sets, reps, weightKg, weightIsPerSide, durationMin, distanceKm }
+// entry: { exerciseId, sets, reps, weightKg, weightIsPerSide, perSetWeights, durationMin }
 function calcExerciseCalories(entry, bodyWeightKg) {
   const ex = EXERCISE_LIBRARY.find(e => e.id === entry.exerciseId) || entry.custom;
   if (!ex || !bodyWeightKg) return 0;
@@ -53,7 +73,7 @@ function calcExerciseCalories(entry, bodyWeightKg) {
       minutes *= ex.restAdjust;
     }
   } else if (ex.inputMode === 'setsRepsWeight' || ex.inputMode === 'setsReps') {
-    minutes = estimateStrengthMinutes(Number(entry.sets), Number(entry.reps));
+    minutes = estimateStrengthMinutesFromEntry(entry);
     // small intensity bump if lifting heavy relative to bodyweight
     if (ex.inputMode === 'setsRepsWeight') {
       const totalLoad = effectiveLoadKg(entry);
@@ -228,4 +248,38 @@ function checkIntakeSafety(loggedKcal, sex) {
     };
   }
   return null;
+}
+
+// --- Strength standard ranking ---
+// exerciseId must be a key in STRENGTH_STANDARDS (load-based, pass valueKg) or
+// STRENGTH_STANDARDS_REPS (rep-based bodyweight moves, pass reps). Returns null
+// if we don't have a reference for that particular exercise.
+function getStrengthStanding({ exerciseId, valueKg, reps, bodyweightKg, sex }) {
+  const sexKey = sex === 'male' ? 'male' : 'female';
+  if (STRENGTH_STANDARDS[exerciseId] && bodyweightKg && valueKg != null) {
+    const levels = STRENGTH_STANDARDS[exerciseId][sexKey];
+    const ratio = valueKg / bodyweightKg;
+    return rankAgainstLevels(ratio, levels, v => v * bodyweightKg);
+  }
+  if (STRENGTH_STANDARDS_REPS[exerciseId] && reps != null) {
+    const levels = STRENGTH_STANDARDS_REPS[exerciseId][sexKey];
+    return rankAgainstLevels(reps, levels, v => v);
+  }
+  return null;
+}
+
+function rankAgainstLevels(value, levels, toDisplayValue) {
+  let tierIdx = -1;
+  for (let i = 0; i < levels.length; i++) {
+    if (value >= levels[i]) tierIdx = i;
+  }
+  const label = tierIdx >= 0 ? STRENGTH_TIER_LABELS[tierIdx] : 'Below beginner';
+  const nextIdx = tierIdx + 1;
+  const hasNext = nextIdx < levels.length;
+  return {
+    label,
+    nextLabel: hasNext ? STRENGTH_TIER_LABELS[nextIdx] : null,
+    nextTargetDisplay: hasNext ? toDisplayValue(levels[nextIdx]) : null,
+    isTop: !hasNext,
+  };
 }

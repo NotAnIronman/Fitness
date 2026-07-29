@@ -23,15 +23,12 @@ function renderBodyFat() {
       <p class="page-sub">Weight alone doesn't say much about body composition. Most people have never actually measured their body fat percentage, and tend to assume it's lower than it really is. Here's how to find out for real.</p>
     </div>
 
-    <div class="card">
-      <div class="card-title">Why this is worth knowing</div>
-      <p class="hint" style="font-size:13px; line-height:1.65;">
-        Two people can weigh the same and look completely different, because weight doesn't separate muscle from fat.
-        Body fat percentage does. It's a more honest number than the scale or BMI, and knowing yours (even roughly) makes
-        goals like "lose fat" or "get toned" concrete instead of vague. This isn't about judgment: bodies vary a lot, and
-        a number here doesn't define your worth. It's just information you can act on if you want to.
-      </p>
-    </div>
+    ${notice('bf-why-worth-knowing', `
+      <strong>Why this is worth knowing:</strong> Two people can weigh the same and look completely different, because weight
+      doesn't separate muscle from fat. Body fat percentage does. It's a more honest number than the scale or BMI, and knowing
+      yours (even roughly) makes goals like "lose fat" or "get toned" concrete instead of vague. This isn't about judgment:
+      bodies vary a lot, and a number here doesn't define your worth. It's just information you can act on if you want to.
+    `)}
 
     <div class="card">
       <div class="card-title">
@@ -92,15 +89,12 @@ function renderBodyFat() {
       <p class="hint" style="margin-top:10px;">Ranges from the American Council on Exercise's commonly cited classification. Individual context (age, training history, genetics) matters too, this is a reference point, not a verdict.</p>
     </div>
 
-    <div class="card">
-      <div class="card-title">A word on BMI</div>
-      <p class="hint" style="font-size:13px; line-height:1.65;">
-        BMI (weight divided by height squared) is easy to calculate, which is why it's everywhere, but it can't tell muscle
-        from fat. A muscular, lean athlete and someone with a higher body fat percentage can land on the exact same BMI.
-        If you've ever heard your BMI and thought "that doesn't sound like me," you're not wrong to be skeptical, body fat
-        percentage is almost always the more useful number for understanding your own body.
-      </p>
-    </div>
+    ${notice('bf-bmi-note', `
+      <strong>A word on BMI:</strong> BMI (weight divided by height squared) is easy to calculate, which is why it's
+      everywhere, but it can't tell muscle from fat. A muscular, lean athlete and someone with a higher body fat percentage
+      can land on the exact same BMI. If you've ever heard your BMI and thought "that doesn't sound like me," you're not
+      wrong to be skeptical, body fat percentage is almost always the more useful number for understanding your own body.
+    `)}
   `;
 }
 
@@ -108,5 +102,5 @@ function updateBodyFatField(field, value) {
   const n = numOrNull(value);
   const isImperial = STATE.profile.unitSystem === 'imperial';
   STATE.bodyFat[field] = n != null ? (isImperial ? inToCm(n) : n) : null;
-  persist(); render();
+  persist(); renderSoon();
 }

@@ -71,6 +71,13 @@ const FONT_STACKS = {
   mono:      { display: "'JetBrains Mono', monospace", body: "'JetBrains Mono', monospace", mono: "'JetBrains Mono', monospace" },
   rounded:   { display: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", mono: "'JetBrains Mono', monospace" },
   grotesk:   { display: "'Space Grotesk', sans-serif", body: "'Space Grotesk', sans-serif", mono: "'JetBrains Mono', monospace" },
+  classic_serif: { display: "'Playfair Display', serif", body: "'Lora', serif", mono: "'JetBrains Mono', monospace" },
+  elegant_script: { display: "'Cormorant Garamond', serif", body: "'Lora', serif", mono: "'JetBrains Mono', monospace" },
+  friendly_round: { display: "'Quicksand', sans-serif", body: "'Nunito', sans-serif", mono: "'JetBrains Mono', monospace" },
+  bold_display: { display: "'Bebas Neue', sans-serif", body: "'Inter', sans-serif", mono: "'JetBrains Mono', monospace" },
+  clean_system: { display: "'Work Sans', sans-serif", body: "'Work Sans', sans-serif", mono: "'JetBrains Mono', monospace" },
+  editorial: { display: "'Libre Baskerville', serif", body: "'Nunito', sans-serif", mono: "'JetBrains Mono', monospace" },
+  playful: { display: "'Baloo 2', sans-serif", body: "'Nunito', sans-serif", mono: "'JetBrains Mono', monospace" },
 };
 
 function applyTheme(theme) {

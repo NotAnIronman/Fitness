@@ -4,6 +4,15 @@
    Works out of the box with USDA's public "DEMO_KEY" (light rate
    limits); people can add their own free key in Themes for higher
    limits. Falls back to a small offline list if the network fails.
+
+   Serving-size model: the adjust-before-add form always shows the
+   TOTAL for however many servings you pick (base x qty), and that
+   scaling happens automatically whenever you change the serving
+   count, before you touch anything by hand. Once you confirm, the
+   logged entry's kcal/macros ARE that total, qty resets to 1, so
+   there is never a silent double-multiplication later. The +/- qty
+   stepper on an already-logged row is a separate, simple "log
+   another one of these" multiplier on top of that confirmed total.
    ============================================================ */
 
 const USDA_SEARCH_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
@@ -44,32 +53,53 @@ function renderFood() {
 
     <div class="field" style="max-width:260px; margin-bottom:16px;">
       <label>Date</label>
-      <input type="date" data-focus-id="food-date" value="${date}" oninput="setFoodDate(this.value)">
+      <input type="date" data-focus-id="food-date" value="${date}" onchange="setFoodDate(this.value)">
     </div>
 
     <div class="grid grid-2" style="margin-bottom:16px;">
       <div class="card">
-        <div class="card-title">Log food</div>
-        <div class="search-wrap">
-          <input type="text" data-focus-id="food-search" placeholder="Search foods (e.g. chicken breast)" value="${escapeAttr(UI.foodQuery)}"
-            oninput="onFoodSearchInput(this.value)">
-          ${UI.foodResults.length ? `
-            <div class="food-search-results">
-              ${UI.foodResults.map((f, i) => `
-                <div class="food-search-item" style="cursor:pointer; display:flex; justify-content:space-between;" onclick="openFoodAdjust(${i})">
-                  <span>${escapeAttr(f.name)}</span>
-                  <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">${Math.round(f.kcal)} kcal</span>
-                </div>
-              `).join('')}
+        <div class="card-title">
+          Log food
+          <button class="btn btn-sm" onclick="openMealBuilder()">+ Build a meal</button>
+        </div>
+
+        ${(STATE.recentFoods.length || STATE.savedMeals.length) && !UI.foodAdjustDraft && !UI.mealBuilderOpen ? `
+          ${STATE.recentFoods.length ? `
+            <p class="hint" style="margin-bottom:6px;">Recent:</p>
+            <div class="chip-row" style="margin-bottom:12px;">
+              ${STATE.recentFoods.map((f, i) => `<button class="chip" onclick="openFoodAdjustFromRecent(${i})">${escapeAttr(f.name)}</button>`).join('')}
             </div>
           ` : ''}
-        </div>
-        ${UI.foodSearchLoading ? `<p class="hint">Searching...</p>` : ''}
-        <div style="margin-top:10px;">
-          <button class="btn btn-sm" onclick="toggleCustomFood()">${UI.showCustomFood ? 'Cancel custom food' : '+ Custom food'}</button>
-        </div>
-        ${UI.showCustomFood ? renderCustomFoodForm() : ''}
-        ${UI.foodAdjustDraft ? renderFoodAdjustForm() : ''}
+          ${STATE.savedMeals.length ? `
+            <p class="hint" style="margin-bottom:6px;">Saved meals:</p>
+            <div class="chip-row" style="margin-bottom:12px;">
+              ${STATE.savedMeals.map(m => `<button class="chip" onclick="openFoodAdjustFromMeal('${m.id}')">${escapeAttr(m.name)}</button>`).join('')}
+            </div>
+          ` : ''}
+        ` : ''}
+
+        ${UI.mealBuilderOpen ? renderMealBuilder() : `
+          <div class="search-wrap">
+            <input type="text" data-focus-id="food-search" placeholder="Search foods (e.g. chicken breast)" value="${escapeAttr(UI.foodQuery)}"
+              oninput="onFoodSearchInput(this.value)">
+            ${UI.foodResults.length ? `
+              <div class="food-search-results">
+                ${UI.foodResults.map((f, i) => `
+                  <div class="food-search-item" style="cursor:pointer; display:flex; justify-content:space-between;" onclick="openFoodAdjust(${i})">
+                    <span>${escapeAttr(f.name)}</span>
+                    <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">${Math.round(f.kcal)} kcal</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+          ${UI.foodSearchLoading ? `<p class="hint">Searching...</p>` : ''}
+          <div style="margin-top:10px;">
+            <button class="btn btn-sm" onclick="toggleCustomFood()">${UI.showCustomFood ? 'Cancel custom food' : '+ Custom food'}</button>
+          </div>
+          ${UI.showCustomFood ? renderCustomFoodForm() : ''}
+          ${UI.foodAdjustDraft ? renderFoodAdjustForm() : ''}
+        `}
       </div>
 
       <div class="card">
@@ -104,6 +134,7 @@ function renderFood() {
                 </div>
               </div>
               <div class="kcal">${Math.round(e.kcal * e.qty)} kcal</div>
+              <button class="icon-btn" onclick="openFoodEdit(${i})" title="Edit">✎</button>
               <button class="icon-btn" onclick="removeFoodEntry(${i})" title="Remove entirely">x</button>
             </div>
           `).join('')}
@@ -150,35 +181,37 @@ function renderCustomFoodForm() {
   `;
 }
 
-// Shown after picking a search result: lets the person adjust the serving size
-// (fractional, e.g. 0.5 for "half the database serving") and correct any nutrition
-// numbers that don't match their actual package (e.g. a protein bar labeled
-// differently than what the database returned).
+// The adjust-before-adding / editing form. UI.foodAdjustDraft = { name, base:
+// {kcal,protein,carbs,fat} (immutable snapshot), qty, kcal, protein, carbs, fat
+// (currently shown, editable, = base*qty until hand-edited) }.
 function renderFoodAdjustForm() {
   const d = UI.foodAdjustDraft;
+  const isEdit = UI.editingFoodIndex != null;
   return `
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px; margin-top:10px;">
-      <p class="hint" style="margin-bottom:10px;"><strong style="color:var(--text)">${escapeAttr(d.name)}</strong>. Adjust the serving or correct any numbers below before adding, useful if your package doesn't match the database exactly.</p>
+      <p class="hint" style="margin-bottom:10px;"><strong style="color:var(--text)">${escapeAttr(d.name)}</strong>${isEdit ? ' (editing)' : ''}. Pick a serving size, the numbers below update to match automatically, then correct anything that doesn't match your package.</p>
       <div class="field">
-        <label>Servings <span class="hint" style="display:inline;">(e.g. 0.5 if you only had half)</span></label>
-        <input type="number" id="fa-qty" data-focus-id="fa-qty" step="0.25" min="0.25" value="${d.qty}">
+        <label>Servings</label>
+        <input type="number" id="fa-qty" data-focus-id="fa-qty" step="0.25" min="0.25" value="${d.qty}" oninput="onAdjustQtyInput(this.value)">
         <div class="chip-row">
-          ${[0.25, 0.5, 1, 1.5, 2, 3].map(q => `<button class="chip" onclick="setAdjustQty(${q})">${formatQty(q)}x</button>`).join('')}
+          ${[0.25, 0.5, 1, 1.5, 2, 3].map(q => `<button class="chip ${d.qty === q ? 'active' : ''}" onclick="setAdjustQty(${q})">${formatQty(q)}x</button>`).join('')}
         </div>
       </div>
       <div class="grid grid-4">
-        <div class="field"><label>kcal (per serving)</label><input type="number" id="fa-kcal" data-focus-id="fa-kcal" min="0" value="${d.kcal}"></div>
-        <div class="field"><label>Protein (g)</label><input type="number" id="fa-protein" data-focus-id="fa-protein" min="0" value="${d.protein}"></div>
-        <div class="field"><label>Carbs (g)</label><input type="number" id="fa-carbs" data-focus-id="fa-carbs" min="0" value="${d.carbs}"></div>
-        <div class="field"><label>Fat (g)</label><input type="number" id="fa-fat" data-focus-id="fa-fat" min="0" value="${d.fat}"></div>
+        <div class="field"><label>kcal (total for servings above)</label><input type="number" id="fa-kcal" data-focus-id="fa-kcal" min="0" value="${round1(d.kcal)}"></div>
+        <div class="field"><label>Protein (g)</label><input type="number" id="fa-protein" data-focus-id="fa-protein" min="0" value="${round1(d.protein)}"></div>
+        <div class="field"><label>Carbs (g)</label><input type="number" id="fa-carbs" data-focus-id="fa-carbs" min="0" value="${round1(d.carbs)}"></div>
+        <div class="field"><label>Fat (g)</label><input type="number" id="fa-fat" data-focus-id="fa-fat" min="0" value="${round1(d.fat)}"></div>
       </div>
       <div style="display:flex; gap:8px;">
-        <button class="btn btn-primary btn-sm" onclick="confirmFoodAdjust()">Add to log</button>
+        <button class="btn btn-primary btn-sm" onclick="confirmFoodAdjust()">${isEdit ? 'Save changes' : 'Add to log'}</button>
         <button class="btn btn-ghost btn-sm" onclick="cancelFoodAdjust()">Cancel</button>
       </div>
     </div>
   `;
 }
+
+function round1(n) { return Math.round(n * 10) / 10; }
 
 function renderMacroBar(label, grams, color) {
   const pct = Math.min(100, grams / 2); // purely visual scale, caps around 200g
@@ -246,19 +279,32 @@ function toggleCustomFood() {
   render();
 }
 
+// ---------- USDA search, with a persistent local cache so repeated/similar
+// searches don't re-hit the API every time (we can't realistically download
+// USDA's entire multi-million-item database client-side, so this caches what's
+// actually been searched instead, which covers the common case of re-searching
+// the same handful of foods). ----------
 let _foodSearchTimer = null;
 function onFoodSearchInput(val) {
   UI.foodQuery = val;
   clearTimeout(_foodSearchTimer);
-  if (!val || val.trim().length < 2) {
+  if (!val || val.trim().length < 3) {
     UI.foodResults = [];
-    render();
+    renderSoon();
     return;
   }
-  _foodSearchTimer = setTimeout(() => runFoodSearch(val), 350);
+  _foodSearchTimer = setTimeout(() => runFoodSearch(val), 400);
 }
 
 async function runFoodSearch(query) {
+  const cacheKey = query.trim().toLowerCase();
+  const cached = STATE.usdaCache[cacheKey];
+  if (cached) {
+    UI.foodResults = cached.results;
+    render();
+    return;
+  }
+
   UI.foodSearchLoading = true;
   render();
   try {
@@ -269,6 +315,10 @@ async function runFoodSearch(query) {
     const data = await res.json();
     const results = (data.foods || []).map(parseUsdaFood).filter(Boolean);
     UI.foodResults = results.length ? results : searchFallbackDb(query);
+    if (results.length) {
+      STATE.usdaCache[cacheKey] = { results, ts: Date.now() };
+      persist();
+    }
   } catch (e) {
     console.error(e);
     if (STATE.foodApiKey) toast('USDA search failed, check your API key in Themes. Using offline list.');
@@ -309,21 +359,81 @@ function searchFallbackDb(query) {
   return FOOD_FALLBACK_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 8);
 }
 
-// ---------- Adjust-before-adding flow ----------
+// ---------- Adjust-before-adding / editing flow ----------
+
 function openFoodAdjust(index) {
   const f = UI.foodResults[index];
   if (!f) return;
-  UI.foodAdjustDraft = { ...f, qty: 1 };
+  startFoodAdjustDraft(f);
   UI.foodResults = [];
   UI.foodQuery = '';
   render();
 }
-function setAdjustQty(q) {
-  UI.foodAdjustDraft.qty = q;
+function openFoodAdjustFromRecent(index) {
+  const f = STATE.recentFoods[index];
+  if (!f) return;
+  startFoodAdjustDraft(f);
   render();
 }
+function openFoodAdjustFromMeal(mealId) {
+  const meal = STATE.savedMeals.find(m => m.id === mealId);
+  if (!meal) return;
+  startFoodAdjustDraft(meal);
+  render();
+}
+function openFoodEdit(index) {
+  const entry = STATE.foodLog[UI.foodDate][index];
+  if (!entry) return;
+  UI.editingFoodIndex = index;
+  UI.foodAdjustDraft = {
+    name: entry.name,
+    base: { kcal: entry.kcal, protein: entry.protein, carbs: entry.carbs, fat: entry.fat },
+    qty: entry.qty,
+    kcal: entry.kcal * entry.qty,
+    protein: entry.protein * entry.qty,
+    carbs: entry.carbs * entry.qty,
+    fat: entry.fat * entry.qty,
+  };
+  render();
+}
+
+function startFoodAdjustDraft(f) {
+  UI.editingFoodIndex = null;
+  UI.foodAdjustDraft = {
+    name: f.name,
+    base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat },
+    qty: 1,
+    kcal: f.kcal,
+    protein: f.protein,
+    carbs: f.carbs,
+    fat: f.fat,
+  };
+}
+
+// Rescales the shown macro fields from the immutable base whenever the serving
+// count changes, before any manual correction, this is the fix for servings not
+// live-updating the macros.
+function rescaleAdjustDraft(qty) {
+  const d = UI.foodAdjustDraft;
+  d.qty = qty;
+  d.kcal = d.base.kcal * qty;
+  d.protein = d.base.protein * qty;
+  d.carbs = d.base.carbs * qty;
+  d.fat = d.base.fat * qty;
+}
+function setAdjustQty(q) {
+  rescaleAdjustDraft(q);
+  render();
+}
+function onAdjustQtyInput(val) {
+  const q = Number(val) || 0.25;
+  rescaleAdjustDraft(q);
+  renderSoon();
+}
+
 function confirmFoodAdjust() {
   const d = UI.foodAdjustDraft;
+  const isEdit = UI.editingFoodIndex != null;
   const f = {
     name: d.name,
     kcal: Number(document.getElementById('fa-kcal').value) || 0,
@@ -331,14 +441,22 @@ function confirmFoodAdjust() {
     carbs: Number(document.getElementById('fa-carbs').value) || 0,
     fat: Number(document.getElementById('fa-fat').value) || 0,
   };
-  const qty = Number(document.getElementById('fa-qty').value) || 1;
-  addOrIncrementFood(f, qty);
+  const qty = 1; // scaling is already baked into the numbers above
+
+  if (isEdit) {
+    STATE.foodLog[UI.foodDate][UI.editingFoodIndex] = { ...f, qty };
+  } else {
+    addOrIncrementFood(f, qty);
+  }
+  recordRecentFood(f);
   UI.foodAdjustDraft = null;
+  UI.editingFoodIndex = null;
   persist(); render();
-  toast('Added to log');
+  toast(isEdit ? 'Updated' : 'Added to log');
 }
 function cancelFoodAdjust() {
   UI.foodAdjustDraft = null;
+  UI.editingFoodIndex = null;
   render();
 }
 
@@ -353,14 +471,14 @@ function submitCustomFood() {
     fat: Number(document.getElementById('cf-fat').value) || 0,
   };
   addOrIncrementFood(f, 1);
+  recordRecentFood(f);
   UI.showCustomFood = false;
   persist(); render();
   toast('Added to log');
 }
 
-// Groups repeat entries of the same food (matched on name + kcal, since an edited
-// entry has effectively become "a different food") into one line with a quantity
-// instead of duplicate rows, e.g. "3 x Apple" rather than three separate lines.
+// Groups repeat entries of the exact same food (matched on name + kcal) into one
+// line with a quantity instead of duplicate rows, e.g. "3 x Apple".
 function addOrIncrementFood(f, qty) {
   const date = UI.foodDate;
   if (!STATE.foodLog[date]) STATE.foodLog[date] = [];
@@ -377,10 +495,131 @@ function setFoodQty(index, value) {
   if (!entry) return;
   const n = Number(value);
   entry.qty = n > 0 ? n : 0.25;
-  persist(); render();
+  persist(); renderSoon();
 }
 
 function removeFoodEntry(index) {
   STATE.foodLog[UI.foodDate].splice(index, 1);
   persist(); render();
+}
+
+// ============================================================
+// MEAL BUILDER
+// Combine several food items (e.g. spaghetti = noodles + sauce + bread) into
+// one saved, editable, loggable item.
+// ============================================================
+
+function renderMealBuilder() {
+  const items = UI.mealBuilderItems;
+  const totals = items.reduce((acc, it) => {
+    acc.kcal += it.kcal * it.qty; acc.protein += it.protein * it.qty;
+    acc.carbs += it.carbs * it.qty; acc.fat += it.fat * it.qty;
+    return acc;
+  }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+
+  return `
+    <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px;">
+      <div class="field">
+        <label>Meal name</label>
+        <input type="text" id="mb-name" data-focus-id="mb-name" placeholder="e.g. Spaghetti night" value="${escapeAttr(UI.mealBuilderName)}" oninput="onMealNameInput(this.value)">
+      </div>
+
+      <p class="hint" style="margin-bottom:6px;">Add items:</p>
+      <div class="search-wrap" style="margin-bottom:12px;">
+        <input type="text" data-focus-id="meal-search" placeholder="Search foods to add" value="${escapeAttr(UI.foodQuery)}" oninput="onFoodSearchInput(this.value)">
+        ${UI.foodResults.length ? `
+          <div class="food-search-results">
+            ${UI.foodResults.map((f, i) => `
+              <div class="food-search-item" style="cursor:pointer; display:flex; justify-content:space-between;" onclick="addItemToMeal(${i})">
+                <span>${escapeAttr(f.name)}</span>
+                <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">${Math.round(f.kcal)} kcal</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+      ${UI.foodSearchLoading ? `<p class="hint">Searching...</p>` : ''}
+
+      ${items.length ? `
+        <div class="row-list" style="margin-bottom:12px;">
+          ${items.map((it, i) => `
+            <div class="exercise-row">
+              <div>
+                <div class="name">${escapeAttr(it.name)}</div>
+                <div class="meta">P ${Math.round(it.protein * it.qty)}g . C ${Math.round(it.carbs * it.qty)}g . F ${Math.round(it.fat * it.qty)}g</div>
+              </div>
+              <input type="number" step="0.25" min="0.25" value="${it.qty}" oninput="setMealItemQty(${i}, this.value)" style="width:60px;">
+              <div class="kcal">${Math.round(it.kcal * it.qty)} kcal</div>
+              <button class="icon-btn" onclick="removeMealItem(${i})">x</button>
+            </div>
+          `).join('')}
+        </div>
+        <div class="grid grid-4" style="margin-bottom:12px;">
+          <div class="stat"><div class="stat-label">Total</div><div class="stat-value" style="font-size:18px;">${Math.round(totals.kcal)}<span class="unit">kcal</span></div></div>
+          <div class="stat"><div class="stat-label">Protein</div><div class="stat-value" style="font-size:18px;">${Math.round(totals.protein)}g</div></div>
+          <div class="stat"><div class="stat-label">Carbs</div><div class="stat-value" style="font-size:18px;">${Math.round(totals.carbs)}g</div></div>
+          <div class="stat"><div class="stat-label">Fat</div><div class="stat-value" style="font-size:18px;">${Math.round(totals.fat)}g</div></div>
+        </div>
+      ` : `<div class="empty-state">No items added yet.</div>`}
+
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary btn-sm" onclick="saveMeal()">Save meal</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeMealBuilder()">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function openMealBuilder() {
+  UI.mealBuilderOpen = true;
+  UI.mealBuilderName = '';
+  UI.mealBuilderItems = [];
+  UI.foodResults = [];
+  UI.foodQuery = '';
+  render();
+}
+function closeMealBuilder() {
+  UI.mealBuilderOpen = false;
+  UI.foodResults = [];
+  UI.foodQuery = '';
+  render();
+}
+function onMealNameInput(val) {
+  UI.mealBuilderName = val;
+  renderSoon();
+}
+function addItemToMeal(index) {
+  const f = UI.foodResults[index];
+  if (!f) return;
+  UI.mealBuilderItems.push({ ...f, qty: 1 });
+  UI.foodResults = [];
+  UI.foodQuery = '';
+  render();
+}
+function setMealItemQty(index, val) {
+  const n = Number(val);
+  UI.mealBuilderItems[index].qty = n > 0 ? n : 0.25;
+  renderSoon();
+}
+function removeMealItem(index) {
+  UI.mealBuilderItems.splice(index, 1);
+  render();
+}
+function saveMeal() {
+  if (!UI.mealBuilderItems.length) { toast('Add at least one item first'); return; }
+  const name = (UI.mealBuilderName || '').trim() || 'Saved meal';
+  const totals = UI.mealBuilderItems.reduce((acc, it) => {
+    acc.kcal += it.kcal * it.qty; acc.protein += it.protein * it.qty;
+    acc.carbs += it.carbs * it.qty; acc.fat += it.fat * it.qty;
+    return acc;
+  }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+  STATE.savedMeals.push({
+    id: uid(),
+    name,
+    items: UI.mealBuilderItems.map(it => ({ ...it })),
+    kcal: totals.kcal, protein: totals.protein, carbs: totals.carbs, fat: totals.fat,
+  });
+  UI.mealBuilderOpen = false;
+  persist(); render();
+  toast(`Saved "${name}"`);
 }

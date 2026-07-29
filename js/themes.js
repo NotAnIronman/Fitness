@@ -14,6 +14,13 @@ function renderThemes() {
     { key: 'mono', label: 'All Mono' },
     { key: 'rounded', label: 'Space Grotesk / Inter' },
     { key: 'grotesk', label: 'All Space Grotesk' },
+    { key: 'classic_serif', label: 'Playfair Display / Lora' },
+    { key: 'elegant_script', label: 'Cormorant Garamond / Lora' },
+    { key: 'friendly_round', label: 'Quicksand / Nunito' },
+    { key: 'bold_display', label: 'Bebas Neue / Inter' },
+    { key: 'clean_system', label: 'Work Sans' },
+    { key: 'editorial', label: 'Libre Baskerville / Nunito' },
+    { key: 'playful', label: 'Baloo 2 / Nunito' },
   ];
 
   return `

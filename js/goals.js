@@ -44,7 +44,7 @@ function renderGoals() {
         </div>
         <div class="field">
           <label>Target date</label>
-          <input type="date" data-focus-id="goal-target-date" value="${g.targetDate || ''}" oninput="updateGoalField('targetDate', this.value)">
+          <input type="date" data-focus-id="goal-target-date" value="${g.targetDate || ''}" onchange="updateGoalField('targetDate', this.value)">
         </div>
         <p class="hint">Starting point locked at ${toDisplay(g.startWeightKg ?? cur)} ${unit} on ${g.startDate ?? todayISO()} the first time you set a goal. <button class="btn btn-ghost btn-sm" onclick="resetGoalStart()">Reset start point to today</button></p>
       </div>
@@ -164,7 +164,7 @@ function updateGoalTargetWeight(val) {
   const kg = n != null ? (STATE.profile.unitSystem === 'imperial' ? lbToKg(n) : n) : null;
   ensureGoalStart();
   STATE.goal.targetWeightKg = kg;
-  persist(); render();
+  persist(); renderSoon();
 }
 
 function updateGoalField(field, val) {
