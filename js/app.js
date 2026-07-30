@@ -32,6 +32,12 @@ let UI = {
   petShopGroupOpen: {},
 };
 
+// Bump this alongside CACHE_VERSION in sw.js on every deploy. Shown as a hover/
+// tap tooltip on the FORGE logo, the most direct way to confirm a deploy
+// actually reached the browser (vs. the browser/service worker still serving
+// something older), since it's visible without opening dev tools.
+const APP_VERSION = 'forge-v6';
+
 function todayISO() {
   const d = new Date();
   return d.toISOString().slice(0, 10);
@@ -365,7 +371,10 @@ function doRender() {
   app.innerHTML = `
     <div class="shell">
       <div class="sidebar">
-        <div class="brand"><span class="mark">FORGE</span><small>TRAINING LOG</small></div>
+        <div class="brand tip" title="Version" style="border-bottom:none;">
+          <span class="mark">FORGE</span><small>TRAINING LOG</small>
+          <span class="tip-box"><span class="tip-title">Version</span>${APP_VERSION}. If this doesn't match what you expect after a deploy, do a hard refresh, or if installed as an app, close it fully and reopen (see the README for why a normal refresh alone can be one generation behind).</span>
+        </div>
         ${NAV_ITEMS.filter(item => item.key !== 'pet' || STATE.pet.enabled).map(item => `
           <button class="nav-item ${UI.route === item.key ? 'active' : ''}" onclick="navigate('${item.key}')">
             <span class="num">${item.num}</span>${item.label}
