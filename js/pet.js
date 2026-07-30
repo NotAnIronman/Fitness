@@ -139,22 +139,53 @@ function petClickInteract() {
 }
 
 // ---------- Rendering ----------
+// Renders one wearable/base slot as either its emoji (default) or custom art,
+// if an `img` URL has been set for it (see PET_ANIMALS/PET_ITEMS in data.js).
+function petVisual(entry, altText) {
+  if (entry && entry.img) {
+    return `<img src="${escapeAttr(entry.img)}" alt="${escapeAttr(altText)}" style="width:100%; height:100%; object-fit:contain; display:block;" loading="lazy">`;
+  }
+  return entry ? entry.emoji : '';
+}
+
 function renderPetSprite(size) {
   const animal = PET_ANIMALS.find(a => a.key === STATE.pet.species);
   if (!animal) return '';
   const eq = STATE.pet.equipped;
   const itemFor = slot => eq[slot] ? PET_ITEMS.find(i => i.key === eq[slot]) : null;
-  const hat = itemFor('hat'), eyewear = itemFor('eyewear'), face = itemFor('face'), neck = itemFor('neck'), accessory = itemFor('accessory');
+  const defaultScale = { hat: 0.45, eyewear: 0.35, face: 0.32, neck: 0.3, accessory: 0.3 };
+
+  const slotSpan = (slotName) => {
+    const item = itemFor(slotName);
+    if (!item) return '';
+    // A species can override where a slot sits via animal.anchors[slot] (e.g.
+    // { top: '-30%', left: '48%' }), useful once custom art isn't a uniform
+    // square like emoji are. Falls back to the generic CSS position (see
+    // .pet-slot-* in styles.css) when no override is set for this species.
+    const anchor = animal.anchors && animal.anchors[slotName];
+    const posStyle = anchor ? `top:${anchor.top}; left:${anchor.left};${anchor.width ? ` width:${anchor.width}; height:${anchor.height || anchor.width};` : ''}` : '';
+    return `<span class="pet-overlay pet-slot-${slotName}" style="font-size:${size * defaultScale[slotName]}px; ${posStyle}">${petVisual(item, item.name)}</span>`;
+  };
+
   return `
     <div class="pet-sprite" style="width:${size}px; height:${size}px; font-size:${size}px;" onclick="petClickInteract()" title="Click to give some love">
-      <span class="pet-base">${animal.emoji}</span>
-      ${hat ? `<span class="pet-overlay pet-slot-hat" style="font-size:${size * 0.45}px;">${hat.emoji}</span>` : ''}
-      ${eyewear ? `<span class="pet-overlay pet-slot-eyewear" style="font-size:${size * 0.35}px;">${eyewear.emoji}</span>` : ''}
-      ${face ? `<span class="pet-overlay pet-slot-face" style="font-size:${size * 0.32}px;">${face.emoji}</span>` : ''}
-      ${neck ? `<span class="pet-overlay pet-slot-neck" style="font-size:${size * 0.3}px;">${neck.emoji}</span>` : ''}
-      ${accessory ? `<span class="pet-overlay pet-slot-accessory" style="font-size:${size * 0.3}px;">${accessory.emoji}</span>` : ''}
+      <span class="pet-base">${petVisual(animal, animal.name)}</span>
+      ${slotSpan('hat')}
+      ${slotSpan('eyewear')}
+      ${slotSpan('face')}
+      ${slotSpan('neck')}
+      ${slotSpan('accessory')}
     </div>
   `;
+}
+
+// Small inline version for chip labels (search results, species picker),
+// where the sprite is more compact than the main display.
+function petIconSmall(entry) {
+  if (entry && entry.img) {
+    return `<img src="${escapeAttr(entry.img)}" alt="${escapeAttr(entry.name)}" style="width:1.1em; height:1.1em; vertical-align:-0.2em; object-fit:contain;" loading="lazy">`;
+  }
+  return entry ? entry.emoji : '';
 }
 
 function renderPetTab() {
@@ -170,7 +201,7 @@ function renderPetTab() {
         <div class="pet-grid">
           ${PET_ANIMALS.map(a => `
             <button class="pet-pick" onclick="choosePetSpecies('${a.key}')">
-              <span class="pet-pick-emoji">${a.emoji}</span>
+              <span class="pet-pick-emoji">${petIconSmall(a)}</span>
               <span class="pet-pick-name">${a.name}</span>
             </button>
           `).join('')}
@@ -204,7 +235,7 @@ function renderPetTab() {
         <input type="text" data-focus-id="pet-name" value="${escapeAttr(STATE.pet.name)}" onchange="renamePet(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
       </div>
       <div class="chip-row" style="justify-content:center; margin-top:10px;">
-        ${PET_ANIMALS.map(a => `<button class="chip ${a.key === STATE.pet.species ? 'active' : ''}" onclick="choosePetSpecies('${a.key}')">${a.emoji}</button>`).join('')}
+        ${PET_ANIMALS.map(a => `<button class="chip ${a.key === STATE.pet.species ? 'active' : ''}" onclick="choosePetSpecies('${a.key}')">${petIconSmall(a)}</button>`).join('')}
       </div>
     </div>
 
@@ -220,6 +251,10 @@ function renderPetTab() {
     </div>
 
     ${renderPetShop()}
+
+    ${(PET_ANIMALS.some(a => a.img) || PET_ITEMS.some(i => i.img)) ? `
+      <p class="hint" style="text-align:center; margin-top:8px;">Some art by <a href="https://openmoji.org" target="_blank" rel="noopener">OpenMoji</a>, licensed CC BY-SA 4.0.</p>
+    ` : ''}
   `;
 }
 
@@ -237,10 +272,10 @@ function renderPetShop() {
               const owned = STATE.pet.ownedItems.includes(item.key);
               const equipped = equippedKey === item.key;
               if (owned) {
-                return `<button class="chip ${equipped ? 'active' : ''}" onclick="equipPetItem('${slot}', '${item.key}')">${item.emoji} ${item.name}</button>`;
+                return `<button class="chip ${equipped ? 'active' : ''}" onclick="equipPetItem('${slot}', '${item.key}')">${petIconSmall(item)} ${item.name}</button>`;
               }
               const afford = STATE.pet.points >= item.cost;
-              return `<button class="chip" style="${afford ? '' : 'opacity:0.5;'}" onclick="buyPetItem('${item.key}')">${item.emoji} ${item.name} \u00b7 ${item.cost}pt</button>`;
+              return `<button class="chip" style="${afford ? '' : 'opacity:0.5;'}" onclick="buyPetItem('${item.key}')">${petIconSmall(item)} ${item.name} \u00b7 ${item.cost}pt</button>`;
             }).join('')}
           </div>
         `;

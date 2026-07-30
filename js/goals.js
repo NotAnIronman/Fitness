@@ -72,6 +72,8 @@ function renderGoals() {
     ${evalResult && !evalResult.error ? renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) : ''}
     ${evalResult && evalResult.error ? `<div class="card"><div class="section-note">${evalResult.error}</div></div>` : ''}
 
+    ${hasGoal ? renderPaceFeedback(isImperial) : ''}
+
     <div class="card">
       <div class="card-title">
         Weight log
@@ -79,6 +81,70 @@ function renderGoals() {
       </div>
       <canvas id="goal-chart" height="90"></canvas>
       ${STATE.weightLog.length === 0 ? `<div class="empty-state">No entries yet - log your weight to start the trend line.</div>` : ''}
+    </div>
+  `;
+}
+
+// Compares your most recent logged weight against where the straight-line
+// trajectory (start -> target, by date) says you "should" be, and gives
+// encouraging, specific feedback either way. If you're behind pace, it also
+// checks whether food was logged the day before, since that's usually the
+// biggest lever and a gap there is worth naming plainly (not as a scolding,
+// just as the most likely explanation).
+function renderPaceFeedback(isImperial) {
+  const log = STATE.weightLog;
+  if (!log.length) return '';
+  const g = STATE.goal;
+  if (!g.startWeightKg || !g.startDate) return '';
+  const latest = log[log.length - 1];
+  const startMs = new Date(g.startDate).getTime();
+  const targetMs = new Date(g.targetDate).getTime();
+  const span = targetMs - startMs;
+  if (span <= 0) return '';
+  const t = (new Date(latest.date).getTime() - startMs) / span;
+  const expectedKg = g.startWeightKg + (g.targetWeightKg - g.startWeightKg) * Math.max(0, t);
+  const diffKg = latest.weightKg - expectedKg; // positive = heavier than the trajectory expects
+  const losing = g.targetWeightKg < g.startWeightKg;
+  const toDisplay = kg => isImperial ? kgToLb(Math.abs(kg)).toFixed(1) + ' lb' : Math.abs(kg).toFixed(1) + ' kg';
+
+  // Tolerance band so ordinary day-to-day water-weight noise doesn't read as "off pace."
+  const toleranceKg = Math.max(0.3, g.startWeightKg * 0.004);
+  const aheadOrOnPace = losing ? diffKg <= toleranceKg : diffKg >= -toleranceKg;
+
+  let badgeClass, badgeText, message;
+
+  if (aheadOrOnPace) {
+    badgeClass = 'badge-ok';
+    badgeText = Math.abs(diffKg) <= toleranceKg ? 'On pace' : 'Ahead of pace';
+    message = Math.abs(diffKg) <= toleranceKg
+      ? `Your latest weigh-in (${latest.date}) is right on your planned trajectory. Nice, steady consistency is exactly what gets this done.`
+      : `Your latest weigh-in (${latest.date}) is ${toDisplay(diffKg)} ahead of your planned pace. Great work, just keep in mind a faster start sometimes evens out, so don't panic if it levels off.`;
+  } else {
+    badgeClass = 'badge-warn';
+    badgeText = 'Behind pace';
+    const yesterday = new Date(latest.date + 'T00:00:00');
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yIso = yesterday.toISOString().slice(0, 10);
+    const yEntries = STATE.foodLog[yIso];
+
+    message = `Your latest weigh-in (${latest.date}) is ${toDisplay(diffKg)} behind your planned pace. `;
+    if (!yEntries || !yEntries.length) {
+      message += `Looks like nothing was logged in Food Tracking the day before, that's worth checking: it's hard to stay on pace with days that aren't tracked at all, even if the eating itself was fine.`;
+    } else {
+      const target = typeof getFoodTargetCalories === 'function' ? getFoodTargetCalories() : null;
+      const kcal = yEntries.reduce((s, e) => s + e.kcal * e.qty, 0);
+      if (target && kcal > target * 1.15) {
+        message += `The day before was logged at about ${Math.round(kcal)} kcal, above your ${Math.round(target)} kcal target, that's a plausible contributor.`;
+      } else {
+        message += `The day before was tracked and looked reasonably close to target, so this is most likely normal fluctuation (water, sodium, hormones, timing), not a real setback. The scale rarely moves in a straight line even when everything is on track.`;
+      }
+    }
+  }
+
+  return `
+    <div class="card">
+      <div class="card-title">How you're tracking <span class="badge ${badgeClass}">${badgeText}</span></div>
+      <p class="hint" style="font-size:13px; line-height:1.6;">${message}</p>
     </div>
   `;
 }

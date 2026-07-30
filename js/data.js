@@ -244,16 +244,42 @@ const FOOD_FALLBACK_DB = [
 
 /* ============================================================
    PET COMPANION (secret feature)
-   Uses native Unicode emoji characters rather than externally hosted
-   art. OpenMoji (openmoji.org, CC BY-SA 4.0) was researched as a real
-   option for consistent hand-drawn art via their CDN, but referencing
-   dozens of exact image files by hex codepoint from memory is fragile
-   (one wrong code = a silently broken image), so native emoji was
-   chosen instead: zero hosting dependency, zero licensing question
-   (it's just text, rendered by the browser's own emoji font), and
-   every character below is one I can type with confidence rather than
-   guess a file path for. If a more custom/consistent art style is
-   wanted later, this is the place to swap it in.
+   Defaults to native Unicode emoji characters (zero hosting dependency,
+   zero licensing question). Every entry below can optionally be upgraded
+   to real art by adding an `img` field, no other code changes needed,
+   js/pet.js already checks for it and falls back to the emoji if absent.
+
+   HOW TO ADD OPENMOJI ART TO AN ANIMAL OR ITEM:
+   1. Find the emoji you want at https://openmoji.org/library (search by
+      name, e.g. "dog face"). Click it, the hex codepoint is shown on its
+      page (e.g. "1F436") and in the URL.
+   2. Add an `img` field pointing at that codepoint via OpenMoji's own CDN:
+        img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F436.svg'
+      (swap 1F436 for whichever codepoint you found). No download or
+      hosting needed, this loads directly from OpenMoji's GitHub repo via
+      jsDelivr, which is what they recommend in their own README. To pin a
+      specific version instead of always-latest, use
+      .../openmoji@14.0.0/color/... - check github.com/hfg-gmuend/openmoji
+      for the current release tag if you want to pin.
+   3. That's it, the `emoji` field can stay as a fallback/label, `img` takes
+      priority automatically wherever this animal or item is rendered.
+
+   PER-SPECIES ACCESSORY POSITIONING:
+   Wearable position (hat/eyewear/face/neck/accessory) defaults to the same
+   spot for every animal, set in css/styles.css under .pet-slot-*. Custom
+   art is rarely a perfect uniform square the way emoji are, so a species
+   can override where a slot sits by adding an `anchors` object, only for
+   the slots that actually need adjusting:
+     anchors: {
+       hat: { top: '-42%', left: '50%' },
+       eyewear: { top: '15%', left: '48%', width: '55%' },
+     }
+   top/left are CSS position values (e.g. percentages work well since the
+   sprite scales for different display sizes around the app). width/height
+   are optional, only needed if a piece of custom art should render larger
+   or smaller than the default relative size for that slot. Easiest way to
+   tune these: change a value, reload, see how the Pet page looks, repeat.
+   Slots with no matching entry in `anchors` just use the shared default.
    ============================================================ */
 
 const PET_ANIMALS = [

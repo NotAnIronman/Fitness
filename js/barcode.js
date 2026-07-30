@@ -12,7 +12,13 @@
    for packaged/branded foods.
    ============================================================ */
 
-const ZXING_BROWSER_CDN = 'https://cdn.jsdelivr.net/npm/@zxing/browser@latest';
+// IMPORTANT: this must point at the actual UMD bundle, not just the bare
+// package. jsDelivr's package.json auto-resolution falls back to the "main"
+// field when there's no "jsdelivr" field, and @zxing/browser's "main" is its
+// CommonJS build (require/module.exports), which is not valid as a plain
+// <script> tag, it "loads" (network-wise) but defines nothing, silently
+// leaving ZXingBrowser undefined. Pinning the exact umd/ path avoids that.
+const ZXING_BROWSER_CDN = 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/umd/zxing-browser.min.js';
 const OPEN_FOOD_FACTS_URL = 'https://world.openfoodfacts.org/api/v2/product/';
 
 let _zxingLoadPromise = null;
@@ -22,8 +28,17 @@ function loadZXing() {
   _zxingLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = ZXING_BROWSER_CDN;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Could not load the barcode scanning library.'));
+    script.onload = () => {
+      // A script can "load" (network success) while still failing to define
+      // what we need (wrong build, blocked by an extension, etc.), so verify
+      // the actual global exists before declaring success.
+      if (typeof ZXingBrowser === 'undefined') {
+        reject(new Error('Scanner library loaded but did not initialize correctly.'));
+      } else {
+        resolve();
+      }
+    };
+    script.onerror = () => reject(new Error('Could not load the barcode scanning library (check your connection).'));
     document.head.appendChild(script);
   });
   return _zxingLoadPromise;
@@ -65,7 +80,7 @@ async function startBarcodeScan() {
     await loadZXing();
   } catch (e) {
     console.error(e);
-    UI.barcodeStatus = 'Could not load the scanner (check your connection) - you can search by name instead.';
+    UI.barcodeStatus = `Could not load the scanner (${(e && e.message) || 'unknown error'}) - you can search by name instead.`;
     render();
     return;
   }
@@ -90,9 +105,14 @@ async function startBarcodeScan() {
     );
   } catch (e) {
     console.error(e);
-    const msg = (e && e.name === 'NotAllowedError')
-      ? 'Camera access was denied, allow camera access to scan a barcode, or search by name instead.'
-      : 'Could not start the camera - your device or browser may not support this, you can search by name instead.';
+    let msg;
+    if (e && e.name === 'NotAllowedError') {
+      msg = 'Camera access was denied, allow camera access to scan a barcode, or search by name instead.';
+    } else if (e && e.name === 'NotFoundError') {
+      msg = 'No camera was found on this device, you can search by name instead.';
+    } else {
+      msg = `Could not start the camera (${(e && e.message) || 'unknown error'}). Try Chrome or Safari, or search by name instead.`;
+    }
     UI.barcodeStatus = msg;
     render();
   }
