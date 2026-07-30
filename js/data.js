@@ -356,8 +356,8 @@ const PET_ITEMS = [
   { key: 'openhand', slot: 'accessory', emoji: '👐', name: 'Open Hands', cost: 30, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F450.svg' },
   { key: 'writinghand', slot: 'accessory', emoji: '✍️', name: 'Writing Hand', cost: 30, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/270D.svg' },
   { key: 'wavehand', slot: 'accessory', emoji: '👋', name: 'Waving Hand', cost: 30, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F590.svg' },
-  { key: 'rockhand', slot: 'accessory', emoji: '🤘', name: 'Rock Hand', cost: 30, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F1918.svg' },
-  { key: 'lovehand', slot: 'accessory', emoji: '🤟', name: 'Love Hand', cost: 30, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F191F.svg' },
+  { key: 'rockhand', slot: 'accessory', emoji: '🤘', name: 'Rock Hand', cost: 30, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F918.svg' },
+  { key: 'lovehand', slot: 'accessory', emoji: '🤟', name: 'Love Hand', cost: 30, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F91F.svg' },
 
   { key: 'wrench', slot: 'accessory', emoji: '🔧', name: 'Wrench', cost: 15, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F527.svg' },
   { key: 'saw', slot: 'accessory', emoji: '🪚', name: 'Saw', cost: 15, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1FA9A.svg' },
