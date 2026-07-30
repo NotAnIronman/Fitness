@@ -41,7 +41,7 @@ function renderWorkouts() {
         </div>
       </div>
       <div class="card">
-        <div class="stat-label">Avg. daily steps</div>
+        <div class="stat-label">Starting step estimate ${tip('ⓘ', 'This is just a starting point', 'Once you check in your steps a few times on the Home page, your real rolling average takes over completely. This number only matters before that history builds up.')}</div>
         <input type="number" data-focus-id="steps-per-day" step="500" value="${STATE.workoutPlan.stepsPerDay}" onchange="updateSteps(this.value)" onkeydown="if(event.key==='Enter') this.blur()" style="margin-top:6px;">
       </div>
     </div>

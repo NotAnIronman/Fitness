@@ -238,3 +238,191 @@ const FOOD_FALLBACK_DB = [
   { name: 'Potato chips (1 oz)', kcal: 152, protein: 2, carbs: 15, fat: 10 },
   { name: 'Chocolate chip cookie (1 medium)', kcal: 78, protein: 0.9, carbs: 10, fat: 4 },
 ];
+
+/* ============================================================
+   PET COMPANION (secret feature)
+   Uses native Unicode emoji characters rather than externally hosted
+   art. OpenMoji (openmoji.org, CC BY-SA 4.0) was researched as a real
+   option for consistent hand-drawn art via their CDN, but referencing
+   dozens of exact image files by hex codepoint from memory is fragile
+   (one wrong code = a silently broken image), so native emoji was
+   chosen instead: zero hosting dependency, zero licensing question
+   (it's just text, rendered by the browser's own emoji font), and
+   every character below is one I can type with confidence rather than
+   guess a file path for. If a more custom/consistent art style is
+   wanted later, this is the place to swap it in.
+   ============================================================ */
+
+const PET_ANIMALS = [
+  { key: 'dog', emoji: '🐶', name: 'Dog' },
+  { key: 'cat', emoji: '🐱', name: 'Cat' },
+  { key: 'fox', emoji: '🦊', name: 'Fox' },
+  { key: 'bear', emoji: '🐻', name: 'Bear' },
+  { key: 'panda', emoji: '🐼', name: 'Panda' },
+  { key: 'koala', emoji: '🐨', name: 'Koala' },
+  { key: 'tiger', emoji: '🐯', name: 'Tiger' },
+  { key: 'lion', emoji: '🦁', name: 'Lion' },
+  { key: 'cow', emoji: '🐮', name: 'Cow' },
+  { key: 'pig', emoji: '🐷', name: 'Pig' },
+  { key: 'frog', emoji: '🐸', name: 'Frog' },
+  { key: 'monkey', emoji: '🐵', name: 'Monkey' },
+  { key: 'rabbit', emoji: '🐰', name: 'Rabbit' },
+  { key: 'chick', emoji: '🐥', name: 'Chick' },
+  { key: 'penguin', emoji: '🐧', name: 'Penguin' },
+  { key: 'owl', emoji: '🦉', name: 'Owl' },
+  { key: 'unicorn', emoji: '🦄', name: 'Unicorn' },
+  { key: 'hamster', emoji: '🐹', name: 'Hamster' },
+  { key: 'wolf', emoji: '🐺', name: 'Wolf' },
+  { key: 'mouse', emoji: '🐭', name: 'Mouse' },
+  { key: 'raccoon', emoji: '🦝', name: 'Raccoon' },
+  { key: 'horse', emoji: '🐴', name: 'Horse' },
+  { key: 'turtle', emoji: '🐢', name: 'Turtle' },
+  { key: 'hedgehog', emoji: '🦔', name: 'Hedgehog' },
+  { key: 'octopus', emoji: '🐙', name: 'Octopus' },
+  { key: 'dragon', emoji: '🐲', name: 'Baby Dragon' },
+];
+
+// slot: 'hat' | 'eyewear' | 'face' | 'neck' | 'accessory'
+const PET_ITEMS = [
+  { key: 'top_hat', slot: 'hat', emoji: '🎩', name: 'Top Hat', cost: 50 },
+  { key: 'crown', slot: 'hat', emoji: '👑', name: 'Crown', cost: 150 },
+  { key: 'grad_cap', slot: 'hat', emoji: '🎓', name: 'Graduation Cap', cost: 60 },
+  { key: 'sun_hat', slot: 'hat', emoji: '👒', name: 'Sun Hat', cost: 40 },
+  { key: 'cap', slot: 'hat', emoji: '🧢', name: 'Baseball Cap', cost: 45 },
+
+  { key: 'glasses', slot: 'eyewear', emoji: '👓', name: 'Nerdy Glasses', cost: 30 },
+  { key: 'sunglasses', slot: 'eyewear', emoji: '🕶️', name: 'Cool Shades', cost: 45 },
+  { key: 'goggles', slot: 'eyewear', emoji: '🥽', name: 'Goggles', cost: 35 },
+  { key: 'monocle', slot: 'eyewear', emoji: '🧐', name: 'Monocle Look', cost: 80 },
+
+  { key: 'beard', slot: 'face', emoji: '🧔', name: 'Distinguished Beard', cost: 40 },
+  { key: 'disguise', slot: 'face', emoji: '🥸', name: 'Mustache Disguise', cost: 60 },
+
+  { key: 'necktie', slot: 'neck', emoji: '👔', name: 'Necktie', cost: 35 },
+  { key: 'scarf', slot: 'neck', emoji: '🧣', name: 'Cozy Scarf', cost: 35 },
+  { key: 'bow', slot: 'neck', emoji: '🎀', name: 'Bow', cost: 25 },
+  { key: 'medal', slot: 'neck', emoji: '🏅', name: 'Gold Medal', cost: 100 },
+
+  { key: 'ring', slot: 'accessory', emoji: '💍', name: 'Ring', cost: 90 },
+  { key: 'gem', slot: 'accessory', emoji: '💎', name: 'Gem Stone', cost: 90 },
+  { key: 'star', slot: 'accessory', emoji: '🌟', name: 'Sparkle', cost: 20 },
+  { key: 'heart', slot: 'accessory', emoji: '💖', name: 'Sparkling Heart', cost: 20 },
+  { key: 'flower', slot: 'accessory', emoji: '🌸', name: 'Cherry Blossom', cost: 15 },
+  { key: 'butterfly', slot: 'accessory', emoji: '🦋', name: 'Butterfly Buddy', cost: 30 },
+];
+
+const PET_SLOTS = ['hat', 'eyewear', 'face', 'neck', 'accessory'];
+const PET_SLOT_LABELS = { hat: 'Hat', eyewear: 'Eyewear', face: 'Face', neck: 'Neck', accessory: 'Accessory' };
+
+// Encouragement shown in the pet widget, some generic, some page-specific.
+const PET_CHEER = {
+  generic: [
+    "You've got this!", "Every day you show up counts.", "Small steps still move you forward.",
+    "Proud of you for checking in.", "One log at a time.", "Consistency beats perfection.",
+  ],
+  home: ["Let's see how today's shaping up!", "Your numbers, your pace."],
+  workouts: ["Let's build a plan you'll actually stick to!", "A good plan makes the day easier."],
+  log: ["Let's get today logged!", "Check things off as you go, I'll be here."],
+  progress: ["Look how far you've come!", "Numbers going up is the best part."],
+  goals: ["Slow and steady gets you there.", "Your pace, your goal."],
+  food: ["Logging it all helps, even the small stuff.", "No judgment here, just data."],
+  bodyfat: ["Knowing your numbers is powerful.", "Info, not judgment."],
+  pet: ["Thanks for visiting me!", "Wanna dress me up today?"],
+  achievements: ["Let's see what you've unlocked!", "Every badge tells a story."],
+};
+
+/* ============================================================
+   ACHIEVEMENTS
+   Each has a check(ctx) predicate and optional progress(ctx) for a
+   progress bar. ctx is built fresh each evaluation in js/achievements.js
+   from current STATE, see buildAchievementContext().
+   ============================================================ */
+const ACHIEVEMENTS = [
+  // ---- Steps ----
+  { id: 'first_checkin', name: 'First Steps', desc: 'Log your first daily step check-in.', category: 'Steps', points: 10,
+    check: ctx => ctx.checkinCount >= 1 },
+  { id: 'steps_5k', name: '5K Day', desc: 'Hit 5,000 steps in a single day.', category: 'Steps', points: 10,
+    check: ctx => ctx.maxStepsDay >= 5000 },
+  { id: 'steps_10k', name: '10K Day', desc: 'Hit 10,000 steps in a single day.', category: 'Steps', points: 15,
+    check: ctx => ctx.maxStepsDay >= 10000 },
+  { id: 'steps_15k', name: '15K Day', desc: 'Hit 15,000 steps in a single day.', category: 'Steps', points: 20,
+    check: ctx => ctx.maxStepsDay >= 15000 },
+  { id: 'steps_20k', name: '20K Day', desc: 'Hit 20,000 steps in a single day.', category: 'Steps', points: 30,
+    check: ctx => ctx.maxStepsDay >= 20000 },
+  { id: 'checkin_streak_7', name: 'Week of Steps', desc: 'Check in your steps 7 days in a row.', category: 'Steps', points: 25,
+    check: ctx => ctx.checkinStreak >= 7, progress: ctx => ({ current: Math.min(ctx.checkinStreak, 7), target: 7 }) },
+  { id: 'checkin_streak_30', name: 'Month of Steps', desc: 'Check in your steps 30 days in a row.', category: 'Steps', points: 75,
+    check: ctx => ctx.checkinStreak >= 30, progress: ctx => ({ current: Math.min(ctx.checkinStreak, 30), target: 30 }) },
+  { id: 'checkin_streak_100', name: 'Century Streak', desc: 'Check in your steps 100 days in a row.', category: 'Steps', points: 200,
+    check: ctx => ctx.checkinStreak >= 100, progress: ctx => ({ current: Math.min(ctx.checkinStreak, 100), target: 100 }) },
+  { id: 'checkin_total_30', name: 'Data Point Collector', desc: 'Log 30 daily step check-ins total.', category: 'Steps', points: 30,
+    check: ctx => ctx.checkinCount >= 30, progress: ctx => ({ current: Math.min(ctx.checkinCount, 30), target: 30 }) },
+  { id: 'avg_week_7k', name: 'On the Move', desc: 'Average 7,000+ steps over your last 7 logged days.', category: 'Steps', points: 20,
+    check: ctx => ctx.last7DayAvgSteps >= 7000 },
+
+  // ---- Workouts ----
+  { id: 'first_workout', name: 'First Rep', desc: 'Log your first workout exercise.', category: 'Workouts', points: 10,
+    check: ctx => ctx.totalExercisesLogged >= 1 },
+  { id: 'workouts_10', name: 'Getting Into It', desc: 'Log 10 exercises total.', category: 'Workouts', points: 20,
+    check: ctx => ctx.totalExercisesLogged >= 10, progress: ctx => ({ current: Math.min(ctx.totalExercisesLogged, 10), target: 10 }) },
+  { id: 'workouts_50', name: 'Regular', desc: 'Log 50 exercises total.', category: 'Workouts', points: 50,
+    check: ctx => ctx.totalExercisesLogged >= 50, progress: ctx => ({ current: Math.min(ctx.totalExercisesLogged, 50), target: 50 }) },
+  { id: 'workouts_100', name: 'Dedicated', desc: 'Log 100 exercises total.', category: 'Workouts', points: 100,
+    check: ctx => ctx.totalExercisesLogged >= 100, progress: ctx => ({ current: Math.min(ctx.totalExercisesLogged, 100), target: 100 }) },
+  { id: 'workout_streak_7', name: 'Weekly Grind', desc: 'Log a workout on 7 days in a row.', category: 'Workouts', points: 30,
+    check: ctx => ctx.workoutStreak >= 7, progress: ctx => ({ current: Math.min(ctx.workoutStreak, 7), target: 7 }) },
+  { id: 'all_body_parts', name: 'Well Rounded', desc: 'Log an exercise from every major body part.', category: 'Workouts', points: 40,
+    check: ctx => ctx.bodyPartsTouched >= 7, progress: ctx => ({ current: ctx.bodyPartsTouched, target: 7 }) },
+  { id: 'ramping_master', name: 'Ramping Up', desc: 'Log an exercise with a different weight per set.', category: 'Workouts', points: 15,
+    check: ctx => ctx.usedPerSetWeights },
+  { id: 'personal_record', name: 'Personal Record', desc: 'Beat your starting weight on any exercise.', category: 'Workouts', points: 35,
+    check: ctx => ctx.hasPersonalRecord },
+  { id: 'plan_builder', name: 'Planner', desc: 'Build a workout plan with 3+ active training days.', category: 'Workouts', points: 20,
+    check: ctx => ctx.activeplanDays >= 3, progress: ctx => ({ current: Math.min(ctx.activeplanDays, 3), target: 3 }) },
+
+  // ---- Nutrition ----
+  { id: 'first_meal', name: 'First Bite', desc: 'Log your first food item.', category: 'Nutrition', points: 10,
+    check: ctx => ctx.totalFoodDaysLogged >= 1 },
+  { id: 'on_target_day', name: 'Right on Target', desc: 'Log food within 10% of your target for one day.', category: 'Nutrition', points: 15,
+    check: ctx => ctx.onTargetDays >= 1 },
+  { id: 'on_target_week', name: 'On-Target Week', desc: 'Within target 7 days in a row.', category: 'Nutrition', points: 40,
+    check: ctx => ctx.onTargetStreak >= 7, progress: ctx => ({ current: Math.min(ctx.onTargetStreak, 7), target: 7 }) },
+  { id: 'on_target_month', name: 'On-Target Month', desc: 'Within target on 30 logged days total.', category: 'Nutrition', points: 100,
+    check: ctx => ctx.onTargetDays >= 30, progress: ctx => ({ current: Math.min(ctx.onTargetDays, 30), target: 30 }) },
+  { id: 'meal_builder_used', name: 'Chef', desc: 'Save your first meal in the meal builder.', category: 'Nutrition', points: 20,
+    check: ctx => ctx.savedMealsCount >= 1 },
+  { id: 'food_days_30', name: 'Habit Formed', desc: 'Log food on 30 different days.', category: 'Nutrition', points: 60,
+    check: ctx => ctx.totalFoodDaysLogged >= 30, progress: ctx => ({ current: Math.min(ctx.totalFoodDaysLogged, 30), target: 30 }) },
+  { id: 'big_day_log', name: 'Thorough', desc: 'Log 10+ separate food items in a single day.', category: 'Nutrition', points: 15,
+    check: ctx => ctx.maxItemsInADay >= 10 },
+
+  // ---- Weight & goals ----
+  { id: 'first_goal_set', name: 'Goal Setter', desc: 'Set your first weight goal.', category: 'Goals', points: 10,
+    check: ctx => ctx.hasGoal },
+  { id: 'weight_streak_7', name: 'Weigh-In Week', desc: 'Log your weight 7 days in a row.', category: 'Goals', points: 25,
+    check: ctx => ctx.weightStreak >= 7, progress: ctx => ({ current: Math.min(ctx.weightStreak, 7), target: 7 }) },
+  { id: 'weight_log_30', name: 'Trend Tracker', desc: 'Log your weight 30 times total.', category: 'Goals', points: 50,
+    check: ctx => ctx.weightLogCount >= 30, progress: ctx => ({ current: Math.min(ctx.weightLogCount, 30), target: 30 }) },
+  { id: 'goal_reached', name: 'Goal Reached', desc: 'Reach your target weight.', category: 'Goals', points: 150,
+    check: ctx => ctx.goalReached },
+
+  // ---- Profile & body fat ----
+  { id: 'profile_complete', name: 'All Set Up', desc: 'Fill in your full profile (age, height, weight).', category: 'Profile', points: 10,
+    check: ctx => ctx.profileComplete },
+  { id: 'body_fat_calculated', name: 'Know Your Numbers', desc: 'Calculate your body fat percentage.', category: 'Profile', points: 15,
+    check: ctx => ctx.bodyFatCalculated },
+
+  // ---- Pet & misc ----
+  { id: 'adopt_pet', name: 'New Friend', desc: 'Choose your pet companion.', category: 'Pet', points: 10,
+    check: ctx => ctx.hasPet },
+  { id: 'first_purchase', name: 'Shopper', desc: 'Buy your first item from the pet shop.', category: 'Pet', points: 10,
+    check: ctx => ctx.ownedItemsCount >= 1 },
+  { id: 'fully_dressed', name: 'Fully Dressed', desc: 'Equip an item in every slot at once.', category: 'Pet', points: 40,
+    check: ctx => ctx.slotsEquipped >= 5, progress: ctx => ({ current: ctx.slotsEquipped, target: 5 }) },
+  { id: 'points_100', name: 'Saver', desc: 'Earn 100 total pet points.', category: 'Pet', points: 10,
+    check: ctx => ctx.totalPointsEarned >= 100, progress: ctx => ({ current: Math.min(ctx.totalPointsEarned, 100), target: 100 }) },
+  { id: 'points_500', name: 'Big Saver', desc: 'Earn 500 total pet points.', category: 'Pet', points: 30,
+    check: ctx => ctx.totalPointsEarned >= 500, progress: ctx => ({ current: Math.min(ctx.totalPointsEarned, 500), target: 500 }) },
+  { id: 'points_1000', name: 'Point Millionaire (almost)', desc: 'Earn 1,000 total pet points.', category: 'Pet', points: 75,
+    check: ctx => ctx.totalPointsEarned >= 1000, progress: ctx => ({ current: Math.min(ctx.totalPointsEarned, 1000), target: 1000 }) },
+];

@@ -25,6 +25,7 @@ let UI = {
   mealBuilderName: '',
   mealBuilderItems: [], // [{name,kcal,protein,carbs,fat,qty}]
   editingFoodIndex: null,
+  secretPanelOpen: false,
 };
 
 function todayISO() {
@@ -109,6 +110,23 @@ function currentWeightKg() {
   return STATE.profile.weightKg;
 }
 
+// The real, growing average from daily check-ins, replacing the old single
+// self-reported number. Blends toward the actual logged average as check-ins
+// build up; before you've logged much, it leans on the starting estimate from
+// the Plan page so the app isn't left with no number at all on day one.
+function getStepsAverage() {
+  const dates = Object.keys(STATE.dailyCheckins).sort();
+  const estimate = STATE.workoutPlan.stepsPerDay || 6000;
+  if (!dates.length) return estimate;
+  const recent = dates.slice(-30); // trailing 30 days, more weight to recent behavior
+  const avg = recent.reduce((s, d) => s + (STATE.dailyCheckins[d].steps || 0), 0) / recent.length;
+  if (recent.length >= 5) return Math.round(avg); // enough real data, trust it fully
+  // early on, blend the few real check-ins with the estimate so one unusual day
+  // doesn't swing the number wildly
+  const weight = recent.length / 5;
+  return Math.round(avg * weight + estimate * (1 - weight));
+}
+
 // Raw plan stats only (no activity-level dependency, to avoid circularity)
 function weeklyPlanSummary() {
   const days = STATE.workoutPlan.days;
@@ -131,7 +149,7 @@ function weeklyPlanSummary() {
     workoutDaysPerWeek: activeDays.length,
     avgSessionMinutes: activeDays.length ? totalMinutes / activeDays.length : 0,
     totalWeeklyExerciseKcal: totalKcal,
-    stepsPerDay: STATE.workoutPlan.stepsPerDay,
+    stepsPerDay: getStepsAverage(),
   };
 }
 
@@ -321,17 +339,30 @@ const NAV_ITEMS = [
   { key: 'goals', label: 'Weight Goals', num: '05' },
   { key: 'food', label: 'Food Tracking', num: '06' },
   { key: 'bodyfat', label: 'Body Fat', num: '07' },
-  { key: 'themes', label: 'Themes', num: '08' },
+  { key: 'achievements', label: 'Achievements', num: '08' },
+  { key: 'pet', label: 'Pet', num: '09' }, // hidden from the nav unless STATE.pet.enabled, see doRender()
+  { key: 'themes', label: 'Themes', num: '10' },
 ];
 
 function doRender() {
   applyTheme(STATE.theme);
+
+  // Idempotent (already-granted rewards/achievements are skipped), so it's safe
+  // to run this on every render rather than only when visiting Pet/Achievements,
+  // that way points/unlocks land the moment they're earned no matter what page
+  // you're on.
+  if (STATE.pet.enabled) {
+    updatePetHappinessForNewDay();
+    evaluatePetDailyRewards().forEach(g => toast(`+${g.points} pts: ${g.label}`));
+  }
+  evaluateAchievements().forEach(a => toast(`Achievement unlocked: ${a.name} (+${a.points}${STATE.pet.enabled ? ' pet pts' : ' pts'})`));
+
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="shell">
       <div class="sidebar">
         <div class="brand"><span class="mark">FORGE</span><small>TRAINING LOG</small></div>
-        ${NAV_ITEMS.map(item => `
+        ${NAV_ITEMS.filter(item => item.key !== 'pet' || STATE.pet.enabled).map(item => `
           <button class="nav-item ${UI.route === item.key ? 'active' : ''}" onclick="navigate('${item.key}')">
             <span class="num">${item.num}</span>${item.label}
           </button>
@@ -341,6 +372,7 @@ function doRender() {
         </div>
       </div>
       <div class="main" id="main-content"></div>
+      ${renderPetWidget(UI.route)}
     </div>
   `;
   const main = document.getElementById('main-content');
@@ -351,6 +383,8 @@ function doRender() {
   else if (UI.route === 'goals') main.innerHTML = renderGoals();
   else if (UI.route === 'food') main.innerHTML = renderFood();
   else if (UI.route === 'bodyfat') main.innerHTML = renderBodyFat();
+  else if (UI.route === 'achievements') main.innerHTML = renderAchievements();
+  else if (UI.route === 'pet') main.innerHTML = STATE.pet.enabled ? renderPetTab() : renderHome();
   else if (UI.route === 'themes') main.innerHTML = renderThemes();
 
   afterRenderHooks();
@@ -399,6 +433,8 @@ function renderHome() {
       <h1 class="page-title">Your numbers</h1>
       <p class="page-sub">Set your stats once. Your activity level is inferred automatically from what you actually plan in the Workout Plan, not a guess you pick yourself.</p>
     </div>
+
+    ${renderStepCheckinCard()}
 
     <div class="grid grid-2">
       <div class="card">
@@ -530,6 +566,41 @@ function renderHome() {
       multiplier for you. Build out your week on the Workout Plan page to sharpen this estimate.
     `)}
   `;
+}
+
+// Daily step check-in, replacing the old "just tell us your average" model.
+// Logging an actual number each day feeds getStepsAverage() above, so the
+// figure used for TDEE/activity level gets more accurate the more you use it,
+// instead of staying wherever a one-time guess landed.
+function renderStepCheckinCard() {
+  const today = todayISO();
+  const todayEntry = STATE.dailyCheckins[today];
+  const ctx = buildGameContext();
+  return `
+    <div class="card">
+      <div class="card-title">
+        Today's step check-in
+        ${ctx.checkinStreak > 1 ? `<span class="badge badge-ok">${ctx.checkinStreak} day streak</span>` : ''}
+      </div>
+      <div class="field-row" style="align-items:end;">
+        <div class="field" style="margin-bottom:0;">
+          <label>Steps so far today</label>
+          <input type="number" data-focus-id="step-checkin" min="0" step="500" value="${todayEntry ? todayEntry.steps : ''}" placeholder="e.g. 8000" onchange="submitStepCheckin(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
+        </div>
+        ${todayEntry ? `<div class="badge badge-ok" style="flex-shrink:0;">Logged today</div>` : ''}
+      </div>
+      <p class="hint" style="margin-top:8px;">Update it any time today, your latest number is what counts. Your rolling average (currently ${getStepsAverage().toLocaleString()}/day) is what drives your activity level, not a one-time guess, so the more you check in, the more accurate it gets.</p>
+    </div>
+  `;
+}
+
+function submitStepCheckin(value) {
+  const steps = Math.max(0, Number(value) || 0);
+  STATE.dailyCheckins[todayISO()] = { steps };
+  persist();
+  const granted = typeof evaluatePetDailyRewards === 'function' ? evaluatePetDailyRewards() : [];
+  render();
+  granted.forEach(g => toast(`+${g.points} pts: ${g.label}`));
 }
 
 function cmToFeetInches(cm) {

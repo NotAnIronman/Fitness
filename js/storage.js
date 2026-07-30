@@ -76,6 +76,36 @@ function defaultState() {
     // network, so the more you search, the more gets answered locally and the
     // less USDA's rate limit gets hit, this fills in over time as you use the app.
     foodIndexPool: [],
+    // Daily step check-ins: an actual number logged each day, replacing the old
+    // single self-reported "average steps" figure. The real rolling average is
+    // computed from this history (see getStepsAverage in js/app.js) and gets more
+    // accurate the more days you check in. workoutPlan.stepsPerDay below becomes
+    // just a starting estimate used until enough check-ins exist.
+    dailyCheckins: {
+      // 'YYYY-MM-DD': { steps: 8000 }
+    },
+    // Secret pet companion feature, off by default. Toggled from a hidden panel
+    // in Themes.
+    pet: {
+      enabled: false,
+      species: null,          // key into PET_ANIMALS, null until first chosen
+      name: '',
+      equipped: {},           // slot -> item key, e.g. { hat: 'top_hat' }
+      ownedItems: [],         // item keys purchased from the shop
+      points: 0,
+      totalPointsEarned: 0,
+      happiness: 80,          // 0-100, decays slowly if you go quiet, tends back up when you check in
+      lastSeenDate: null,     // last date happiness was updated, for decay calc
+      checkinStreak: 0,
+      longestStreak: 0,
+      rewardedDates: {},      // 'YYYY-MM-DD': { checkin, steps, workout, calorie } - prevents double-awarding
+      rewardedWeeks: {},      // 'weekStartYYYY-MM-DD': true - the all-metrics-hit weekly bonus
+      petClicksToday: 0,      // simple click-to-pet interaction, capped per day
+      lastClickDate: null,
+    },
+    achievements: {
+      unlocked: {}, // achievementId -> 'YYYY-MM-DD' date unlocked
+    },
     theme: {
       preset: 'forge',
       bg: '#0B0F14',

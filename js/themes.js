@@ -102,6 +102,26 @@ function renderThemes() {
         <button class="btn btn-danger" onclick="resetAllData()">Reset all data</button>
       </div>
     </div>
+
+    ${renderSecretSettings()}
+  `;
+}
+
+function renderSecretSettings() {
+  if (!UI.secretPanelOpen) {
+    return `<div style="text-align:center; margin-top:8px;"><button class="notice-pill" onclick="toggleSecretPanel()" style="opacity:0.5;">🥚 ???</button></div>`;
+  }
+  return `
+    <div class="card">
+      <div class="card-title">🥚 Secret settings</div>
+      <div class="field-row" style="align-items:center;">
+        <div class="field" style="margin-bottom:0;">
+          <label>Pet companion</label>
+          <p class="hint">A little character that hangs out on every page and cheers you on. Earn points by checking in on steps, logging workouts, and staying on target, then spend them dressing your pet up.</p>
+        </div>
+        <button class="btn ${STATE.pet.enabled ? 'btn-primary' : ''}" onclick="togglePetEnabled()">${STATE.pet.enabled ? 'Disable' : 'Enable'} pet</button>
+      </div>
+    </div>
   `;
 }
 
@@ -184,6 +204,16 @@ function importData(event) {
   };
   reader.readAsText(file);
   event.target.value = '';
+}
+
+function toggleSecretPanel() {
+  UI.secretPanelOpen = !UI.secretPanelOpen;
+  render();
+}
+function togglePetEnabled() {
+  STATE.pet.enabled = !STATE.pet.enabled;
+  persist(); render();
+  if (STATE.pet.enabled) toast('Pet companion enabled! Check the new Pet tab.');
 }
 
 function resetAllData() {
