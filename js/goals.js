@@ -42,12 +42,13 @@ function renderGoals() {
           <label>Target weight (${unit})</label>
           <input type="number" data-focus-id="goal-target-weight" step="0.1" value="${toDisplay(g.targetWeightKg)}" onchange="updateGoalTargetWeight(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
         </div>
-        <div class="field-row" style="align-items:end;">
-          <div class="field" style="margin-bottom:0; flex:1;">
+        <div class="field-row" style="align-items:end; gap:8px;">
+          ${g.targetDate ? renderDatePrevButton('shiftGoalTargetDate') : ''}
+          <div class="field" style="margin-bottom:0; flex:1; min-width:0;">
             <label>Target date</label>
             <input type="date" data-focus-id="goal-target-date" value="${g.targetDate || ''}" onchange="updateGoalField('targetDate', this.value)">
           </div>
-          ${g.targetDate ? renderDateArrows('shiftGoalTargetDate') : ''}
+          ${g.targetDate ? renderDateNextButton('shiftGoalTargetDate') : ''}
         </div>
         <p class="hint">Starting point locked at ${toDisplay(g.startWeightKg ?? cur)} ${unit} on ${g.startDate ?? todayISO()} the first time you set a goal. <button class="btn btn-ghost btn-sm" onclick="resetGoalStart()">Reset start point to today</button></p>
       </div>
@@ -189,30 +190,30 @@ function drawGoalChart() {
   const isImperial = STATE.profile.unitSystem === 'imperial';
   const toDisplay = kg => isImperial ? +kgToLb(kg).toFixed(1) : +kg.toFixed(1);
   const hasGoal = g.targetWeightKg != null && g.targetDate && g.startWeightKg != null && g.startDate;
+  if (!log.length && !hasGoal) return;
 
-  // Build a single shared, sorted set of date labels: every date you've actually
-  // logged, plus the goal's start/target dates so the trajectory line has
-  // somewhere to start and end.
-  const labelSet = new Set(log.map(e => e.date));
-  if (hasGoal) { labelSet.add(g.startDate); labelSet.add(g.targetDate); }
-  const labels = Array.from(labelSet).sort();
+  // Anchor the x-axis at day 0 = the earliest relevant date, and plot everything
+  // by real elapsed days (a linear scale), not by evenly-spaced label index. That's
+  // what makes a target 22 weeks out actually look 22 weeks out, rather than
+  // getting squashed next to a cluster of early check-ins.
+  const allDates = log.map(e => e.date).concat(hasGoal ? [g.startDate, g.targetDate] : []).sort();
+  const anchorMs = new Date(allDates[0] + 'T00:00:00').getTime();
+  const dayOffset = dateStr => Math.round((new Date(dateStr + 'T00:00:00').getTime() - anchorMs) / 86400000);
 
-  const actualByDate = {};
-  log.forEach(e => { actualByDate[e.date] = toDisplay(e.weightKg); });
-  const actualData = labels.map(d => (d in actualByDate ? actualByDate[d] : null));
+  const actualPoints = log.map(e => ({ x: dayOffset(e.date), y: toDisplay(e.weightKg) }));
 
-  let trajectoryData = null;
+  let trajectoryPoints = null;
   if (hasGoal) {
-    const startMs = new Date(g.startDate).getTime();
-    const targetMs = new Date(g.targetDate).getTime();
-    const span = targetMs - startMs;
-    trajectoryData = labels.map(d => {
-      const t = span > 0 ? (new Date(d).getTime() - startMs) / span : 0;
-      if (t < 0) return null;
-      const val = g.startWeightKg + (g.targetWeightKg - g.startWeightKg) * Math.min(t, 1.15); // let it run a little past target
-      return toDisplay(val);
-    });
+    trajectoryPoints = [
+      { x: dayOffset(g.startDate), y: toDisplay(g.startWeightKg) },
+      { x: dayOffset(g.targetDate), y: toDisplay(g.targetWeightKg) },
+    ];
   }
+
+  // Label the x-axis only at dates you actually logged (plus start/target),
+  // rather than a dense auto-generated grid, keeps it readable at a glance.
+  const tickDates = Array.from(new Set(log.map(e => e.date).concat(hasGoal ? [g.startDate, g.targetDate] : []))).sort();
+  const tickMap = new Map(tickDates.map(d => [dayOffset(d), d.slice(5)])); // 'MM-DD'
 
   if (_goalChart) { _goalChart.destroy(); }
   const styles = getComputedStyle(document.documentElement);
@@ -223,36 +224,48 @@ function drawGoalChart() {
 
   const datasets = [{
     label: `Actual weight (${isImperial ? 'lb' : 'kg'})`,
-    data: actualData,
+    data: actualPoints,
     borderColor: accent,
     backgroundColor: accent + '33',
     tension: 0.3,
     fill: true,
     pointRadius: 3,
-    spanGaps: true,
   }];
-  if (trajectoryData) {
+  if (trajectoryPoints) {
     datasets.push({
       label: 'Target pace',
-      data: trajectoryData,
+      data: trajectoryPoints,
       borderColor: accent2,
       backgroundColor: 'transparent',
       borderDash: [6, 4],
       tension: 0,
       fill: false,
       pointRadius: 0,
-      spanGaps: true,
     });
   }
 
   _goalChart = new Chart(canvas, {
     type: 'line',
-    data: { labels, datasets },
+    data: { datasets },
     options: {
       responsive: true,
-      plugins: { legend: { display: !!trajectoryData, labels: { color: textDim, boxWidth: 12, font: { size: 11 } } } },
+      plugins: {
+        legend: { display: !!trajectoryPoints, labels: { color: textDim, boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { title: (items) => tickMap.get(items[0].parsed.x) || `Day ${items[0].parsed.x}` } },
+      },
       scales: {
-        x: { ticks: { color: textDim }, grid: { color: border } },
+        x: {
+          type: 'linear',
+          ticks: {
+            color: textDim,
+            callback: (value) => tickMap.get(value) || '',
+            maxRotation: 0,
+          },
+          afterBuildTicks: (axis) => {
+            axis.ticks = Array.from(tickMap.keys()).sort((a, b) => a - b).map(v => ({ value: v }));
+          },
+          grid: { color: border },
+        },
         y: { ticks: { color: textDim }, grid: { color: border } },
       },
     },

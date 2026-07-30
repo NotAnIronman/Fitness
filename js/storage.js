@@ -87,7 +87,7 @@ function defaultState() {
     // Secret pet companion feature, off by default. Toggled from a hidden panel
     // in Themes.
     pet: {
-      enabled: false,
+      enabled: true,
       species: null,          // key into PET_ANIMALS, null until first chosen
       name: '',
       equipped: {},           // slot -> item key, e.g. { hat: 'top_hat' }

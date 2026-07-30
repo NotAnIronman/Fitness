@@ -29,6 +29,7 @@ let UI = {
   foodQuickPicksOpen: false,
   barcodeScannerOpen: false,
   barcodeStatus: '',
+  petShopGroupOpen: {},
 };
 
 function todayISO() {
@@ -405,6 +406,15 @@ function navigate(route) {
 function afterRenderHooks() {
   if (UI.route === 'goals') drawGoalChart();
   if (UI.route === 'progress') { drawProgressChart(); drawStepsChart(); }
+  if (UI.route === 'food' && typeof loadZXing === 'function') {
+    // Fire-and-forget: get the scanner library loaded in the background before
+    // it's needed. iOS Safari requires getUserMedia to fire very close to the
+    // user's tap, if there's a network/script-load delay in between (like
+    // loading this library on first tap), it can silently decline to even show
+    // the permission prompt. Preloading here means by the time someone actually
+    // taps "Scan barcode," the library is already cached and ready.
+    loadZXing().catch(() => { /* will retry properly when Scan is tapped */ });
+  }
   if (UI.route === 'workouts' || UI.route === 'log') {
     const sel = document.getElementById('ex-select');
     if (sel) {
@@ -659,11 +669,11 @@ function escapeAttr(s) {
 // Small reusable prev/next arrows to sit next to any date input. shiftFnName is
 // a global function that takes a signed integer (days to shift). Used anywhere
 // a date field exists outside the Log page's bigger day-nav.
-function renderDateArrows(shiftFnName) {
-  return `
-    <button class="btn btn-sm" style="padding:9px 12px;" onclick="${shiftFnName}(-1)" title="Previous day">\u2039</button>
-    <button class="btn btn-sm" style="padding:9px 12px;" onclick="${shiftFnName}(1)" title="Next day">\u203a</button>
-  `;
+function renderDatePrevButton(shiftFnName) {
+  return `<button class="day-nav-btn" style="width:34px; height:34px; flex-shrink:0;" onclick="${shiftFnName}(-1)" title="Previous day">\u2039</button>`;
+}
+function renderDateNextButton(shiftFnName) {
+  return `<button class="day-nav-btn" style="width:34px; height:34px; flex-shrink:0;" onclick="${shiftFnName}(1)" title="Next day">\u203a</button>`;
 }
 
 function setUnitSystem(sys) {

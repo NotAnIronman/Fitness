@@ -268,26 +268,64 @@ function renderPetShop() {
   return `
     <div class="card">
       <div class="card-title">Shop <span style="font-family:var(--font-mono); font-size:13px; color:var(--accent);">${STATE.pet.points} pts</span></div>
-      ${PET_SLOTS.map(slot => {
-        const items = PET_ITEMS.filter(i => i.slot === slot);
-        const equippedKey = STATE.pet.equipped[slot];
-        return `
-          <p class="hint" style="margin: 10px 0 6px;">${PET_SLOT_LABELS[slot]}${equippedKey ? ` <button class="btn btn-ghost btn-sm" onclick="unequipPetSlot('${slot}')">Unequip</button>` : ''}</p>
-          <div class="chip-row" style="margin-bottom:10px;">
-            ${items.map(item => {
-              const owned = STATE.pet.ownedItems.includes(item.key);
-              const equipped = equippedKey === item.key;
-              if (owned) {
-                return `<button class="chip ${equipped ? 'active' : ''}" onclick="equipPetItem('${slot}', '${item.key}')">${petIconSmall(item)} ${item.name}</button>`;
-              }
-              const afford = STATE.pet.points >= item.cost;
-              return `<button class="chip" style="${afford ? '' : 'opacity:0.5;'}" onclick="buyPetItem('${item.key}')">${petIconSmall(item)} ${item.name} \u00b7 ${item.cost}pt</button>`;
-            }).join('')}
-          </div>
-        `;
+      ${PET_SLOTS.map(slot => renderShopSlot(slot)).join('')}
+    </div>
+  `;
+}
+
+function renderShopSlot(slot) {
+  const items = PET_ITEMS.filter(i => i.slot === slot);
+  const equippedKey = STATE.pet.equipped[slot];
+  const header = `<p class="hint" style="margin: 10px 0 6px;">${PET_SLOT_LABELS[slot]}${equippedKey ? ` <button class="btn btn-ghost btn-sm" onclick="unequipPetSlot('${slot}')">Unequip</button>` : ''}</p>`;
+
+  // Group by an optional `group` field on the item (e.g. "Hands", "Flowers",
+  // "Tools"). Slots where nothing sets a group (most of them) just render as
+  // one flat row, same as before, only slots someone has actually organized
+  // into groups (typically a big "accessory" list) get the collapsible
+  // sub-sections, so this doesn't add clutter anywhere it isn't needed.
+  const groups = {};
+  items.forEach(item => { (groups[item.group || ''] = groups[item.group || '']  || []).push(item); });
+  const groupNames = Object.keys(groups);
+  const hasRealGroups = groupNames.some(g => g !== '') && groupNames.length > 1;
+
+  if (!hasRealGroups) {
+    return header + renderShopChipRow(items, slot, equippedKey);
+  }
+
+  return header + groupNames.map(gName => {
+    const groupKey = `${slot}:${gName}`;
+    const isOpen = !!UI.petShopGroupOpen[groupKey];
+    const label = gName || 'Other';
+    const groupItems = groups[gName];
+    const ownedInGroup = groupItems.filter(i => STATE.pet.ownedItems.includes(i.key)).length;
+    return `
+      <button class="notice-pill" onclick="togglePetShopGroup('${groupKey}')" style="margin-bottom:6px;">
+        <span class="plus">${isOpen ? '\u2212' : '+'}</span> ${escapeAttr(label)} (${groupItems.length}${ownedInGroup ? `, ${ownedInGroup} owned` : ''})
+      </button>
+      ${isOpen ? renderShopChipRow(groupItems, slot, equippedKey) : ''}
+    `;
+  }).join('');
+}
+
+function renderShopChipRow(items, slot, equippedKey) {
+  return `
+    <div class="chip-row" style="margin-bottom:10px;">
+      ${items.map(item => {
+        const owned = STATE.pet.ownedItems.includes(item.key);
+        const equipped = equippedKey === item.key;
+        if (owned) {
+          return `<button class="chip ${equipped ? 'active' : ''}" onclick="equipPetItem('${slot}', '${item.key}')">${petIconSmall(item)} ${item.name}</button>`;
+        }
+        const afford = STATE.pet.points >= item.cost;
+        return `<button class="chip" style="${afford ? '' : 'opacity:0.5;'}" onclick="buyPetItem('${item.key}')">${petIconSmall(item)} ${item.name} \u00b7 ${item.cost}pt</button>`;
       }).join('')}
     </div>
   `;
+}
+
+function togglePetShopGroup(key) {
+  UI.petShopGroupOpen[key] = !UI.petShopGroupOpen[key];
+  render();
 }
 
 // ---------- Floating widget shown on every page ----------

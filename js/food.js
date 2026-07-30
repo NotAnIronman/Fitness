@@ -51,12 +51,13 @@ function renderFood() {
       </div>
     ` : ''}
 
-    <div class="field-row" style="max-width:340px; margin-bottom:16px; align-items:end;">
-      <div class="field" style="margin-bottom:0;">
+    <div class="field-row" style="max-width:340px; margin-bottom:16px; align-items:end; gap:8px;">
+      ${renderDatePrevButton('shiftFoodDate')}
+      <div class="field" style="margin-bottom:0; flex:1; min-width:0;">
         <label>Date</label>
         <input type="date" data-focus-id="food-date" value="${date}" onchange="setFoodDate(this.value)">
       </div>
-      ${renderDateArrows('shiftFoodDate')}
+      ${renderDateNextButton('shiftFoodDate')}
     </div>
 
     <div class="grid grid-2" style="margin-bottom:16px;">

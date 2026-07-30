@@ -89,7 +89,9 @@ async function startBarcodeScan() {
   if (!video) return; // user navigated away before this resolved
 
   try {
-    _zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+    // delayBetweenScanAttempts defaults to 500ms, faster here so a barcode gets
+    // picked up quickly instead of needing to hold it steady for a while.
+    _zxingReader = new ZXingBrowser.BrowserMultiFormatReader(undefined, { delayBetweenScanAttempts: 100 });
     UI.barcodeStatus = 'Point your camera at a product barcode.';
     _zxingControls = await _zxingReader.decodeFromConstraints(
       { video: { facingMode: 'environment' } },
