@@ -272,18 +272,19 @@ const FOOD_FALLBACK_DB = [
    the slots that actually need adjusting:
      anchors: {
        hat: { top: '-42%', left: '50%' },
-       eyewear: { top: '15%', left: '48%', width: '55%' },
+       eyewear: { top: '15%', left: '48%', scale: 1.3 },
      }
-   top/left are CSS position values (e.g. percentages work well since the
-   sprite scales for different display sizes around the app). width/height
-   are optional, only needed if a piece of custom art should render larger
-   or smaller than the default relative size for that slot. Easiest way to
-   tune these: change a value, reload, see how the Pet page looks, repeat.
-   Slots with no matching entry in `anchors` just use the shared default.
+   top/left are CSS position values (percentages work well since the sprite
+   scales for different sizes around the app). scale is optional, a plain
+   multiplier (1.3 = 30% bigger than the default relative size for that
+   slot), only needed if a piece of custom art should render larger or
+   smaller than usual. Easiest way to tune these: change a value, reload,
+   see how the Pet page looks, repeat. Slots with no matching entry in
+   `anchors` just use the shared default.
    ============================================================ */
 
 const PET_ANIMALS = [
-  { key: 'dog', emoji: '🐶', name: 'Dog', img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F436.svg' },
+  { key: 'dog', emoji: '🐶', name: 'Dog' },
   { key: 'cat', emoji: '🐱', name: 'Cat' },
   { key: 'fox', emoji: '🦊', name: 'Fox' },
   { key: 'bear', emoji: '🐻', name: 'Bear' },

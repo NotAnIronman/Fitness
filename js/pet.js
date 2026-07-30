@@ -141,9 +141,14 @@ function petClickInteract() {
 // ---------- Rendering ----------
 // Renders one wearable/base slot as either its emoji (default) or custom art,
 // if an `img` URL has been set for it (see PET_ANIMALS/PET_ITEMS in data.js).
-function petVisual(entry, altText) {
+// sizePx: rendered size in pixels. Percentage sizing (width:100%) doesn't work
+// here since the containing <span> has no explicit size of its own, that was
+// the original bug: emoji rendered fine because text doesn't need a sized
+// container, but an <img> with percentage dimensions inside an unsized
+// element resolves to nothing and shows blank.
+function petVisual(entry, altText, sizePx) {
   if (entry && entry.img) {
-    return `<img src="${escapeAttr(entry.img)}" alt="${escapeAttr(altText)}" style="width:100%; height:100%; object-fit:contain; display:block;" loading="lazy">`;
+    return `<img src="${escapeAttr(entry.img)}" alt="${escapeAttr(altText)}" style="width:${sizePx}px; height:${sizePx}px; object-fit:contain; display:block;" loading="lazy">`;
   }
   return entry ? entry.emoji : '';
 }
@@ -159,17 +164,18 @@ function renderPetSprite(size) {
     const item = itemFor(slotName);
     if (!item) return '';
     // A species can override where a slot sits via animal.anchors[slot] (e.g.
-    // { top: '-30%', left: '48%' }), useful once custom art isn't a uniform
-    // square like emoji are. Falls back to the generic CSS position (see
-    // .pet-slot-* in styles.css) when no override is set for this species.
+    // { top: '-30%', left: '48%', scale: 1.2 }), useful once custom art isn't
+    // a uniform square the way emoji are. Falls back to the generic CSS
+    // position (see .pet-slot-* in styles.css) when no override is set.
     const anchor = animal.anchors && animal.anchors[slotName];
-    const posStyle = anchor ? `top:${anchor.top}; left:${anchor.left};${anchor.width ? ` width:${anchor.width}; height:${anchor.height || anchor.width};` : ''}` : '';
-    return `<span class="pet-overlay pet-slot-${slotName}" style="font-size:${size * defaultScale[slotName]}px; ${posStyle}">${petVisual(item, item.name)}</span>`;
+    const posStyle = anchor ? `top:${anchor.top}; left:${anchor.left};` : '';
+    const slotSizePx = size * defaultScale[slotName] * (anchor && anchor.scale ? anchor.scale : 1);
+    return `<span class="pet-overlay pet-slot-${slotName}" style="font-size:${slotSizePx}px; width:${slotSizePx}px; height:${slotSizePx}px; ${posStyle}">${petVisual(item, item.name, slotSizePx)}</span>`;
   };
 
   return `
     <div class="pet-sprite" style="width:${size}px; height:${size}px; font-size:${size}px;" onclick="petClickInteract()" title="Click to give some love">
-      <span class="pet-base">${petVisual(animal, animal.name)}</span>
+      <span class="pet-base" style="width:${size}px; height:${size}px;">${petVisual(animal, animal.name, size)}</span>
       ${slotSpan('hat')}
       ${slotSpan('eyewear')}
       ${slotSpan('face')}
