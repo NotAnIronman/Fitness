@@ -168,7 +168,7 @@ button {
   .sidebar {
     position: sticky; top: 0; z-index: 20;
     height: auto; flex-direction: row; overflow-x: auto;
-    padding: 10px 12px; gap: 6px; align-items: center;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px; gap: 6px; align-items: center;
     -webkit-overflow-scrolling: touch;
   }
   .brand { padding: 4px 8px; flex-shrink: 0; }
@@ -624,8 +624,8 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 
 .pet-widget {
   position: fixed;
-  bottom: 18px;
-  right: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  right: calc(18px + env(safe-area-inset-right));
   display: flex;
   align-items: flex-end;
   gap: 8px;
@@ -645,6 +645,6 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 }
 .pet-widget .pet-sprite { filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); }
 @media (max-width: 900px) {
-  .pet-widget { bottom: 12px; right: 12px; }
+  .pet-widget { bottom: calc(12px + env(safe-area-inset-bottom)); right: calc(12px + env(safe-area-inset-right)); }
   .pet-widget-bubble { display: none; }
 }
