@@ -239,6 +239,22 @@ function getEnergyBreakdown({ bmr, tdee, dailyExerciseKcal }) {
 // Flags dangerously low logged intake. This is a coarse rule-of-thumb floor, not
 // personalized medical advice, intended to catch clearly-too-low days (e.g. a few
 // hundred calories) rather than fine-tune anyone's specific target.
+// --- Daily water target ---
+// Baseline of ~30-35 ml per kg of bodyweight/day is a commonly cited general
+// guideline (e.g. often summarized from sports medicine and dietetics sources).
+// The male/female adjustment loosely reconciles with the US National Academy of
+// Medicine's Adequate Intake figures for total water (~3.7L/day men, ~2.7L/day
+// women for a reference-sized adult), scaled here by actual bodyweight instead
+// of population averages. This is a general baseline, not personalized medical
+// advice, actual needs go up with heat, altitude, and exercise/sweat.
+function getWaterTargetMl(weightKg, sex) {
+  if (!weightKg) return null;
+  const mlPerKg = 33;
+  let target = weightKg * mlPerKg;
+  if (sex === 'male') target *= 1.1;
+  return Math.round(target / 50) * 50; // round to a clean number
+}
+
 function checkIntakeSafety(loggedKcal, sex) {
   const floor = MIN_SAFE_INTAKE[sex] || MIN_SAFE_INTAKE.female;
   if (loggedKcal > 0 && loggedKcal < floor) {

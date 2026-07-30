@@ -42,14 +42,21 @@ function renderGoals() {
           <label>Target weight (${unit})</label>
           <input type="number" data-focus-id="goal-target-weight" step="0.1" value="${toDisplay(g.targetWeightKg)}" onchange="updateGoalTargetWeight(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
         </div>
-        <div class="field-row" style="align-items:end; gap:8px;">
-          ${g.targetDate ? renderDatePrevButton('shiftGoalTargetDate') : ''}
-          <div class="field" style="margin-bottom:0; flex:1; min-width:0;">
-            <label>Target date</label>
-            <input type="date" data-focus-id="goal-target-date" value="${g.targetDate || ''}" onchange="updateGoalField('targetDate', this.value)">
+        ${g.targetDate ? `
+          <div class="date-nav-row">
+            ${renderDatePrevButton('shiftGoalTargetDate')}
+            <div class="field date-nav-bar" style="margin-bottom:0;">
+              <label>Target date</label>
+              <input type="date" data-focus-id="goal-target-date" value="${g.targetDate}" onchange="updateGoalField('targetDate', this.value)">
+            </div>
+            ${renderDateNextButton('shiftGoalTargetDate')}
           </div>
-          ${g.targetDate ? renderDateNextButton('shiftGoalTargetDate') : ''}
-        </div>
+        ` : `
+          <div class="field">
+            <label>Target date</label>
+            <input type="date" data-focus-id="goal-target-date" value="" onchange="updateGoalField('targetDate', this.value)">
+          </div>
+        `}
         <p class="hint">Starting point locked at ${toDisplay(g.startWeightKg ?? cur)} ${unit} on ${g.startDate ?? todayISO()} the first time you set a goal. <button class="btn btn-ghost btn-sm" onclick="resetGoalStart()">Reset start point to today</button></p>
       </div>
 

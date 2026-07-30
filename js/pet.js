@@ -71,25 +71,52 @@ function evaluatePetDailyRewards() {
 }
 
 // ---------- Happiness (runs once per calendar day) ----------
-function updatePetHappinessForNewDay() {
+// How often the pet needs attention to stay happy, and how fast happiness
+// falls once overdue. Shortened from once-a-day to a few hours based on
+// feedback that a tighter cadence actually motivated more frequent check-ins.
+// Tune these two numbers to adjust the pace.
+const PET_CARE_INTERVAL_HOURS = 4;
+const PET_DECAY_PER_HOUR = 6;
+
+// Call this on any genuine caring action (step check-in, logging a workout,
+// logging food, feeding/watering, clicking to pet) to reset the countdown and
+// give a small happiness boost.
+function markPetInteraction(boost) {
   if (!STATE.pet.enabled) return;
-  const today = todayISO();
-  if (STATE.pet.lastSeenDate === today) return; // already handled today
-  const p = STATE.pet;
-  if (p.lastSeenDate) {
-    const gapDays = Math.round((new Date(today) - new Date(p.lastSeenDate)) / 86400000);
-    if (gapDays > 1) {
-      p.happiness = Math.max(0, p.happiness - (gapDays - 1) * 8);
-    } else if (gapDays === 1) {
-      const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-      const yIso = yesterday.toISOString().slice(0, 10);
-      const r = STATE.pet.rewardedDates[yIso];
-      const hadActivity = r && (r.checkin || r.workout || r.calorie);
-      p.happiness = Math.max(0, Math.min(100, p.happiness + (hadActivity ? 2 : -3)));
-    }
-  }
-  p.lastSeenDate = today;
+  STATE.pet.lastInteractionAt = Date.now();
+  STATE.pet.happiness = Math.min(100, STATE.pet.happiness + (boost || 5));
   persist();
+}
+
+// Derives current happiness from elapsed time since the last interaction,
+// rather than mutating it incrementally once a day, this way "needing
+// attention" is continuous and responsive to the shorter interval above
+// instead of only ever being evaluated once every 24 hours.
+// Generic version of the decay math above, used for hunger/thirst too (each
+// tracked by its own "last fed/watered" timestamp instead of general
+// interaction, since feeding shouldn't satisfy thirst and vice versa).
+function decayPetStat(lastAtField, statField, intervalHours, decayPerHour) {
+  const p = STATE.pet;
+  if (!p[lastAtField]) {
+    p[lastAtField] = Date.now();
+    persist();
+    return;
+  }
+  const hoursSince = (Date.now() - p[lastAtField]) / 3600000;
+  if (hoursSince <= intervalHours) return;
+  const overdueHours = hoursSince - intervalHours;
+  const target = Math.max(0, 100 - overdueHours * decayPerHour);
+  if (target < p[statField]) {
+    p[statField] = target;
+    persist();
+  }
+}
+
+function updatePetHappinessDecay() {
+  if (!STATE.pet.enabled || !STATE.pet.species) return;
+  decayPetStat('lastInteractionAt', 'happiness', PET_CARE_INTERVAL_HOURS, PET_DECAY_PER_HOUR);
+  decayPetStat('lastFedAt', 'hunger', PET_CARE_INTERVAL_HOURS, PET_DECAY_PER_HOUR);
+  decayPetStat('lastWateredAt', 'thirst', PET_CARE_INTERVAL_HOURS, PET_DECAY_PER_HOUR);
 }
 
 function happinessMood(h) {
@@ -111,6 +138,10 @@ function renamePet(name) {
   STATE.pet.name = name.trim().slice(0, 24) || 'Pet';
   persist(); render();
 }
+function togglePetChangePanel() {
+  UI.petChangePanelOpen = !UI.petChangePanelOpen;
+  render();
+}
 function buyPetItem(key) {
   const item = PET_ITEMS.find(i => i.key === key);
   if (!item) return;
@@ -129,13 +160,30 @@ function unequipPetSlot(slot) {
   delete STATE.pet.equipped[slot];
   persist(); render();
 }
+function feedPetItem() {
+  if (!STATE.pet.foodInventory) { toast('No food saved up yet, log a meal on the Food page first.'); return; }
+  STATE.pet.foodInventory -= 1;
+  STATE.pet.hunger = Math.min(100, STATE.pet.hunger + 35);
+  STATE.pet.lastFedAt = Date.now();
+  persist(); render();
+  toast(`${STATE.pet.name || 'Your pet'} is happily eating!`);
+}
+function waterPetItem() {
+  if (!STATE.pet.waterInventory) { toast('No water saved up yet, log some on the Food page first.'); return; }
+  STATE.pet.waterInventory -= 1;
+  STATE.pet.thirst = Math.min(100, STATE.pet.thirst + 35);
+  STATE.pet.lastWateredAt = Date.now();
+  persist(); render();
+  toast(`${STATE.pet.name || 'Your pet'} is drinking up!`);
+}
+
 function petClickInteract() {
   const today = todayISO();
   if (STATE.pet.lastClickDate !== today) { STATE.pet.petClicksToday = 0; STATE.pet.lastClickDate = today; }
   if (STATE.pet.petClicksToday >= 5) { toast(`${STATE.pet.name || 'Your pet'} needs a little space now, try again tomorrow!`); return; }
   STATE.pet.petClicksToday++;
-  STATE.pet.happiness = Math.min(100, STATE.pet.happiness + 2);
-  persist(); render();
+  markPetInteraction(2);
+  render();
 }
 
 // ---------- Rendering ----------
@@ -217,7 +265,12 @@ function renderPetTab() {
   }
 
   const mood = happinessMood(STATE.pet.happiness);
-  const cheer = PET_CHEER.pet[Math.floor(Math.random() * PET_CHEER.pet.length)];
+  // The pet mentions being hungry/thirsty instead of a generic cheer when it
+  // actually is one, ties the caretaking directly to what you're logging.
+  let cheer;
+  if (STATE.pet.hunger < 30) cheer = PET_CHEER.hungry[Math.floor(Math.random() * PET_CHEER.hungry.length)];
+  else if (STATE.pet.thirst < 30) cheer = PET_CHEER.thirsty[Math.floor(Math.random() * PET_CHEER.thirsty.length)];
+  else cheer = PET_CHEER.pet[Math.floor(Math.random() * PET_CHEER.pet.length)];
   const ctx = buildGameContext();
 
   return `
@@ -230,19 +283,42 @@ function renderPetTab() {
     <div class="card" style="text-align:center;">
       ${renderPetSprite(90)}
       <p class="hint" style="margin-top:8px; font-style:italic;">"${cheer}"</p>
+
+      ${(STATE.pet.foodInventory > 0 || STATE.pet.waterInventory > 0) ? `
+        <div class="pet-tray">
+          ${Array.from({ length: STATE.pet.foodInventory }).map(() => `<button class="pet-tray-item" onclick="feedPetItem()" title="Feed">🍗</button>`).join('')}
+          ${Array.from({ length: STATE.pet.waterInventory }).map(() => `<button class="pet-tray-item" onclick="waterPetItem()" title="Give water">💧</button>`).join('')}
+        </div>
+        <p class="hint">Tap an item to feed or water ${escapeAttr(STATE.pet.name)}. Logging meals and water on the Food page adds more here.</p>
+      ` : `<p class="hint">Log a meal or some water on the Food page, it'll show up here to feed ${escapeAttr(STATE.pet.name)}.</p>`}
+
       <div class="grid grid-3" style="margin-top:14px;">
+        <div class="stat"><div class="stat-label">Happiness</div><div class="stat-value" style="font-size:18px;">${mood.label} ${mood.emoji}</div></div>
+        <div class="stat"><div class="stat-label">Hunger</div><div class="stat-value" style="font-size:18px; color:${STATE.pet.hunger < 30 ? 'var(--danger)' : 'var(--text)'};">${Math.round(STATE.pet.hunger)}%</div></div>
+        <div class="stat"><div class="stat-label">Thirst</div><div class="stat-value" style="font-size:18px; color:${STATE.pet.thirst < 30 ? 'var(--danger)' : 'var(--text)'};">${Math.round(STATE.pet.thirst)}%</div></div>
+      </div>
+      <div class="macro-bar-track" style="margin-top:8px;"><div class="macro-bar-fill" style="width:${STATE.pet.happiness}%; background:var(--accent);"></div></div>
+      <div class="macro-bar-track" style="margin-top:6px;"><div class="macro-bar-fill" style="width:${STATE.pet.hunger}%; background:#F97316;"></div></div>
+      <div class="macro-bar-track" style="margin-top:6px;"><div class="macro-bar-fill" style="width:${STATE.pet.thirst}%; background:#38BDF8;"></div></div>
+      <div class="grid grid-3" style="margin-top:6px;">
         <div class="stat"><div class="stat-label">Points</div><div class="stat-value accent">${STATE.pet.points}</div></div>
-        <div class="stat"><div class="stat-label">Mood</div><div class="stat-value" style="font-size:18px;">${mood.label} ${mood.emoji}</div></div>
         <div class="stat"><div class="stat-label">Check-in streak</div><div class="stat-value" style="font-size:18px;">${ctx.checkinStreak}d</div></div>
+        <div class="stat"><div class="stat-label">Needs attention every</div><div class="stat-value" style="font-size:18px;">${PET_CARE_INTERVAL_HOURS}h</div></div>
       </div>
-      <div class="macro-bar-track" style="margin-top:12px;"><div class="macro-bar-fill" style="width:${STATE.pet.happiness}%; background:var(--accent);"></div></div>
-      <div class="field" style="max-width:260px; margin:16px auto 0;">
-        <label>Rename</label>
-        <input type="text" data-focus-id="pet-name" value="${escapeAttr(STATE.pet.name)}" onchange="renamePet(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
-      </div>
-      <div class="chip-row" style="justify-content:center; margin-top:10px;">
-        ${PET_ANIMALS.map(a => `<button class="chip ${a.key === STATE.pet.species ? 'active' : ''}" onclick="choosePetSpecies('${a.key}')">${petIconSmall(a)}</button>`).join('')}
-      </div>
+
+      <button class="btn btn-sm" style="margin-top:14px;" onclick="togglePetChangePanel()">${UI.petChangePanelOpen ? 'Close' : 'Change Pet'}</button>
+      ${UI.petChangePanelOpen ? `
+        <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px; margin-top:10px; text-align:left;">
+          <div class="field" style="max-width:260px; margin:0 auto 12px;">
+            <label>Rename</label>
+            <input type="text" data-focus-id="pet-name" value="${escapeAttr(STATE.pet.name)}" onchange="renamePet(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
+          </div>
+          <p class="hint" style="text-align:center; margin-bottom:8px;">Species</p>
+          <div class="chip-row" style="justify-content:center;">
+            ${PET_ANIMALS.map(a => `<button class="chip ${a.key === STATE.pet.species ? 'active' : ''}" onclick="choosePetSpecies('${a.key}')">${petIconSmall(a)}</button>`).join('')}
+          </div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="card">
@@ -294,7 +370,9 @@ function renderShopSlot(slot) {
 
   return header + groupNames.map(gName => {
     const groupKey = `${slot}:${gName}`;
-    const isOpen = !!UI.petShopGroupOpen[groupKey];
+    // Groups default open (undefined -> open); once someone explicitly
+    // collapses one, that choice (false) sticks.
+    const isOpen = UI.petShopGroupOpen[groupKey] !== false;
     const label = gName || 'Other';
     const groupItems = groups[gName];
     const ownedInGroup = groupItems.filter(i => STATE.pet.ownedItems.includes(i.key)).length;
@@ -324,7 +402,8 @@ function renderShopChipRow(items, slot, equippedKey) {
 }
 
 function togglePetShopGroup(key) {
-  UI.petShopGroupOpen[key] = !UI.petShopGroupOpen[key];
+  const currentlyOpen = UI.petShopGroupOpen[key] !== false;
+  UI.petShopGroupOpen[key] = !currentlyOpen;
   render();
 }
 

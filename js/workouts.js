@@ -166,6 +166,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
           <span class="set-label">SET ${i + 1}</span>
           ${showCheckbox ? `<input type="checkbox" ${s.completed ? 'checked' : ''} ${checkboxAttr}>` : ''}
           <span class="set-detail">${s.reps} reps @ ${loadLb} lb${s.weightIsPerSide ? ' per side' : ''}</span>
+          ${target.scope === 'log' ? `<button class="icon-btn" onclick="quickStartRestTimer('Rest, ${escapeAttr(ex.name)} set ${i + 1}')" title="Start rest timer">\u23F1</button>` : ''}
         </div>
       `;
     }).join('');
@@ -174,6 +175,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
         <div class="exercise-block-header">
           <div class="name" style="${allDone ? 'opacity:0.55;' : ''}">${escapeAttr(ex.name)}${allDone ? ' \u2713' : ''}</div>
           <div class="kcal">${kcalTip}</div>
+          ${target.scope === 'log' ? `<button class="icon-btn" onclick="quickStartRestTimer('Rest before next exercise')" title="Start rest timer">\u23F1</button>` : ''}
           <button class="icon-btn" onclick="${editAttr}" title="Edit">\u270E</button>
           <button class="icon-btn" onclick="${removeAttr}" title="Remove">x</button>
         </div>
@@ -200,6 +202,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
         <div class="meta">${meta} . ${ex.bodyPart || ex.category || 'Custom'}</div>
       </div>
       <div class="kcal">${kcalTip}</div>
+      ${target.scope === 'log' && ex.category === 'Strength' ? `<button class="icon-btn" onclick="quickStartRestTimer('Rest, ${escapeAttr(ex.name)}')" title="Start rest timer">\u23F1</button>` : ''}
       <button class="icon-btn" onclick="${editAttr}" title="Edit">\u270E</button>
       <button class="icon-btn" onclick="${removeAttr}" title="Remove">x</button>
     </div>
@@ -486,6 +489,9 @@ function submitExerciseForm(scope, dayId) {
   const label = ex ? ex.name : (entry.custom ? entry.custom.name : 'Exercise');
   const key = entry.exerciseId || ('custom:' + (entry.custom ? entry.custom.name : label));
   recordRecentExercise(key, label, entry);
+
+  const loggedScope = editing ? editing.scope : scope;
+  if (loggedScope === 'log' && typeof markPetInteraction === 'function') markPetInteraction(3);
 
   UI.addExerciseOpenFor = null;
   UI.logAddOpen = false;

@@ -30,6 +30,7 @@ function defaultState() {
         // { id, name: 'Monday', exercises: [ {id, exerciseId, sets, reps, weightKg, durationMin, distanceKm} ] }
       ],
       stepsPerDay: 6000,
+      restTimerSeconds: 90, // default rest timer duration, adjustable on the Workout Log page
     },
     // Dated workout history, separate from the weekly workoutPlan template above.
     // Lets someone log what they actually did (or backfill a missed day, or plan
@@ -84,6 +85,12 @@ function defaultState() {
     dailyCheckins: {
       // 'YYYY-MM-DD': { steps: 8000 }
     },
+    // Water intake, logged per day in ml. Target is computed from bodyweight/sex
+    // (see getWaterTargetMl in js/food.js), this just stores what's actually
+    // been logged.
+    dailyWater: {
+      // 'YYYY-MM-DD': { ml: 1500 }
+    },
     // Secret pet companion feature, off by default. Toggled from a hidden panel
     // in Themes.
     pet: {
@@ -94,14 +101,21 @@ function defaultState() {
       ownedItems: [],         // item keys purchased from the shop
       points: 0,
       totalPointsEarned: 0,
-      happiness: 80,          // 0-100, decays slowly if you go quiet, tends back up when you check in
-      lastSeenDate: null,     // last date happiness was updated, for decay calc
-      checkinStreak: 0,
-      longestStreak: 0,
+      happiness: 80,          // 0-100, derived from how recently you've interacted, see updatePetHappinessDecay
+      lastInteractionAt: null, // ms timestamp of last caring action (checkin, workout/food log, click, feed, water)
+      lastSeenDate: null,      // legacy field kept so old saves still deepMerge cleanly, unused by current logic
       rewardedDates: {},      // 'YYYY-MM-DD': { checkin, steps, workout, calorie } - prevents double-awarding
       rewardedWeeks: {},      // 'weekStartYYYY-MM-DD': true - the all-metrics-hit weekly bonus
       petClicksToday: 0,      // simple click-to-pet interaction, capped per day
       lastClickDate: null,
+      // Food/water: logging a meal or water on the Food page adds one to the
+      // matching tray below the pet on the Pet page, tap an item to feed/water.
+      foodInventory: 0,
+      waterInventory: 0,
+      hunger: 100,             // 0-100, decays like happiness, feeding refills it
+      thirst: 100,             // 0-100, decays like happiness, watering refills it
+      lastFedAt: null,
+      lastWateredAt: null,
     },
     achievements: {
       unlocked: {}, // achievementId -> 'YYYY-MM-DD' date unlocked

@@ -51,14 +51,16 @@ function renderFood() {
       </div>
     ` : ''}
 
-    <div class="field-row" style="max-width:340px; margin-bottom:16px; align-items:end; gap:8px;">
+    <div class="date-nav-row" style="max-width:400px;">
       ${renderDatePrevButton('shiftFoodDate')}
-      <div class="field" style="margin-bottom:0; flex:1; min-width:0;">
+      <div class="field date-nav-bar" style="margin-bottom:0;">
         <label>Date</label>
         <input type="date" data-focus-id="food-date" value="${date}" onchange="setFoodDate(this.value)">
       </div>
       ${renderDateNextButton('shiftFoodDate')}
     </div>
+
+    ${renderWaterCard(date)}
 
     <div class="grid grid-2" style="margin-bottom:16px;">
       <div class="card">
@@ -280,6 +282,56 @@ function getFoodTargetCalories() {
 function formatQty(q) {
   const n = Number(q);
   return n % 1 === 0 ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+// ---------- Water tracking ----------
+// Quick-add chips for common amounts, a target from bodyweight/sex (see
+// getWaterTargetMl in calc.js), and each log grants your pet a water item on
+// the Pet page tray (see js/pet.js).
+function renderWaterCard(date) {
+  const p = STATE.profile;
+  const isImperial = p.unitSystem === 'imperial';
+  const entry = STATE.dailyWater[date];
+  const loggedMl = entry ? entry.ml : 0;
+  const target = getWaterTargetMl(p.weightKg, p.sex);
+  const toDisplay = ml => isImperial ? `${(ml / 29.5735).toFixed(0)} fl oz` : `${(ml / 1000).toFixed(2)} L`;
+  const pct = target ? Math.min(100, (loggedMl / target) * 100) : 0;
+
+  return `
+    <div class="card">
+      <div class="card-title">Water</div>
+      ${target ? `
+        <div class="grid grid-2" style="margin-bottom:10px;">
+          <div class="stat"><div class="stat-label">Logged today</div><div class="stat-value" style="font-size:20px;">${toDisplay(loggedMl)}</div></div>
+          <div class="stat"><div class="stat-label">Target</div><div class="stat-value accent" style="font-size:20px;">${toDisplay(target)}</div></div>
+        </div>
+        <div class="macro-bar-track" style="margin-bottom:12px;"><div class="macro-bar-fill" style="width:${pct}%; background:#38BDF8;"></div></div>
+        <p class="hint" style="margin-bottom:10px;">Baseline of ~33ml per kg of bodyweight (a commonly cited general range), adjusted slightly by sex. Hotter days, altitude, and heavy sweating all push actual needs higher.</p>
+        <div class="chip-row">
+          ${[250, 350, 500, 750].map(ml => `<button class="chip" onclick="logWater(${ml}, '${date}')">+${toDisplay(ml)}</button>`).join('')}
+          <button class="chip" onclick="undoLastWater('${date}')">Undo last</button>
+        </div>
+      ` : `<div class="hint">Set your weight on Home to see a personalized water target.</div>`}
+    </div>
+  `;
+}
+
+function logWater(ml, date) {
+  const entry = STATE.dailyWater[date] || { ml: 0 };
+  entry.ml += ml;
+  STATE.dailyWater[date] = entry;
+  if (date === todayISO()) {
+    STATE.pet.waterInventory = (STATE.pet.waterInventory || 0) + 1;
+    if (typeof markPetInteraction === 'function') markPetInteraction(2);
+  }
+  persist(); render();
+}
+
+function undoLastWater(date) {
+  const entry = STATE.dailyWater[date];
+  if (!entry || entry.ml <= 0) return;
+  entry.ml = Math.max(0, entry.ml - 250);
+  persist(); render();
 }
 
 function setFoodDate(date) {
@@ -529,6 +581,7 @@ function confirmFoodAdjust() {
     STATE.foodLog[UI.foodDate][UI.editingFoodIndex] = { ...f, qty };
   } else {
     addOrIncrementFood(f, qty);
+    grantPetFoodIfToday();
   }
   recordRecentFood(f);
   UI.foodAdjustDraft = null;
@@ -553,10 +606,19 @@ function submitCustomFood() {
     fat: Number(document.getElementById('cf-fat').value) || 0,
   };
   addOrIncrementFood(f, 1);
+  grantPetFoodIfToday();
   recordRecentFood(f);
   UI.showCustomFood = false;
   persist(); render();
   toast('Added to log');
+}
+
+// A new (not edited/backfilled) food log entry for today gives your pet
+// something to eat, shown as a tray item on the Pet page.
+function grantPetFoodIfToday() {
+  if (UI.foodDate !== todayISO()) return;
+  STATE.pet.foodInventory = (STATE.pet.foodInventory || 0) + 1;
+  if (typeof markPetInteraction === 'function') markPetInteraction(2);
 }
 
 // Groups repeat entries of the exact same food (matched on name + kcal) into one

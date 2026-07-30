@@ -30,13 +30,14 @@ let UI = {
   barcodeScannerOpen: false,
   barcodeStatus: '',
   petShopGroupOpen: {},
+  petChangePanelOpen: false,
 };
 
 // Bump this alongside CACHE_VERSION in sw.js on every deploy. Shown as a hover/
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v6';
+const APP_VERSION = 'forge-v8';
 
 function todayISO() {
   const d = new Date();
@@ -362,7 +363,7 @@ function doRender() {
   // that way points/unlocks land the moment they're earned no matter what page
   // you're on.
   if (STATE.pet.enabled) {
-    updatePetHappinessForNewDay();
+    updatePetHappinessDecay();
     evaluatePetDailyRewards().forEach(g => toast(`+${g.points} pts: ${g.label}`));
   }
   evaluateAchievements().forEach(a => toast(`Achievement unlocked: ${a.name} (+${a.points}${STATE.pet.enabled ? ' pet pts' : ' pts'})`));
@@ -386,6 +387,7 @@ function doRender() {
       </div>
       <div class="main" id="main-content"></div>
       ${renderPetWidget(UI.route)}
+      ${typeof renderRestTimerWidget === 'function' ? renderRestTimerWidget() : ''}
     </div>
   `;
   const main = document.getElementById('main-content');
@@ -653,6 +655,7 @@ function submitStepCheckin(value, date) {
   const steps = Math.max(0, Number(value) || 0);
   STATE.dailyCheckins[date] = { steps };
   persist();
+  if (date === todayISO() && typeof markPetInteraction === 'function') markPetInteraction(3);
   const granted = (date === todayISO() && typeof evaluatePetDailyRewards === 'function') ? evaluatePetDailyRewards() : [];
   render();
   granted.forEach(g => toast(`+${g.points} pts: ${g.label}`));
@@ -679,10 +682,10 @@ function escapeAttr(s) {
 // a global function that takes a signed integer (days to shift). Used anywhere
 // a date field exists outside the Log page's bigger day-nav.
 function renderDatePrevButton(shiftFnName) {
-  return `<button class="day-nav-btn" style="width:34px; height:34px; flex-shrink:0;" onclick="${shiftFnName}(-1)" title="Previous day">\u2039</button>`;
+  return `<button class="date-nav-btn" onclick="${shiftFnName}(-1)" title="Previous day">\u2039</button>`;
 }
 function renderDateNextButton(shiftFnName) {
-  return `<button class="day-nav-btn" style="width:34px; height:34px; flex-shrink:0;" onclick="${shiftFnName}(1)" title="Next day">\u203a</button>`;
+  return `<button class="date-nav-btn" onclick="${shiftFnName}(1)" title="Next day">\u203a</button>`;
 }
 
 function setUnitSystem(sys) {

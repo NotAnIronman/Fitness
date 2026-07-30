@@ -34,19 +34,31 @@ function renderLog() {
     ${renderStepCheckinCard(date)}
 
     <div class="card">
-      <div class="day-nav" style="margin-bottom:0;">
-        <button class="day-nav-btn" onclick="shiftLogDate(-1)" title="Previous day">‹</button>
-        <div class="day-nav-label">
+      <div class="card-title">Rest timer</div>
+      <div class="field-row" style="align-items:end;">
+        <div class="field" style="margin-bottom:0;">
+          <label>Default duration (seconds)</label>
+          <input type="number" data-focus-id="rest-timer-default" min="10" step="15" value="${STATE.workoutPlan.restTimerSeconds}" onchange="updateRestTimerDefault(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
+        </div>
+        <button class="btn btn-primary" onclick="quickStartRestTimer('Rest')" style="flex: 0 0 auto;">Start rest timer</button>
+      </div>
+      <p class="hint">Also available next to any exercise or set below, once you're actually logging (not on the Plan template).</p>
+    </div>
+
+    <div class="card">
+      <div class="date-nav-row" style="margin-bottom:0;">
+        <button class="date-nav-btn" onclick="shiftLogDate(-1)" title="Previous day">‹</button>
+        <div class="date-nav-bar date-nav-label">
           ${dateLabel}${isToday ? ' (today)' : ''}
           <span class="sub">${entries.length} exercise(s)${entries.length ? `, ${completedCount}/${entries.length} checked off` : ''}, ${Math.round(dayKcal)} kcal</span>
         </div>
-        <button class="day-nav-btn" onclick="shiftLogDate(1)" title="Next day">›</button>
+        <button class="date-nav-btn" onclick="shiftLogDate(1)" title="Next day">›</button>
       </div>
       <div class="field-row" style="margin-top:12px;">
         <div class="field" style="margin-bottom:0;">
           <input type="date" data-focus-id="log-date" value="${date}" onchange="setLogDate(this.value)">
         </div>
-        ${!isToday ? `<button class="btn btn-sm" onclick="setLogDate('${todayISO()}')" style="flex:0;">Jump to today</button>` : ''}
+        ${!isToday ? `<button class="btn btn-sm" onclick="setLogDate('${todayISO()}')" style="flex: 0 0 auto; white-space: nowrap;">Jump to today</button>` : ''}
       </div>
     </div>
 
@@ -121,6 +133,11 @@ function renderCopyIntoLogMenu() {
 }
 
 // ---------- Actions ----------
+
+function updateRestTimerDefault(val) {
+  STATE.workoutPlan.restTimerSeconds = Math.max(10, Number(val) || 90);
+  persist(); render();
+}
 
 function shiftLogDate(days) {
   const d = new Date(UI.logDate + 'T00:00:00');
