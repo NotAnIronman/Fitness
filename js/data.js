@@ -283,7 +283,7 @@ const FOOD_FALLBACK_DB = [
    ============================================================ */
 
 const PET_ANIMALS = [
-  { key: 'dog', emoji: '🐶', name: 'Dog' },
+  { key: 'dog', emoji: '🐶', name: 'Dog', img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F436.svg' },
   { key: 'cat', emoji: '🐱', name: 'Cat' },
   { key: 'fox', emoji: '🦊', name: 'Fox' },
   { key: 'bear', emoji: '🐻', name: 'Bear' },
