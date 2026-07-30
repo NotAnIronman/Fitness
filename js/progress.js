@@ -5,6 +5,76 @@
    ============================================================ */
 
 let _progressChart = null;
+let _stepsChart = null;
+
+function renderStepsCard() {
+  const dates = Object.keys(STATE.dailyCheckins).sort();
+  if (!dates.length) {
+    return `
+      <div class="card">
+        <div class="card-title">Steps</div>
+        <div class="empty-state">No step check-ins yet. Log a few on the <a href="#" onclick="navigate('log'); return false;">Workout Log</a> page to see your trend here.</div>
+      </div>
+    `;
+  }
+  const avgOf = n => {
+    const recent = dates.slice(-n);
+    return Math.round(recent.reduce((s, d) => s + (STATE.dailyCheckins[d].steps || 0), 0) / recent.length);
+  };
+  const allTimeAvg = avgOf(dates.length);
+  const avg7 = avgOf(Math.min(7, dates.length));
+  const avg30 = avgOf(Math.min(30, dates.length));
+
+  return `
+    <div class="card">
+      <div class="card-title">Steps</div>
+      <div class="grid grid-3" style="margin-bottom:14px;">
+        <div class="stat"><div class="stat-label">Last 7 logged days</div><div class="stat-value accent" style="font-size:22px;">${avg7.toLocaleString()}</div></div>
+        <div class="stat"><div class="stat-label">Last 30 logged days</div><div class="stat-value" style="font-size:22px;">${avg30.toLocaleString()}</div></div>
+        <div class="stat"><div class="stat-label">All-time average</div><div class="stat-value" style="font-size:22px;">${allTimeAvg.toLocaleString()}</div></div>
+      </div>
+      <canvas id="steps-chart" height="80"></canvas>
+      <p class="hint" style="margin-top:8px;">${dates.length} day(s) checked in total. Averages here are based on the days you actually logged, not calendar days, gaps don't drag them down.</p>
+    </div>
+  `;
+}
+
+function drawStepsChart() {
+  const canvas = document.getElementById('steps-chart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const dates = Object.keys(STATE.dailyCheckins).sort();
+  if (!dates.length) return;
+
+  if (_stepsChart) { _stepsChart.destroy(); }
+  const styles = getComputedStyle(document.documentElement);
+  const accent = styles.getPropertyValue('--accent').trim();
+  const textDim = styles.getPropertyValue('--text-dim').trim();
+  const border = styles.getPropertyValue('--border').trim();
+
+  _stepsChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [{
+        label: 'Steps',
+        data: dates.map(d => STATE.dailyCheckins[d].steps || 0),
+        borderColor: accent,
+        backgroundColor: accent + '33',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: textDim, maxTicksLimit: 8 }, grid: { color: border } },
+        y: { ticks: { color: textDim }, grid: { color: border } },
+      },
+    },
+  });
+}
 
 // Collects every distinct exercise that appears anywhere in the log, with a
 // human label, so the picker only shows things the person has actually logged.
@@ -117,6 +187,8 @@ function renderProgress() {
       <h1 class="page-title">Progress</h1>
       <p class="page-sub">Pulled from your Workout Log. Log the same exercise on different days to start seeing a trend here, watching a number go up over weeks is one of the best motivators there is.</p>
     </div>
+
+    ${renderStepsCard()}
 
     ${!options.length ? `
       <div class="card"><div class="empty-state"><div class="big">-</div>Nothing logged yet. Head to the Workout Log page and log a few sessions, then come back here to see the trend.</div></div>

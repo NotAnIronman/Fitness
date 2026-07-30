@@ -140,11 +140,14 @@ const ACTIVITY_LEVELS = [
 // naturally adds steps). Used to show a "don't double count" reminder when adding these.
 const STEP_OVERLAP_EXERCISE_IDS = ['run_easy', 'run_moderate', 'run_fast', 'walk_casual', 'walk_brisk', 'hiking'];
 
-// Rough public-health reference points for "is this a lot of exercise calories?" feedback.
-// Loosely grounded in CDC/ACSM guidance: ~150-300 min/week of moderate activity is the
-// general adult recommendation, which works out to roughly 1,000-2,000 kcal/week from
-// exercise for a lot of people, depending on bodyweight and intensity. These are general
-// reference points, not targets, and vary a lot by individual and by goal.
+// Rough public-health reference points for "is this a lot of exercise calories?"
+// feedback. The CDC's Physical Activity Guidelines for Americans recommend
+// ~150-300 min/week of moderate aerobic activity for adults, that time-based
+// figure is accurate as stated. The 1,000-2,000 kcal/week range below is a
+// commonly cited derived estimate (roughly what that much moderate activity
+// burns for an average-sized adult), not a kcal figure CDC/ACSM publish
+// directly, individual burn varies a lot by bodyweight and intensity. Treat
+// these as loose reference points, not targets.
 const EXERCISE_INTENSITY_BANDS = {
   session: [
     { max: 100, label: 'Light', tier: 1, note: 'Good for recovery or a warm-up day. Light if the goal is cardio training benefit.' },
@@ -153,9 +156,9 @@ const EXERCISE_INTENSITY_BANDS = {
     { max: Infinity, label: 'Vigorous', tier: 4, note: 'A high-output session: longer, harder, or both.' },
   ],
   weekly: [
-    { max: 1000, label: 'Below range', tier: 1, note: 'General guidance points to roughly 1,000-2,000 kcal/week from exercise for health benefits. Add a session or two if that is a goal.' },
-    { max: 2000, label: 'On track', tier: 2, note: 'Within the commonly cited 1,000-2,000 kcal/week range for general health benefits.' },
-    { max: Infinity, label: 'Above range', tier: 3, note: 'Above the general benchmark, common when training for performance or weight loss.' },
+    { max: 1000, label: 'Below range', tier: 1, note: 'The CDC recommends about 150-300 min/week of moderate activity for adults, which commonly works out to roughly 1,000-2,000 kcal/week for an average-sized adult. Add a session or two if that is a goal.' },
+    { max: 2000, label: 'On track', tier: 2, note: 'Within the range commonly associated with the CDC\u2019s ~150-300 min/week adult activity guideline.' },
+    { max: Infinity, label: 'Above range', tier: 3, note: 'Above that general benchmark, common when training for performance or weight loss.' },
   ],
 };
 
@@ -357,8 +360,8 @@ const ACHIEVEMENTS = [
     check: ctx => ctx.checkinStreak >= 100, progress: ctx => ({ current: Math.min(ctx.checkinStreak, 100), target: 100 }) },
   { id: 'checkin_total_30', name: 'Data Point Collector', desc: 'Log 30 daily step check-ins total.', category: 'Steps', points: 30,
     check: ctx => ctx.checkinCount >= 30, progress: ctx => ({ current: Math.min(ctx.checkinCount, 30), target: 30 }) },
-  { id: 'avg_week_7k', name: 'On the Move', desc: 'Average 7,000+ steps over your last 7 logged days.', category: 'Steps', points: 20,
-    check: ctx => ctx.last7DayAvgSteps >= 7000 },
+  { id: 'avg_week_7k', name: 'On the Move', desc: 'Average 7,000+ steps across at least 5 of your last 7 calendar days.', category: 'Steps', points: 20,
+    check: ctx => ctx.last7CalendarDaysLogged >= 5 && ctx.last7DayAvgSteps >= 7000 },
 
   // ---- Workouts ----
   { id: 'first_workout', name: 'First Rep', desc: 'Log your first workout exercise.', category: 'Workouts', points: 10,

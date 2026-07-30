@@ -31,6 +31,8 @@ function renderLog() {
 
     ${compliance ? renderComplianceCard(compliance) : ''}
 
+    ${renderStepCheckinCard(date)}
+
     <div class="card">
       <div class="day-nav" style="margin-bottom:0;">
         <button class="day-nav-btn" onclick="shiftLogDate(-1)" title="Previous day">‹</button>

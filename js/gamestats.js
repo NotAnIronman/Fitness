@@ -34,8 +34,18 @@ function buildGameContext() {
   const checkinCount = checkinDates.length;
   const maxStepsDay = checkinDates.reduce((m, d) => Math.max(m, STATE.dailyCheckins[d].steps || 0), 0);
   const checkinStreak = computeCalendarStreak(checkinDates);
-  const last7 = checkinDates.slice(-7);
-  const last7DayAvgSteps = last7.length ? last7.reduce((s, d) => s + (STATE.dailyCheckins[d].steps || 0), 0) / last7.length : 0;
+  // The last 7 CALENDAR days (not just "the last 7 check-in entries," which
+  // could span months if check-ins are sporadic, and could be fooled by a
+  // single check-in producing an "average" of just itself).
+  let last7Sum = 0, last7CalendarDaysLogged = 0;
+  const todayD = todayISO();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(todayD + 'T00:00:00');
+    d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    if (STATE.dailyCheckins[iso]) { last7Sum += STATE.dailyCheckins[iso].steps || 0; last7CalendarDaysLogged++; }
+  }
+  const last7DayAvgSteps = last7CalendarDaysLogged ? last7Sum / last7CalendarDaysLogged : 0;
 
   // ---- Workouts ----
   const logDatesWithExercises = Object.keys(STATE.workoutLog).filter(d => STATE.workoutLog[d].length > 0);
@@ -95,7 +105,7 @@ function buildGameContext() {
   const totalPointsEarned = STATE.pet.totalPointsEarned;
 
   return {
-    checkinCount, maxStepsDay, checkinStreak, last7DayAvgSteps,
+    checkinCount, maxStepsDay, checkinStreak, last7DayAvgSteps, last7CalendarDaysLogged,
     totalExercisesLogged, workoutStreak, bodyPartsTouched: bodyPartsSet.size, usedPerSetWeights, hasPersonalRecord, activeplanDays,
     totalFoodDaysLogged, onTargetDays, onTargetStreak, savedMealsCount, maxItemsInADay,
     weightLogCount, weightStreak, hasGoal, goalReached,

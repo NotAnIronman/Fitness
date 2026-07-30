@@ -26,6 +26,9 @@ let UI = {
   mealBuilderItems: [], // [{name,kcal,protein,carbs,fat,qty}]
   editingFoodIndex: null,
   secretPanelOpen: false,
+  foodQuickPicksOpen: false,
+  barcodeScannerOpen: false,
+  barcodeStatus: '',
 };
 
 function todayISO() {
@@ -391,13 +394,17 @@ function doRender() {
 }
 
 function navigate(route) {
+  if (UI.barcodeScannerOpen && typeof stopBarcodeScan === 'function') {
+    stopBarcodeScan();
+    UI.barcodeScannerOpen = false;
+  }
   UI.route = route;
   render();
 }
 
 function afterRenderHooks() {
   if (UI.route === 'goals') drawGoalChart();
-  if (UI.route === 'progress') drawProgressChart();
+  if (UI.route === 'progress') { drawProgressChart(); drawStepsChart(); }
   if (UI.route === 'workouts' || UI.route === 'log') {
     const sel = document.getElementById('ex-select');
     if (sel) {
@@ -434,7 +441,7 @@ function renderHome() {
       <p class="page-sub">Set your stats once. Your activity level is inferred automatically from what you actually plan in the Workout Plan, not a guess you pick yourself.</p>
     </div>
 
-    ${renderStepCheckinCard()}
+    ${renderStepCheckinSummary()}
 
     <div class="grid grid-2">
       <div class="card">
@@ -571,34 +578,63 @@ function renderHome() {
 // Daily step check-in, replacing the old "just tell us your average" model.
 // Logging an actual number each day feeds getStepsAverage() above, so the
 // figure used for TDEE/activity level gets more accurate the more you use it,
-// instead of staying wherever a one-time guess landed.
-function renderStepCheckinCard() {
+// instead of staying wherever a one-time guess landed. The actual check-in
+// input lives on the Workout Log page (that's the daily "what happened today"
+// hub already), Home just shows a compact read-only summary with a link over.
+function renderStepCheckinSummary() {
   const today = todayISO();
   const todayEntry = STATE.dailyCheckins[today];
   const ctx = buildGameContext();
   return `
     <div class="card">
       <div class="card-title">
-        Today's step check-in
+        Steps
         ${ctx.checkinStreak > 1 ? `<span class="badge badge-ok">${ctx.checkinStreak} day streak</span>` : ''}
       </div>
-      <div class="field-row" style="align-items:end;">
-        <div class="field" style="margin-bottom:0;">
-          <label>Steps so far today</label>
-          <input type="number" data-focus-id="step-checkin" min="0" step="500" value="${todayEntry ? todayEntry.steps : ''}" placeholder="e.g. 8000" onchange="submitStepCheckin(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
+      <div class="grid grid-2">
+        <div class="stat">
+          <div class="stat-label">Today</div>
+          <div class="stat-value" style="font-size:20px;">${todayEntry ? todayEntry.steps.toLocaleString() : '\u2014'}</div>
         </div>
-        ${todayEntry ? `<div class="badge badge-ok" style="flex-shrink:0;">Logged today</div>` : ''}
+        <div class="stat">
+          <div class="stat-label">Rolling average</div>
+          <div class="stat-value accent" style="font-size:20px;">${getStepsAverage().toLocaleString()}</div>
+        </div>
       </div>
-      <p class="hint" style="margin-top:8px;">Update it any time today, your latest number is what counts. Your rolling average (currently ${getStepsAverage().toLocaleString()}/day) is what drives your activity level, not a one-time guess, so the more you check in, the more accurate it gets.</p>
+      <p class="hint" style="margin-top:8px;">${todayEntry ? "Update today's number" : "Check in today's steps"} on the <a href="#" onclick="navigate('log'); return false;">Workout Log</a> page. Your rolling average is what drives your activity level here, not a one-time guess.</p>
     </div>
   `;
 }
 
-function submitStepCheckin(value) {
+function renderStepCheckinCard(date) {
+  date = date || todayISO();
+  const isToday = date === todayISO();
+  const entry = STATE.dailyCheckins[date];
+  const ctx = buildGameContext();
+  return `
+    <div class="card">
+      <div class="card-title">
+        ${isToday ? "Today's step check-in" : 'Step check-in'}
+        ${isToday && ctx.checkinStreak > 1 ? `<span class="badge badge-ok">${ctx.checkinStreak} day streak</span>` : ''}
+      </div>
+      <div class="field-row" style="align-items:end;">
+        <div class="field" style="margin-bottom:0;">
+          <label>${isToday ? 'Steps so far today' : 'Steps that day'}</label>
+          <input type="number" data-focus-id="step-checkin" min="0" step="500" value="${entry ? entry.steps : ''}" placeholder="e.g. 8000" onchange="submitStepCheckin(this.value, '${date}')" onkeydown="if(event.key==='Enter') this.blur()">
+        </div>
+        ${entry ? `<div class="badge badge-ok" style="flex-shrink:0;">Logged</div>` : ''}
+      </div>
+      <p class="hint" style="margin-top:8px;">${isToday ? "Update it any time today, your latest number is what counts." : "Backfilling a missed day is fine, it still counts toward your average."} Your rolling average (currently ${getStepsAverage().toLocaleString()}/day) is what drives your activity level, not a one-time guess, so the more you check in, the more accurate it gets.</p>
+    </div>
+  `;
+}
+
+function submitStepCheckin(value, date) {
+  date = date || todayISO();
   const steps = Math.max(0, Number(value) || 0);
-  STATE.dailyCheckins[todayISO()] = { steps };
+  STATE.dailyCheckins[date] = { steps };
   persist();
-  const granted = typeof evaluatePetDailyRewards === 'function' ? evaluatePetDailyRewards() : [];
+  const granted = (date === todayISO() && typeof evaluatePetDailyRewards === 'function') ? evaluatePetDailyRewards() : [];
   render();
   granted.forEach(g => toast(`+${g.points} pts: ${g.label}`));
 }
@@ -618,6 +654,16 @@ function numOrNull(v) {
 
 function escapeAttr(s) {
   return (s || '').replace(/"/g, '&quot;');
+}
+
+// Small reusable prev/next arrows to sit next to any date input. shiftFnName is
+// a global function that takes a signed integer (days to shift). Used anywhere
+// a date field exists outside the Log page's bigger day-nav.
+function renderDateArrows(shiftFnName) {
+  return `
+    <button class="btn btn-sm" style="padding:9px 12px;" onclick="${shiftFnName}(-1)" title="Previous day">\u2039</button>
+    <button class="btn btn-sm" style="padding:9px 12px;" onclick="${shiftFnName}(1)" title="Next day">\u203a</button>
+  `;
 }
 
 function setUnitSystem(sys) {

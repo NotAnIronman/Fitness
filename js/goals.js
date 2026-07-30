@@ -42,9 +42,12 @@ function renderGoals() {
           <label>Target weight (${unit})</label>
           <input type="number" data-focus-id="goal-target-weight" step="0.1" value="${toDisplay(g.targetWeightKg)}" onchange="updateGoalTargetWeight(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
         </div>
-        <div class="field">
-          <label>Target date</label>
-          <input type="date" data-focus-id="goal-target-date" value="${g.targetDate || ''}" onchange="updateGoalField('targetDate', this.value)">
+        <div class="field-row" style="align-items:end;">
+          <div class="field" style="margin-bottom:0; flex:1;">
+            <label>Target date</label>
+            <input type="date" data-focus-id="goal-target-date" value="${g.targetDate || ''}" onchange="updateGoalField('targetDate', this.value)">
+          </div>
+          ${g.targetDate ? renderDateArrows('shiftGoalTargetDate') : ''}
         </div>
         <p class="hint">Starting point locked at ${toDisplay(g.startWeightKg ?? cur)} ${unit} on ${g.startDate ?? todayISO()} the first time you set a goal. <button class="btn btn-ghost btn-sm" onclick="resetGoalStart()">Reset start point to today</button></p>
       </div>
@@ -106,6 +109,7 @@ function renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) {
       </div>
       <p class="hint" style="font-size:13px; line-height:1.6;">${messages[feasibility]}
         ${effTdee ? ` Your current maintenance is ~${Math.round(effTdee)} kcal/day (TDEE of ${Math.round(tdee)}${stepBonus.dailyKcal > 0 ? ` plus a ${Math.round(stepBonus.dailyKcal)} kcal step bonus` : ''}).` : ' Fill in your profile on Home to see a suggested intake target.'}
+        This uses the standard ~3,500 kcal-per-pound estimate, a widely used approximation, not an exact prediction: your maintenance calories actually drift a bit as your weight changes, so real-world progress is rarely perfectly linear even when adherence is.
       </p>
     </div>
   `;
@@ -201,6 +205,13 @@ function updateGoalField(field, val) {
   ensureGoalStart();
   STATE.goal[field] = val;
   persist(); render();
+}
+
+function shiftGoalTargetDate(delta) {
+  if (!STATE.goal.targetDate) return;
+  const d = new Date(STATE.goal.targetDate + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  updateGoalField('targetDate', d.toISOString().slice(0, 10));
 }
 
 function ensureGoalStart() {

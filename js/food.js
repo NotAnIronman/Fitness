@@ -51,54 +51,67 @@ function renderFood() {
       </div>
     ` : ''}
 
-    <div class="field" style="max-width:260px; margin-bottom:16px;">
-      <label>Date</label>
-      <input type="date" data-focus-id="food-date" value="${date}" onchange="setFoodDate(this.value)">
+    <div class="field-row" style="max-width:340px; margin-bottom:16px; align-items:end;">
+      <div class="field" style="margin-bottom:0;">
+        <label>Date</label>
+        <input type="date" data-focus-id="food-date" value="${date}" onchange="setFoodDate(this.value)">
+      </div>
+      ${renderDateArrows('shiftFoodDate')}
     </div>
 
     <div class="grid grid-2" style="margin-bottom:16px;">
       <div class="card">
         <div class="card-title">
           Log food
-          <button class="btn btn-sm" onclick="openMealBuilder()">+ Build a meal</button>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-sm" onclick="openBarcodeScanner()">📷 Scan barcode</button>
+            <button class="btn btn-sm" onclick="openMealBuilder()">+ Build a meal</button>
+          </div>
         </div>
 
-        ${(STATE.recentFoods.length || STATE.savedMeals.length) && !UI.foodAdjustDraft && !UI.mealBuilderOpen ? `
-          ${STATE.recentFoods.length ? `
-            <p class="hint" style="margin-bottom:6px;">Recent:</p>
-            <div class="chip-row" style="margin-bottom:12px;">
-              ${STATE.recentFoods.map((f, i) => `<button class="chip" onclick="openFoodAdjustFromRecent(${i})">${escapeAttr(f.name)}</button>`).join('')}
-            </div>
-          ` : ''}
-          ${STATE.savedMeals.length ? `
-            <p class="hint" style="margin-bottom:6px;">Saved meals:</p>
-            <div class="chip-row" style="margin-bottom:12px;">
-              ${STATE.savedMeals.map(m => `<button class="chip" onclick="openFoodAdjustFromMeal('${m.id}')">${escapeAttr(m.name)}</button>`).join('')}
-            </div>
-          ` : ''}
-        ` : ''}
-
-        ${UI.mealBuilderOpen ? renderMealBuilder() : `
-          <div class="search-wrap">
-            <input type="text" data-focus-id="food-search" placeholder="Search foods (e.g. chicken breast)" value="${escapeAttr(UI.foodQuery)}"
-              oninput="onFoodSearchInput(this.value)">
-            ${UI.foodResults.length ? `
-              <div class="food-search-results">
-                ${UI.foodResults.map((f, i) => `
-                  <div class="food-search-item" style="cursor:pointer; display:flex; justify-content:space-between;" onclick="openFoodAdjust(${i})">
-                    <span>${escapeAttr(f.name)}</span>
-                    <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">${Math.round(f.kcal)} kcal</span>
-                  </div>
-                `).join('')}
-              </div>
+        ${UI.barcodeScannerOpen ? renderBarcodeScanner() : `
+          ${(STATE.recentFoods.length || STATE.savedMeals.length) && !UI.foodAdjustDraft && !UI.mealBuilderOpen ? `
+            <button class="notice-pill" onclick="toggleFoodQuickPicks()">
+              <span class="plus">${UI.foodQuickPicksOpen ? '\u2212' : '+'}</span> Recent & saved (${STATE.recentFoods.length + STATE.savedMeals.length})
+            </button>
+            ${UI.foodQuickPicksOpen ? `
+              ${STATE.recentFoods.length ? `
+                <p class="hint" style="margin: 10px 0 6px;">Recent:</p>
+                <div class="chip-row" style="margin-bottom:12px;">
+                  ${STATE.recentFoods.map((f, i) => `<button class="chip" onclick="openFoodAdjustFromRecent(${i})">${escapeAttr(f.name)}</button>`).join('')}
+                </div>
+              ` : ''}
+              ${STATE.savedMeals.length ? `
+                <p class="hint" style="margin-bottom:6px;">Saved meals:</p>
+                <div class="chip-row" style="margin-bottom:12px;">
+                  ${STATE.savedMeals.map(m => `<button class="chip" onclick="openFoodAdjustFromMeal('${m.id}')">${escapeAttr(m.name)}</button>`).join('')}
+                </div>
+              ` : ''}
             ` : ''}
-          </div>
-          ${UI.foodSearchLoading ? `<p class="hint">Searching...</p>` : ''}
-          <div style="margin-top:10px;">
-            <button class="btn btn-sm" onclick="toggleCustomFood()">${UI.showCustomFood ? 'Cancel custom food' : '+ Custom food'}</button>
-          </div>
-          ${UI.showCustomFood ? renderCustomFoodForm() : ''}
-          ${UI.foodAdjustDraft ? renderFoodAdjustForm() : ''}
+          ` : ''}
+
+          ${UI.mealBuilderOpen ? renderMealBuilder() : `
+            <div class="search-wrap">
+              <input type="text" data-focus-id="food-search" placeholder="Search foods (e.g. chicken breast)" value="${escapeAttr(UI.foodQuery)}"
+                oninput="onFoodSearchInput(this.value)">
+              ${UI.foodResults.length ? `
+                <div class="food-search-results">
+                  ${UI.foodResults.map((f, i) => `
+                    <div class="food-search-item" style="cursor:pointer; display:flex; justify-content:space-between;" onclick="openFoodAdjust(${i})">
+                      <span>${escapeAttr(f.name)}</span>
+                      <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">${Math.round(f.kcal)} kcal</span>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+            ${UI.foodSearchLoading ? `<p class="hint">Searching...</p>` : ''}
+            <div style="margin-top:10px;">
+              <button class="btn btn-sm" onclick="toggleCustomFood()">${UI.showCustomFood ? 'Cancel custom food' : '+ Custom food'}</button>
+            </div>
+            ${UI.showCustomFood ? renderCustomFoodForm() : ''}
+            ${UI.foodAdjustDraft ? renderFoodAdjustForm() : ''}
+          `}
         `}
       </div>
 
@@ -272,6 +285,17 @@ function setFoodDate(date) {
   UI.foodDate = date;
   UI.foodResults = [];
   render();
+}
+
+function toggleFoodQuickPicks() {
+  UI.foodQuickPicksOpen = !UI.foodQuickPicksOpen;
+  render();
+}
+
+function shiftFoodDate(delta) {
+  const d = new Date(UI.foodDate + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  setFoodDate(d.toISOString().slice(0, 10));
 }
 
 function toggleCustomFood() {
