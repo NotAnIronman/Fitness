@@ -25,7 +25,7 @@ function renderWorkouts() {
     <div class="page-head">
       <p class="page-eyebrow">Plan</p>
       <h1 class="page-title">Workout plan</h1>
-      <p class="page-sub">Your reusable weekly template with base weights and set/rep targets. Head to the <a href="#" onclick="navigate('log'); return false;">Workout Log</a> to record what you actually did on a given day (you can copy a plan day in, then adjust it).</p>
+      <p class="page-sub">Your reusable weekly template. Head to the <a href="#" onclick="navigate('log'); return false;">Workout Log</a> to record what you actually did on a given day.</p>
     </div>
 
     ${!bw ? `<div class="section-note">Set your weight on the Home page first. Calorie estimates need it.</div>` : ''}
