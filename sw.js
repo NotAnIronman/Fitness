@@ -11,7 +11,7 @@
    on whatever was cached at install time.
    ============================================================ */
 
-const CACHE_VERSION = 'forge-v2';
+const CACHE_VERSION = 'forge-v3';
 
 const PRECACHE_URLS = [
   './',
