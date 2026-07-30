@@ -162,8 +162,11 @@ button {
 .grid-2 { grid-template-columns: 1fr 1fr; }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
-@media (max-width: 900px) {
-  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+/* The (max-aspect-ratio: 0.65) fallback catches unusually tall/narrow
+   viewports (e.g. foldable cover screens) that might report a CSS width the
+   plain max-width check alone wouldn't catch, even if some OS/browser
+   compatibility layer scales the reported viewport up. */
+@media (max-width: 900px), (max-aspect-ratio: 0.65) {
   .shell { grid-template-columns: 1fr; }
   .sidebar {
     position: sticky; top: 0; z-index: 20;
@@ -644,7 +647,7 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   margin-bottom: 8px;
 }
 .pet-widget .pet-sprite { filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); }
-@media (max-width: 900px) {
+@media (max-width: 900px), (max-aspect-ratio: 0.65) {
   .pet-widget { bottom: calc(12px + env(safe-area-inset-bottom)); right: calc(12px + env(safe-area-inset-right)); }
   .pet-widget-bubble { display: none; }
 }
