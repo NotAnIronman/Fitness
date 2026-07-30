@@ -307,7 +307,7 @@ const PET_ANIMALS = [
   { key: 'wolf', emoji: '🐺', name: 'Wolf', img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F43A.svg' },
   { key: 'mouse', emoji: '🐭', name: 'Mouse', img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F42D.svg' },
   { key: 'raccoon', emoji: '🦝', name: 'Raccoon' },
-  { key: 'raccoon', emoji: '🐞', name: 'Ladybug', img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F41E.svg' },
+  { key: 'ladybug', emoji: '🐞', name: 'Ladybug', img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F41E.svg' },
   { key: 'horse', emoji: '🐴', name: 'Horse', img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F434.svg' },
   { key: 'turtle', emoji: '🐢', name: 'Turtle', img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F422.svg' },
   { key: 'crab', emoji: '🦀', name: 'Crab', img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F980.svg' },
@@ -331,7 +331,7 @@ const PET_ITEMS = [
   { key: 'pignose', slot: 'eyewear', emoji: '🐽', name: 'Pig Nose', cost: 80, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F43D.svg' },
 
   { key: 'necktie', slot: 'neck', emoji: '👔', name: 'Necktie', cost: 35, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F454.svg' },
-  { key: 'dress', slot: 'neck', emoji: '👗', name: 'Necktie', cost: 35, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F457.svg' },
+  { key: 'dress', slot: 'neck', emoji: '👗', name: 'Dress', cost: 35, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F457.svg' },
   { key: 'bow', slot: 'neck', emoji: '🎀', name: 'Bow', cost: 25 },
   { key: 'medal', slot: 'neck', emoji: '🏅', name: 'Gold Medal', cost: 500, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F3C5.svg' },
   { key: 'militarymedal', slot: 'neck', emoji: '🎖️', name: 'Military Medal', cost: 250, img: 'https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/1F3C5.svg' },
