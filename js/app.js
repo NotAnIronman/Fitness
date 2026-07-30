@@ -457,7 +457,7 @@ function renderHome() {
     <div class="page-head">
       <p class="page-eyebrow">Profile</p>
       <h1 class="page-title">Your numbers</h1>
-      <p class="page-sub">Set your stats once. Your activity level is inferred automatically from what you actually plan in the Workout Plan, not a guess you pick yourself.</p>
+      <p class="page-sub">Set your stats here, your activity level is automatically calculated from the Workout Plan page.</p>
     </div>
 
     ${renderStepCheckinSummary()}
