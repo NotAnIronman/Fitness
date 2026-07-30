@@ -185,11 +185,27 @@ foods and log as a single aggregated entry.
 
 ## Daily step check-in
 
-Steps are no longer a single self-reported "average" you set once. Log an actual
-number each day on the Home page, and `getStepsAverage()` in `js/app.js` computes
-a real rolling average from that history (blended with the old estimate early on,
-fully trusting real data once you've checked in a handful of times). This feeds
-directly into the auto-detected activity level and TDEE math.
+Steps are no longer a single self-reported "average" you set once. Check in an
+actual number each day on the Workout Log page (any date, so you can backfill),
+and `getStepsAverage()` in `js/app.js` computes a real rolling average from that
+history (blended with a starting estimate early on, fully trusting real data once
+you've checked in a handful of times). This feeds directly into the auto-detected
+activity level and TDEE math. Home shows a compact read-only summary; the Progress
+page shows 7/30-day/all-time averages and a trend chart.
+
+## Barcode scanning
+
+The "📷 Scan barcode" button on the Food page uses the camera to read a product
+barcode and look it up automatically. It's built on `@zxing/browser` (MIT
+license) rather than the browser-native BarcodeDetector API, since Safari/iOS
+doesn't implement that API at all, so a native-only approach would silently fail
+on every iPhone. The library is lazy-loaded from a CDN only when the scanner is
+opened. Lookups go to [Open Food Facts](https://openfoodfacts.org) (free, no API
+key, Open Database License), a barcode-indexed product database that
+complements USDA search well for packaged/branded foods. A found product opens
+the same adjust-before-adding flow as a text search result, so you can still
+correct anything before it's logged. Requires camera permission and HTTPS
+(works on GitHub Pages by default).
 
 ## Achievements
 

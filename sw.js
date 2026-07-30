@@ -11,7 +11,7 @@
    on whatever was cached at install time.
    ============================================================ */
 
-const CACHE_VERSION = 'forge-v1';
+const CACHE_VERSION = 'forge-v2';
 
 const PRECACHE_URLS = [
   './',
@@ -29,6 +29,7 @@ const PRECACHE_URLS = [
   './js/progress.js',
   './js/goals.js',
   './js/food.js',
+  './js/barcode.js',
   './js/bodyfat.js',
   './js/pet.js',
   './js/achievements.js',
