@@ -542,25 +542,31 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 .set-row.set-done .set-detail { opacity: 0.5; text-decoration: line-through; }
 
 /* ---------- Quick day navigation ---------- */
-.day-nav {
+/* ---------- Date navigation (prev/next arrows either side of a date field
+   or label). Used for every "back / date / forward" control in the app.
+   Explicit percentage flex-basis so this can never get stretched by a
+   parent's own flex rules (e.g. a wrapping .field-row that gives all its
+   children flex:1), that was the earlier bug that turned these into ovals. ---------- */
+.date-nav-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: stretch;
+  gap: 5%;
   margin-bottom: 16px;
 }
-.day-nav-btn {
+.date-nav-btn {
+  flex: 0 0 10%;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  width: 34px; height: 34px;
-  border-radius: 50%;
-  font-size: 15px;
+  border-radius: calc(var(--radius) * 0.5);
+  font-size: 16px;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  min-width: 36px;
 }
-.day-nav-btn:hover { border-color: var(--accent); }
-.day-nav-label { flex: 1; text-align: center; font-weight: 600; font-size: 14px; }
-.day-nav-label .sub { display: block; font-size: 11px; color: var(--text-dim); font-weight: 400; margin-top: 1px; }
+.date-nav-btn:hover { border-color: var(--accent); }
+.date-nav-bar { flex: 0 0 70%; min-width: 0; }
+.date-nav-label { text-align: center; font-weight: 600; font-size: 14px; }
+.date-nav-label .sub { display: block; font-size: 11px; color: var(--text-dim); font-weight: 400; margin-top: 1px; }
 
 /* ---------- Quick-add serving chips ---------- */
 .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
@@ -616,6 +622,30 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 .pet-slot-accessory { top: 5%; right: -10%; }
 
 .pet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
+
+/* ---------- Feeding tray ---------- */
+.pet-tray {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: calc(var(--radius) * 0.6);
+}
+.pet-tray-item {
+  font-size: 22px;
+  line-height: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.5);
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.pet-tray-item:hover { border-color: var(--accent); transform: scale(1.08); }
+.pet-tray-item:active { transform: scale(0.95); }
 .pet-pick {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   background: var(--bg); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.6);
@@ -650,4 +680,27 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 @media (max-width: 900px), (max-aspect-ratio: 0.65) {
   .pet-widget { bottom: calc(12px + env(safe-area-inset-bottom)); right: calc(12px + env(safe-area-inset-right)); }
   .pet-widget-bubble { display: none; }
+}
+
+/* ---------- Rest timer widget (opposite corner from the pet widget) ---------- */
+.rest-timer-widget {
+  position: fixed;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  left: calc(18px + env(safe-area-inset-left));
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  box-shadow: var(--shadow);
+  z-index: 40;
+  min-width: 150px;
+}
+.rest-timer-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; font-family: var(--font-mono); }
+.rest-timer-time { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--accent); line-height: 1.2; }
+.rest-timer-track { height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin: 6px 0; }
+.rest-timer-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.rest-timer-controls { display: flex; gap: 4px; }
+.rest-timer-controls .btn { padding: 4px 7px; font-size: 11px; }
+@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+  .rest-timer-widget { bottom: calc(12px + env(safe-area-inset-bottom)); left: calc(12px + env(safe-area-inset-left)); }
 }
