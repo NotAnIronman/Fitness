@@ -1,2 +1,0 @@
-#Forge Training Log
--August
