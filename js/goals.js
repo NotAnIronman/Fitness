@@ -57,6 +57,10 @@ function renderGoals() {
             <input type="date" data-focus-id="goal-target-date" value="" onchange="updateGoalField('targetDate', this.value)">
           </div>
         `}
+        <div class="chip-row" style="margin-bottom:10px;">
+          ${[['1 month', 30], ['3 months', 91], ['6 months', 182], ['1 year', 365]].map(([label, days]) => `<button class="chip" onclick="setGoalTargetDateFromToday(${days})">+${label}</button>`).join('')}
+        </div>
+        <p class="hint" style="margin-bottom:10px;">Typing a distant year into the date field directly can be fiddly (a native browser quirk, not something we can fully fix), the shortcuts above set a target date without needing to.</p>
         <p class="hint">Starting point locked at ${toDisplay(g.startWeightKg ?? cur)} ${unit} on ${g.startDate ?? todayISO()} the first time you set a goal. <button class="btn btn-ghost btn-sm" onclick="resetGoalStart()">Reset start point to today</button></p>
       </div>
 
@@ -288,9 +292,20 @@ function updateGoalTargetWeight(val) {
 }
 
 function updateGoalField(field, val) {
+  if (field === 'targetDate' && !isReasonableDateString(val)) {
+    toast("That doesn't look like a valid date, try again");
+    render();
+    return;
+  }
   ensureGoalStart();
   STATE.goal[field] = val;
   persist(); render();
+}
+
+function setGoalTargetDateFromToday(daysFromNow) {
+  const d = new Date(todayISO() + 'T00:00:00');
+  d.setDate(d.getDate() + daysFromNow);
+  updateGoalField('targetDate', dateToLocalISO(d));
 }
 
 function shiftGoalTargetDate(delta) {

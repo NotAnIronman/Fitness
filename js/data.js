@@ -415,6 +415,80 @@ const PET_SLOTS = ['hat', 'eyewear', 'face', 'neck', 'accessory'];
 const PET_SLOT_LABELS = { hat: 'Hat', eyewear: 'Eyewear', face: 'Face', neck: 'Neck', accessory: 'Accessory' };
 
 // Encouragement shown in the pet widget, some generic, some page-specific.
+/* ============================================================
+   PET TRAVEL MINIGAME (US states, part of the secret pet feature)
+   Steps you log translate to pet-steps (see PET_STEP_MULTIPLIER) that
+   your pet spends walking a fixed tour route through all 50 states,
+   unlocking a souvenir item at each stop along the way. Distance
+   between stops is computed from these coordinates via the haversine
+   formula (js/pet.js), not hand-curated, so the route/order and
+   distances stay consistent and are easy to extend later (e.g. for
+   international stops).
+
+   Coordinates are each state's capital or largest city, approximate
+   (a few decimal places of precision is plenty for a fun feature,
+   this isn't meant to be surveying-grade). Souvenirs aim for
+   something actually associated with the state; a handful lean on
+   fun trivia rather than the single most obvious pick, mostly to
+   avoid repeating the same item (cowboy hat, mountain, etc) across
+   too many states.
+   ============================================================ */
+const PET_STEP_MULTIPLIER = 100; // your logged steps count 100x toward pet travel
+const STEPS_PER_MILE = 2112; // ~2.5ft stride, a commonly cited average
+
+const US_STATES = [
+  { key: 'TX', name: 'Texas',          lat: 30.27, lng: -97.74, souvenir: { emoji: '\ud83e\udd20', name: 'Cowboy Hat' } },
+  { key: 'OK', name: 'Oklahoma',       lat: 35.47, lng: -97.52, souvenir: { emoji: '\ud83d\udee2\ufe0f', name: 'Oil Derrick' } },
+  { key: 'AR', name: 'Arkansas',       lat: 34.75, lng: -92.29, souvenir: { emoji: '\ud83d\udc8e', name: 'Diamond' } },
+  { key: 'LA', name: 'Louisiana',      lat: 29.95, lng: -90.07, souvenir: { emoji: '\ud83c\udfb7', name: 'Saxophone' } },
+  { key: 'MS', name: 'Mississippi',    lat: 32.30, lng: -90.18, souvenir: { emoji: '\ud83c\udfb8', name: 'Guitar' } },
+  { key: 'AL', name: 'Alabama',        lat: 32.37, lng: -86.30, souvenir: { emoji: '\ud83d\ude80', name: 'Rocket' } },
+  { key: 'TN', name: 'Tennessee',      lat: 36.16, lng: -86.78, souvenir: { emoji: '\ud83c\udfb6', name: 'Music Note' } },
+  { key: 'GA', name: 'Georgia',        lat: 33.75, lng: -84.39, souvenir: { emoji: '\ud83c\udf51', name: 'Peach' } },
+  { key: 'FL', name: 'Florida',        lat: 30.44, lng: -84.28, souvenir: { emoji: '\ud83c\udf4a', name: 'Orange' } },
+  { key: 'SC', name: 'South Carolina', lat: 34.00, lng: -81.03, souvenir: { emoji: '\ud83d\udc1a', name: 'Seashell' } },
+  { key: 'NC', name: 'North Carolina', lat: 35.78, lng: -78.64, souvenir: { emoji: '\u2708\ufe0f', name: 'Airplane' } },
+  { key: 'VA', name: 'Virginia',       lat: 37.54, lng: -77.44, souvenir: { emoji: '\ud83c\udfdb\ufe0f', name: 'Historic Column' } },
+  { key: 'WV', name: 'West Virginia',  lat: 38.35, lng: -81.63, souvenir: { emoji: '\u26f0\ufe0f', name: 'Mountain' } },
+  { key: 'KY', name: 'Kentucky',       lat: 38.20, lng: -84.87, souvenir: { emoji: '\ud83c\udfc7', name: 'Racehorse' } },
+  { key: 'MD', name: 'Maryland',       lat: 38.98, lng: -76.49, souvenir: { emoji: '\ud83e\udd80', name: 'Crab' } },
+  { key: 'DE', name: 'Delaware',       lat: 39.16, lng: -75.53, souvenir: { emoji: '\ud83d\udc14', name: 'Blue Hen' } },
+  { key: 'NJ', name: 'New Jersey',     lat: 40.22, lng: -74.76, souvenir: { emoji: '\ud83c\udf45', name: 'Jersey Tomato' } },
+  { key: 'PA', name: 'Pennsylvania',   lat: 40.27, lng: -76.88, souvenir: { emoji: '\ud83d\udd14', name: 'Liberty Bell' } },
+  { key: 'NY', name: 'New York',       lat: 40.71, lng: -74.01, souvenir: { emoji: '\ud83d\uddfd', name: 'Statue of Liberty' } },
+  { key: 'CT', name: 'Connecticut',    lat: 41.31, lng: -72.92, souvenir: { emoji: '\u26f5', name: 'Sailboat' } },
+  { key: 'RI', name: 'Rhode Island',   lat: 41.82, lng: -71.41, souvenir: { emoji: '\ud83e\udd6a', name: 'Oyster' } },
+  { key: 'MA', name: 'Massachusetts',  lat: 42.36, lng: -71.06, souvenir: { emoji: '\ud83e\udd58', name: 'Baked Beans' } },
+  { key: 'VT', name: 'Vermont',        lat: 44.26, lng: -72.58, souvenir: { emoji: '\ud83c\udf68', name: 'Ice Cream' } },
+  { key: 'NH', name: 'New Hampshire',  lat: 43.21, lng: -71.54, souvenir: { emoji: '\ud83c\udf41', name: 'Maple Leaf' } },
+  { key: 'ME', name: 'Maine',          lat: 44.31, lng: -69.78, souvenir: { emoji: '\ud83e\udd9e', name: 'Lobster' } },
+  { key: 'OH', name: 'Ohio',           lat: 39.96, lng: -83.00, souvenir: { emoji: '\ud83c\udfa2', name: 'Roller Coaster' } },
+  { key: 'MI', name: 'Michigan',       lat: 42.73, lng: -84.56, souvenir: { emoji: '\ud83d\ude97', name: 'Car' } },
+  { key: 'IN', name: 'Indiana',        lat: 39.77, lng: -86.16, souvenir: { emoji: '\ud83c\udfce\ufe0f', name: 'Race Car' } },
+  { key: 'IL', name: 'Illinois',       lat: 39.80, lng: -89.64, souvenir: { emoji: '\ud83c\udf2d', name: 'Hot Dog' } },
+  { key: 'WI', name: 'Wisconsin',      lat: 43.07, lng: -89.40, souvenir: { emoji: '\ud83e\uddc0', name: 'Cheese' } },
+  { key: 'MN', name: 'Minnesota',      lat: 44.95, lng: -93.09, souvenir: { emoji: '\ud83c\udfa3', name: 'Fishing Rod' } },
+  { key: 'IA', name: 'Iowa',           lat: 41.59, lng: -93.62, souvenir: { emoji: '\ud83c\udf3d', name: 'Corn' } },
+  { key: 'MO', name: 'Missouri',       lat: 38.58, lng: -92.17, souvenir: { emoji: '\ud83c\udf66', name: 'Ice Cream Cone' } },
+  { key: 'KS', name: 'Kansas',         lat: 39.05, lng: -95.68, souvenir: { emoji: '\ud83c\udf3b', name: 'Sunflower' } },
+  { key: 'NE', name: 'Nebraska',       lat: 40.81, lng: -96.68, souvenir: { emoji: '\ud83c\udf3e', name: 'Wheat' } },
+  { key: 'SD', name: 'South Dakota',   lat: 44.37, lng: -100.35, souvenir: { emoji: '\ud83d\uddff', name: 'Monument Carving' } },
+  { key: 'ND', name: 'North Dakota',   lat: 46.81, lng: -100.78, souvenir: { emoji: '\ud83d\ude9c', name: 'Tractor' } },
+  { key: 'MT', name: 'Montana',        lat: 46.59, lng: -112.02, souvenir: { emoji: '\ud83e\udd2c', name: 'Bison' } },
+  { key: 'WY', name: 'Wyoming',        lat: 41.14, lng: -104.82, souvenir: { emoji: '\ud83e\udd8c', name: 'Deer' } },
+  { key: 'CO', name: 'Colorado',       lat: 39.74, lng: -104.99, souvenir: { emoji: '\ud83c\udfd4\ufe0f', name: 'Snowy Peak' } },
+  { key: 'UT', name: 'Utah',           lat: 40.76, lng: -111.89, souvenir: { emoji: '\u26f7\ufe0f', name: 'Skier' } },
+  { key: 'NM', name: 'New Mexico',     lat: 35.69, lng: -105.94, souvenir: { emoji: '\ud83c\udf36\ufe0f', name: 'Chili Pepper' } },
+  { key: 'AZ', name: 'Arizona',        lat: 33.45, lng: -112.07, souvenir: { emoji: '\ud83c\udf35', name: 'Cactus' } },
+  { key: 'NV', name: 'Nevada',         lat: 36.17, lng: -115.14, souvenir: { emoji: '\ud83c\udfb0', name: 'Slot Machine' } },
+  { key: 'ID', name: 'Idaho',          lat: 43.62, lng: -116.20, souvenir: { emoji: '\ud83e\udd54', name: 'Potato' } },
+  { key: 'OR', name: 'Oregon',         lat: 44.94, lng: -123.03, souvenir: { emoji: '\ud83c\udf32', name: 'Evergreen Tree' } },
+  { key: 'WA', name: 'Washington',     lat: 47.04, lng: -122.90, souvenir: { emoji: '\u2615', name: 'Coffee' } },
+  { key: 'CA', name: 'California',     lat: 37.81, lng: -122.42, souvenir: { emoji: '\ud83c\udf09', name: 'Golden Gate Bridge' } },
+  { key: 'HI', name: 'Hawaii',         lat: 21.31, lng: -157.86, souvenir: { emoji: '\ud83c\udf3a', name: 'Hibiscus' } },
+  { key: 'AK', name: 'Alaska',         lat: 61.22, lng: -149.90, souvenir: { emoji: '\ud83d\udc3b', name: 'Bear' } },
+];
+
 const PET_CHEER = {
   generic: [
     "You've got this!", 

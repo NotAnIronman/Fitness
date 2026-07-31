@@ -55,7 +55,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v11';
+const APP_VERSION = 'forge-v12';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -395,6 +395,9 @@ function doRender() {
   if (STATE.pet.enabled) {
     updatePetHappinessDecay();
     evaluatePetDailyRewards().forEach(g => toast(`+${g.points} pts: ${g.label}`));
+    if (typeof evaluateTravelArrivals === 'function') {
+      evaluateTravelArrivals().forEach(s => toast(`${STATE.pet.name || 'Your pet'} arrived in ${s.name}! Got a ${s.souvenir.name.toLowerCase()} ${s.souvenir.emoji}`));
+    }
   }
   evaluateAchievements().forEach(a => toast(`Achievement unlocked: ${a.name} (+${a.points}${STATE.pet.enabled ? ' pet pts' : ' pts'})`));
 
@@ -691,6 +694,18 @@ function submitStepCheckin(value, date) {
   const granted = (date === todayISO() && typeof evaluatePetDailyRewards === 'function') ? evaluatePetDailyRewards() : [];
   render();
   granted.forEach(g => toast(`+${g.points} pts: ${g.label}`));
+}
+
+// Guards against the native <input type="date"> quirk where typing a partial
+// year (e.g. "2" on the way to "2026") can commit as something like
+// "0002-01-15" if the field loses focus mid-entry, that's a browser-level
+// behavior we can't fully control from here, but we can stop a nonsense date
+// from silently corrupting logs/streaks/goal math. Returns true if the date
+// looks sane enough to use.
+function isReasonableDateString(dateStr) {
+  if (!dateStr) return false;
+  const year = parseInt(dateStr.slice(0, 4), 10);
+  return year >= 1900 && year <= 2200;
 }
 
 function cmToFeetInches(cm) {

@@ -122,6 +122,14 @@ function defaultState() {
       thirst: 100,             // 0-100, decays like happiness, watering refills it
       lastFedAt: null,
       lastWateredAt: null,
+      // Travel minigame: progress is fully DERIVED from the daily step
+      // check-in log each time it's needed (see getTravelProgress in
+      // js/pet.js), not stored incrementally, so backfilling or editing a
+      // day's steps can never cause drift or double-counting. This just
+      // remembers which arrivals have already gotten their "you made it!"
+      // celebration, so revisiting the Pet page doesn't re-celebrate the
+      // same stop every time.
+      travelCelebrated: [], // state keys, e.g. ['TX', 'OK']
     },
     achievements: {
       unlocked: {}, // achievementId -> 'YYYY-MM-DD' date unlocked

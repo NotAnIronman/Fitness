@@ -350,6 +350,7 @@ function undoLastWater(date) {
 }
 
 function setFoodDate(date) {
+  if (!isReasonableDateString(date)) { toast("That doesn't look like a valid date, try again"); render(); return; }
   UI.foodDate = date;
   UI.foodResults = [];
   render();

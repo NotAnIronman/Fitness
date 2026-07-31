@@ -242,6 +242,103 @@ function petIconSmall(entry) {
   return entry ? entry.emoji : '';
 }
 
+/* ---------- Travel minigame ---------- */
+
+// Haversine great-circle distance between two lat/lng points, in miles.
+function haversineMiles(lat1, lng1, lat2, lng2) {
+  const R = 3958.8; // Earth's radius in miles
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Cumulative distance (in pet-steps) from the tour's start to arriving at
+// each state, computed once and cached, US_STATES's array order IS the tour
+// order (a hand-sequenced geographic sweep starting in Texas).
+let _tourCumulativeCache = null;
+function getTourCumulative() {
+  if (_tourCumulativeCache) return _tourCumulativeCache;
+  let cumulativeMiles = 0;
+  _tourCumulativeCache = US_STATES.map((state, i) => {
+    if (i > 0) {
+      const prev = US_STATES[i - 1];
+      cumulativeMiles += haversineMiles(prev.lat, prev.lng, state.lat, state.lng);
+    }
+    return { ...state, cumulativeSteps: Math.round(cumulativeMiles * STEPS_PER_MILE) };
+  });
+  return _tourCumulativeCache;
+}
+
+// Total pet-steps ever earned: every logged day's steps, multiplied, summed
+// fresh from the check-in log itself (see the comment on travelCelebrated in
+// js/storage.js for why this is derived rather than incrementally stored).
+function getTotalPetSteps() {
+  return Object.values(STATE.dailyCheckins).reduce((sum, entry) => sum + (entry.steps || 0), 0) * PET_STEP_MULTIPLIER;
+}
+
+// Everything the Pet page needs to show travel progress: which states have
+// been reached, which is next, and how far along that next leg the pet is.
+function getTravelProgress() {
+  const tour = getTourCumulative();
+  const totalSteps = getTotalPetSteps();
+  const visited = tour.filter(s => totalSteps >= s.cumulativeSteps);
+  const nextIndex = visited.length;
+  const next = nextIndex < tour.length ? tour[nextIndex] : null;
+  const prevCumulative = visited.length ? visited[visited.length - 1].cumulativeSteps : 0;
+  const legTotal = next ? next.cumulativeSteps - prevCumulative : 0;
+  const legProgress = next ? totalSteps - prevCumulative : 0;
+  return {
+    totalSteps,
+    visited,
+    next,
+    legProgress,
+    legTotal,
+    legPct: legTotal ? Math.min(100, (legProgress / legTotal) * 100) : 100,
+    complete: !next,
+  };
+}
+
+// Grants any newly-arrived souvenirs since the last check, called centrally
+// alongside the other pet evaluations so it's caught regardless of which
+// page someone is on when they cross a threshold.
+function evaluateTravelArrivals() {
+  if (!STATE.pet.enabled || !STATE.pet.species) return [];
+  const progress = getTravelProgress();
+  const newlyArrived = progress.visited.filter(s => !STATE.pet.travelCelebrated.includes(s.key));
+  if (!newlyArrived.length) return [];
+  newlyArrived.forEach(s => STATE.pet.travelCelebrated.push(s.key));
+  persist();
+  return newlyArrived;
+}
+
+function renderTravelCard() {
+  const progress = getTravelProgress();
+  return `
+    <div class="card">
+      <div class="card-title">Travel <span style="font-family:var(--font-mono); font-size:12px; color:var(--text-dim);">${progress.visited.length} / ${US_STATES.length} states</span></div>
+      <p class="hint" style="margin-bottom:10px;">Your steps count ${PET_STEP_MULTIPLIER}x toward ${escapeAttr(STATE.pet.name)}'s own journey, walking a route through all 50 states and bringing back a souvenir from each.</p>
+      ${progress.complete ? `
+        <div class="empty-state"><div class="big">\ud83c\udf89</div>${escapeAttr(STATE.pet.name)} has visited every state! International trips may be next.</div>
+      ` : `
+        <div class="stat" style="margin-bottom:8px;">
+          <div class="stat-label">Currently walking to</div>
+          <div class="stat-value" style="font-size:20px;">${progress.next.souvenir.emoji} ${escapeAttr(progress.next.name)}</div>
+        </div>
+        <div class="macro-bar-track"><div class="macro-bar-fill" style="width:${progress.legPct}%; background:var(--accent);"></div></div>
+        <p class="hint" style="margin-top:6px;">${Math.round(progress.legProgress / STEPS_PER_MILE).toLocaleString()} of ${Math.round(progress.legTotal / STEPS_PER_MILE).toLocaleString()} pet-miles there.</p>
+      `}
+      ${progress.visited.length ? `
+        <p class="hint" style="margin: 12px 0 6px;">Souvenirs collected:</p>
+        <div class="chip-row">
+          ${progress.visited.map(s => `<span class="chip" title="${escapeAttr(s.name)}">${s.souvenir.emoji} ${escapeAttr(s.name)}</span>`).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
 function renderPetTab() {
 
   if (!STATE.pet.species) {
@@ -320,6 +417,8 @@ function renderPetTab() {
         </div>
       ` : ''}
     </div>
+
+    ${renderTravelCard()}
 
     <div class="card">
       <div class="card-title">How points are earned</div>

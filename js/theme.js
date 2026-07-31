@@ -103,6 +103,26 @@ function applyTheme(theme) {
   root.setProperty('--font-display', fonts.display);
   root.setProperty('--font-body', fonts.body);
   root.setProperty('--font-mono', fonts.mono);
+
+  // Native form controls (the date-picker calendar icon, number spinners, etc)
+  // render using whichever of light/dark best matches color-scheme, which
+  // defaults to following the OS setting, not this app's own theme. That's
+  // what made the calendar icon blend into the background on a dark theme
+  // paired with a light OS setting (or vice versa). Deciding it from the
+  // theme's actual background luminance keeps native controls visible
+  // regardless of what the OS happens to be set to.
+  root.setProperty('color-scheme', themeLuminance(theme.bg) < 0.5 ? 'dark' : 'light');
+}
+
+// Standard relative luminance approximation from an RGB hex color, used only
+// to decide "is this background dark or light" for color-scheme above.
+function themeLuminance(hex) {
+  const clean = (hex || '#000000').replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+  const r = parseInt(full.substring(0, 2), 16) / 255;
+  const g = parseInt(full.substring(2, 4), 16) / 255;
+  const b = parseInt(full.substring(4, 6), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 // Build a full theme object (for state.theme) from a preset key
