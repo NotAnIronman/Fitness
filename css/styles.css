@@ -1,5 +1,10 @@
 /* ============================================================
-   FORGE - personal training log styler
+   FORGE - personal training log
+
+   Theming: every color/spacing/font decision routes through CSS
+   custom properties on :root, set live by js/theme.js. Change a
+   variable, the whole app re-skins, nothing below should ever
+   hardcode a color/radius/font that already has a variable for it.
 
    TABLE OF CONTENTS
      1. Font imports
@@ -31,6 +36,10 @@
 
 /* ============================================================
    1. FONT IMPORTS
+   One @import per family instead of one giant line, CSS allows
+   multiple @import rules (they just all have to come before any
+   other rule), this is the easiest way to add/remove a font
+   without editing one unreadable line.
    ============================================================ */
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
@@ -46,12 +55,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Macondo&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Leckerli+One&display=swap');
 
 /* ============================================================
    2. THEME VARIABLES
-   These are the defaults; js/theme.js overwrites them inline
+   These are the defaults; js/theme.js overwrites them inline for
+   whichever preset/custom colors the user has picked.
    ============================================================ */
 :root {
   --bg: #0B0F14;
@@ -192,8 +200,7 @@ img, canvas, svg {
 }
 
 /* ---- Responsive: below 900px width, or any unusually tall/narrow
-   viewport (foldable cover screens etc, see max-aspect-ratio) 
-   Added this for my Samsung Fold 7                         ---- */
+   viewport (foldable cover screens etc, see max-aspect-ratio) ---- */
 @media (max-width: 900px), (max-aspect-ratio: 0.65) {
   .shell {
     grid-template-columns: 1fr;
@@ -919,7 +926,12 @@ hr.div {
 /* ============================================================
    20. DATE NAVIGATION
    Back/date/forward controls used everywhere a date field exists
-   10%/10% width with a 70% middle bar and a 5% gap on each side.
+   (Food, Goals, Workout Log). Explicit percentage flex-basis so
+   this can never get stretched by a parent's own flex rules (e.g.
+   a wrapping .field-row that gives all its children flex:1), that
+   was the bug that turned these into stretched ovals earlier.
+   Buttons are rectangular, 10%/10% width with a 70% middle bar and
+   a 5% gap on each side.
    ============================================================ */
 .date-nav-row {
   display: flex;
@@ -1196,6 +1208,8 @@ hr.div {
 
 /* ============================================================
    25. REST TIMER WIDGET
+   Floating, bottom-left, opposite corner from the pet widget so
+   the two never overlap if both are active at once.
    ============================================================ */
 .rest-timer-widget {
   position: fixed;
