@@ -1,6 +1,27 @@
-/* ======================================================================
-   SERVICE WORKER - Caches this app's own files so it still works offline. 
-   ====================================================================== */
+/* ============================================================
+   SERVICE WORKER
+   Caches this app's own files so it still works offline. Cross-origin
+   requests (Google Fonts, Chart.js CDN, USDA/Open Food Facts/ZXing)
+   are left alone and go straight to the network, this only takes
+   ownership of files that live in this repo.
+
+   Strategy: network-first for this app's own files. Whenever there's
+   a connection, the freshest deployed version is always fetched and
+   shown (and the cache is refreshed alongside it); the cache is only
+   used as a fallback when there's no network at all. An earlier
+   version of this file used cache-first, which served the cached
+   copy forever once anything was cached, the background network
+   fetch updated the cache but that updated copy was never actually
+   displayed, so redeploys never visibly showed up. Don't reintroduce
+   that.
+
+   Bump CACHE_VERSION any time app files change - that's what makes
+   an already-installed copy fully replace its old cached files (old
+   cache buckets get deleted on activate) and is a quick way to
+   confirm a deploy went out (see the version tooltip on the FORGE
+   logo in the app, which reads APP_VERSION in js/app.js, keep that
+   in sync with this).
+   ============================================================ */
 
 const CACHE_VERSION = 'forge-v9';
 
