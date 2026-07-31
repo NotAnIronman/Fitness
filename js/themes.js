@@ -21,6 +21,14 @@ function renderThemes() {
     { key: 'clean_system', label: 'Work Sans' },
     { key: 'editorial', label: 'Libre Baskerville / Nunito' },
     { key: 'playful', label: 'Baloo 2 / Nunito' },
+    { key: 'whimsical', label: 'Macondo / Nunito \u2728' },
+    { key: 'storybook', label: 'Leckerli One / Quicksand \u2728' },
+    { key: 'bubbly', label: 'Pacifico / Comfortaa \u2728' },
+    { key: 'handwritten', label: 'Dancing Script / Nunito \u2728' },
+    { key: 'cozy_note', label: 'Caveat / Inter \u2728' },
+    { key: 'soft_rounded', label: 'Comfortaa \u2728' },
+    { key: 'cheerful', label: 'Fredoka / Nunito \u2728' },
+    { key: 'candy', label: 'Chewy / Quicksand \u2728' },
   ];
 
   return `

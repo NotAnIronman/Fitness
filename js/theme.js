@@ -78,6 +78,14 @@ const FONT_STACKS = {
   clean_system: { display: "'Work Sans', sans-serif", body: "'Work Sans', sans-serif", mono: "'JetBrains Mono', monospace" },
   editorial: { display: "'Libre Baskerville', serif", body: "'Nunito', sans-serif", mono: "'JetBrains Mono', monospace" },
   playful: { display: "'Baloo 2', sans-serif", body: "'Nunito', sans-serif", mono: "'JetBrains Mono', monospace" },
+  whimsical: { display: "'Macondo', cursive", body: "'Nunito', sans-serif", mono: "'JetBrains Mono', monospace" },
+  storybook: { display: "'Leckerli One', cursive", body: "'Quicksand', sans-serif", mono: "'JetBrains Mono', monospace" },
+  bubbly: { display: "'Pacifico', cursive", body: "'Comfortaa', sans-serif", mono: "'JetBrains Mono', monospace" },
+  handwritten: { display: "'Dancing Script', cursive", body: "'Nunito', sans-serif", mono: "'JetBrains Mono', monospace" },
+  cozy_note: { display: "'Caveat', cursive", body: "'Inter', sans-serif", mono: "'JetBrains Mono', monospace" },
+  soft_rounded: { display: "'Comfortaa', sans-serif", body: "'Comfortaa', sans-serif", mono: "'JetBrains Mono', monospace" },
+  cheerful: { display: "'Fredoka', sans-serif", body: "'Nunito', sans-serif", mono: "'JetBrains Mono', monospace" },
+  candy: { display: "'Chewy', cursive", body: "'Quicksand', sans-serif", mono: "'JetBrains Mono', monospace" },
 };
 
 function applyTheme(theme) {
