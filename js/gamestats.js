@@ -21,7 +21,7 @@ function computeCalendarStreak(qualifyingDates) {
   const cursor = new Date(mostRecent + 'T00:00:00');
   for (let i = sorted.length - 2; i >= 0; i--) {
     cursor.setDate(cursor.getDate() - 1);
-    const expected = cursor.toISOString().slice(0, 10);
+    const expected = dateToLocalISO(cursor);
     if (sorted[i] === expected) streak++;
     else break;
   }
@@ -42,7 +42,7 @@ function buildGameContext() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(todayD + 'T00:00:00');
     d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = dateToLocalISO(d);
     if (STATE.dailyCheckins[iso]) { last7Sum += STATE.dailyCheckins[iso].steps || 0; last7CalendarDaysLogged++; }
   }
   const last7DayAvgSteps = last7CalendarDaysLogged ? last7Sum / last7CalendarDaysLogged : 0;

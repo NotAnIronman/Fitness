@@ -132,7 +132,7 @@ function renderPaceFeedback(isImperial) {
     badgeText = 'Behind pace';
     const yesterday = new Date(latest.date + 'T00:00:00');
     yesterday.setDate(yesterday.getDate() - 1);
-    const yIso = yesterday.toISOString().slice(0, 10);
+    const yIso = dateToLocalISO(yesterday);
     const yEntries = STATE.foodLog[yIso];
 
     message = `Your latest weigh-in (${latest.date}) is ${toDisplay(diffKg)} behind your planned pace. `;
@@ -297,7 +297,7 @@ function shiftGoalTargetDate(delta) {
   if (!STATE.goal.targetDate) return;
   const d = new Date(STATE.goal.targetDate + 'T00:00:00');
   d.setDate(d.getDate() + delta);
-  updateGoalField('targetDate', d.toISOString().slice(0, 10));
+  updateGoalField('targetDate', dateToLocalISO(d));
 }
 
 function ensureGoalStart() {

@@ -42,6 +42,8 @@ function renderFood() {
 
     ${notice('food-hidden-cals', `The most common reason a diet stops adding up isn't the meals, it's the extras: sauces, dressings, cooking oil, coffee add-ins, drinks, and snacks eaten standing up. If your numbers aren't matching your results, that's usually the first place to look.`)}
 
+    ${notice('food-pet-reward', `Your pet earns a meal once your day's total logged calories pass ${STATE.profile.sex === 'male' ? MIN_SAFE_INTAKE.male : MIN_SAFE_INTAKE.female} kcal, not once per item logged, so it rewards actually eating enough for the day rather than logging lots of tiny entries.`)}
+
     ${notice('food-no-scale', renderPortionGuideBody())}
 
     ${compliance && compliance.status !== 'good' ? `
@@ -306,7 +308,7 @@ function renderWaterCard(date) {
           <div class="stat"><div class="stat-label">Target</div><div class="stat-value accent" style="font-size:20px;">${toDisplay(target)}</div></div>
         </div>
         <div class="macro-bar-track" style="margin-bottom:12px;"><div class="macro-bar-fill" style="width:${pct}%; background:#38BDF8;"></div></div>
-        <p class="hint" style="margin-bottom:10px;">Baseline of ~33ml per kg of bodyweight (a commonly cited general range), adjusted slightly by sex. Hotter days, altitude, and heavy sweating all push actual needs higher.</p>
+        <p class="hint" style="margin-bottom:10px;">Baseline of ~33ml per kg of bodyweight (a commonly cited general range), adjusted slightly by sex. Hotter days, altitude, and heavy sweating all push actual needs higher. Reach this target for the day and your pet earns a water item, not one per log, so it rewards actually hitting the goal.</p>
         <div class="chip-row">
           ${[250, 350, 500, 750].map(ml => `<button class="chip" onclick="logWater(${ml}, '${date}')">+${toDisplay(ml)}</button>`).join('')}
           <button class="chip" onclick="undoLastWater('${date}')">Undo last</button>
@@ -320,11 +322,24 @@ function logWater(ml, date) {
   const entry = STATE.dailyWater[date] || { ml: 0 };
   entry.ml += ml;
   STATE.dailyWater[date] = entry;
-  if (date === todayISO()) {
-    STATE.pet.waterInventory = (STATE.pet.waterInventory || 0) + 1;
-    if (typeof markPetInteraction === 'function') markPetInteraction(2);
-  }
+  grantPetWaterIfThresholdMet(date);
   persist(); render();
+}
+
+// Same idea as grantPetFoodIfThresholdMet: one water tray item per day, the
+// first time that day's logged water reaches the personalized target (see
+// getWaterTargetMl), not one per log action.
+function grantPetWaterIfThresholdMet(date) {
+  if (date !== todayISO()) return;
+  if (STATE.pet.waterRewardedDates[date]) return;
+  const entry = STATE.dailyWater[date];
+  const loggedMl = entry ? entry.ml : 0;
+  const target = getWaterTargetMl(STATE.profile.weightKg, STATE.profile.sex);
+  if (!target || loggedMl < target) return;
+  STATE.pet.waterInventory = (STATE.pet.waterInventory || 0) + 1;
+  STATE.pet.waterRewardedDates[date] = true;
+  if (typeof markPetInteraction === 'function') markPetInteraction(2);
+  toast(`Hit your water target today, ${STATE.pet.name || 'your pet'} earned a drink!`);
 }
 
 function undoLastWater(date) {
@@ -348,7 +363,7 @@ function toggleFoodQuickPicks() {
 function shiftFoodDate(delta) {
   const d = new Date(UI.foodDate + 'T00:00:00');
   d.setDate(d.getDate() + delta);
-  setFoodDate(d.toISOString().slice(0, 10));
+  setFoodDate(dateToLocalISO(d));
 }
 
 function toggleCustomFood() {
@@ -581,7 +596,7 @@ function confirmFoodAdjust() {
     STATE.foodLog[UI.foodDate][UI.editingFoodIndex] = { ...f, qty };
   } else {
     addOrIncrementFood(f, qty);
-    grantPetFoodIfToday();
+    grantPetFoodIfThresholdMet(UI.foodDate);
   }
   recordRecentFood(f);
   UI.foodAdjustDraft = null;
@@ -606,19 +621,27 @@ function submitCustomFood() {
     fat: Number(document.getElementById('cf-fat').value) || 0,
   };
   addOrIncrementFood(f, 1);
-  grantPetFoodIfToday();
+  grantPetFoodIfThresholdMet(UI.foodDate);
   recordRecentFood(f);
   UI.showCustomFood = false;
   persist(); render();
   toast('Added to log');
 }
 
-// A new (not edited/backfilled) food log entry for today gives your pet
-// something to eat, shown as a tray item on the Pet page.
-function grantPetFoodIfToday() {
-  if (UI.foodDate !== todayISO()) return;
+// Rewards a food tray item once per day, the first time that day's TOTAL
+// logged calories cross a minimum (reusing MIN_SAFE_INTAKE), not once per
+// item logged, so logging five small snacks doesn't outpace one real meal.
+function grantPetFoodIfThresholdMet(date) {
+  if (date !== todayISO()) return;
+  if (STATE.pet.foodRewardedDates[date]) return; // already earned today
+  const entries = STATE.foodLog[date] || [];
+  const totalKcal = entries.reduce((s, e) => s + e.kcal * e.qty, 0);
+  const threshold = MIN_SAFE_INTAKE[STATE.profile.sex] || MIN_SAFE_INTAKE.female;
+  if (totalKcal < threshold) return;
   STATE.pet.foodInventory = (STATE.pet.foodInventory || 0) + 1;
+  STATE.pet.foodRewardedDates[date] = true;
   if (typeof markPetInteraction === 'function') markPetInteraction(2);
+  toast(`Passed ${Math.round(threshold)} kcal today, ${STATE.pet.name || 'your pet'} earned a meal!`);
 }
 
 // Groups repeat entries of the exact same food (matched on name + kcal) into one

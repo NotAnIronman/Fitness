@@ -108,10 +108,16 @@ function defaultState() {
       rewardedWeeks: {},      // 'weekStartYYYY-MM-DD': true - the all-metrics-hit weekly bonus
       petClicksToday: 0,      // simple click-to-pet interaction, capped per day
       lastClickDate: null,
-      // Food/water: logging a meal or water on the Food page adds one to the
-      // matching tray below the pet on the Pet page, tap an item to feed/water.
+      // Food/water: earning a tray item is tied to hitting a daily minimum
+      // (not one item per food/water logged, which just rewarded spamming
+      // tiny entries), see getFoodTrayThresholdKcal/getWaterTargetMl. Each is
+      // granted at most once per calendar day, tracked here so re-crossing
+      // the threshold later the same day (e.g. logging more food) doesn't
+      // grant more than once.
       foodInventory: 0,
       waterInventory: 0,
+      foodRewardedDates: {}, // 'YYYY-MM-DD': true
+      waterRewardedDates: {}, // 'YYYY-MM-DD': true
       hunger: 100,             // 0-100, decays like happiness, feeding refills it
       thirst: 100,             // 0-100, decays like happiness, watering refills it
       lastFedAt: null,

@@ -2,9 +2,26 @@
    APP - state, router, shell, and Home (profile/BMR/TDEE) view
    ============================================================ */
 
+const LAST_ROUTE_KEY = 'forge.lastRoute';
+
+// Kept deliberately independent of NAV_ITEMS (which isn't defined yet this early
+// in the file) - doRender()'s route dispatch below has a safe fallback to
+// 'home' for anything it doesn't recognize, so an invalid/stale stored value
+// here just quietly lands on Home instead of a blank page.
+function loadLastRoute() {
+  try {
+    return localStorage.getItem(LAST_ROUTE_KEY) || 'home';
+  } catch (e) {
+    return 'home';
+  }
+}
+function saveLastRoute(route) {
+  try { localStorage.setItem(LAST_ROUTE_KEY, route); } catch (e) { /* private browsing etc, not critical */ }
+}
+
 let STATE = loadState();
 let UI = {
-  route: 'home',
+  route: loadLastRoute(),
   workoutDayId: null,
   addExerciseOpenFor: null,
   copyDayOpenFor: null,
@@ -31,17 +48,30 @@ let UI = {
   barcodeStatus: '',
   petShopGroupOpen: {},
   petChangePanelOpen: false,
+  pasteSyncOpen: false,
 };
 
 // Bump this alongside CACHE_VERSION in sw.js on every deploy. Shown as a hover/
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v9';
+const APP_VERSION = 'forge-v10';
 
 function todayISO() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
+  return dateToLocalISO(new Date());
+}
+
+// Converts a Date object to a 'YYYY-MM-DD' string using the LOCAL calendar
+// date, not UTC. Date.toISOString() always formats in UTC, which silently
+// gives the wrong day whenever local time and UTC fall on different calendar
+// dates (e.g. it's still Thursday evening locally but already Friday UTC).
+// Every date-math spot in the app should go through this, not
+// .toISOString().slice(0,10) directly.
+function dateToLocalISO(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function persist() {
@@ -226,7 +256,7 @@ function getWorkoutComplianceCheck() {
   let loggedCount = 0;
   for (let i = 0; i < 7; i++) {
     const d = new Date(today); d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = dateToLocalISO(d);
     if (STATE.workoutLog[iso] && STATE.workoutLog[iso].length > 0) loggedCount++;
   }
   const ratio = loggedCount / plannedDays;
@@ -250,7 +280,7 @@ function getFoodComplianceCheck() {
   const days = [];
   for (let i = 1; i <= 7; i++) {
     const d = new Date(today); d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = dateToLocalISO(d);
     const entries = STATE.foodLog[iso];
     if (entries && entries.length) {
       days.push(entries.reduce((s, e) => s + e.kcal * e.qty, 0));
@@ -401,6 +431,7 @@ function doRender() {
   else if (UI.route === 'achievements') main.innerHTML = renderAchievements();
   else if (UI.route === 'pet') main.innerHTML = STATE.pet.enabled ? renderPetTab() : renderHome();
   else if (UI.route === 'themes') main.innerHTML = renderThemes();
+  else { UI.route = 'home'; main.innerHTML = renderHome(); }
 
   afterRenderHooks();
 }
@@ -411,6 +442,7 @@ function navigate(route) {
     UI.barcodeScannerOpen = false;
   }
   UI.route = route;
+  saveLastRoute(route);
   render();
 }
 

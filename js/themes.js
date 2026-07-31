@@ -102,7 +102,27 @@ function renderThemes() {
 
     <div class="card">
       <div class="card-title">Your data</div>
-      <p class="hint" style="margin-bottom:12px;">Everything lives in this browser's local storage, nothing is sent anywhere except food searches. Export a backup to move data to another device, or import one back in.</p>
+      <p class="hint" style="margin-bottom:12px;">Everything lives in this browser's local storage, nothing is sent anywhere except food searches. There's no account and no server this data passes through, syncing between your own devices is entirely up to you, using whichever option below actually works on what you've got.</p>
+
+      <p class="hint" style="margin-bottom:6px;"><strong style="color:var(--text);">Fastest, if supported:</strong> share directly to another device you're holding (AirDrop, Nearby Share, Bluetooth), no file to find and re-upload.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="shareBackup()">\ud83d\udce4 Share to another device</button>
+      </div>
+
+      <p class="hint" style="margin-bottom:6px;"><strong style="color:var(--text);">Works everywhere:</strong> copy a sync code on this device, paste it into Forge on the other one.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+        <button class="btn" onclick="copySyncCode()">Copy sync code</button>
+        <button class="btn" onclick="togglePasteSync()">${UI.pasteSyncOpen ? 'Cancel paste' : 'Paste sync code'}</button>
+      </div>
+      ${UI.pasteSyncOpen ? `
+        <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:12px; margin-bottom:16px;">
+          <p class="hint" style="margin-bottom:8px;">Paste the code copied from your other device. This replaces what's currently on this device, only do this on the device you want to overwrite.</p>
+          <textarea id="paste-sync-text" data-focus-id="paste-sync-text" rows="4" style="font-family:var(--font-mono); font-size:11px;" placeholder="Paste sync code here"></textarea>
+          <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="importFromPasteSync()">Sync from pasted code</button>
+        </div>
+      ` : ''}
+
+      <p class="hint" style="margin-bottom:6px;"><strong style="color:var(--text);">Traditional file backup:</strong> a .json file you keep somewhere (or attach to an email to yourself, upload to your own cloud storage, etc).</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" onclick="exportData()">Export backup (.json)</button>
         <button class="btn" onclick="document.getElementById('import-file-input').click()">Import backup (.json)</button>
@@ -182,6 +202,62 @@ function updateThemeField(key, value) {
 function updateFoodApiKey(value) {
   STATE.foodApiKey = value;
   persist();
+}
+
+// Uses the OS's own native share sheet (AirDrop, Nearby Share, Bluetooth, or
+// any app that accepts a file) to send the backup directly to another device,
+// no server or account involved, this just hands the file to the OS. Not
+// every browser supports sharing files (desktop support is spotty), falls
+// back to a clear message pointing at the other options when unavailable.
+async function shareBackup() {
+  try {
+    const json = JSON.stringify(STATE, null, 2);
+    const file = new File([json], `forge-backup-${todayISO()}.json`, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Forge backup', text: 'Forge training log backup' });
+    } else {
+      toast("Sharing files isn't supported in this browser, try Copy sync code or Export instead.");
+    }
+  } catch (e) {
+    if (e && e.name !== 'AbortError') { // AbortError just means they closed the share sheet, not a real failure
+      console.error(e);
+      toast('Could not open the share sheet, try Copy sync code or Export instead.');
+    }
+  }
+}
+
+// Copies the whole backup to the clipboard as text, works on essentially any
+// device/browser, paste it into the "Paste sync code" box on the other one.
+async function copySyncCode() {
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(STATE));
+    toast("Copied! Paste it into Forge on your other device (Themes -> Paste sync code).");
+  } catch (e) {
+    console.error(e);
+    toast('Could not copy automatically, try Export instead.');
+  }
+}
+
+function togglePasteSync() {
+  UI.pasteSyncOpen = !UI.pasteSyncOpen;
+  render();
+}
+
+function importFromPasteSync() {
+  const textEl = document.getElementById('paste-sync-text');
+  const text = textEl ? textEl.value.trim() : '';
+  if (!text) { toast('Paste your sync code first'); return; }
+  try {
+    const parsed = JSON.parse(text);
+    STATE = deepMerge(defaultState(), parsed);
+    persist();
+    UI.pasteSyncOpen = false;
+    render();
+    toast('Synced from pasted code!');
+  } catch (e) {
+    console.error(e);
+    alert("That doesn't look like a valid Forge sync code. Make sure you copied the whole thing.");
+  }
 }
 
 function exportData() {

@@ -54,7 +54,7 @@ function evaluatePetDailyRewards() {
     for (let i = 0; i < 7; i++) {
       const d = new Date(date + 'T00:00:00');
       d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
+      const iso = dateToLocalISO(d);
       const r = STATE.pet.rewardedDates[iso];
       if (!r || !r.checkin || !r.steps || !r.workout || !r.calorie) { allWeek = false; break; }
     }

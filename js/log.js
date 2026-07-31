@@ -111,7 +111,7 @@ function renderCopyIntoLogMenu() {
   const planDays = STATE.workoutPlan.days.filter(d => d.exercises.length > 0);
   const yesterday = new Date(UI.logDate + 'T00:00:00');
   yesterday.setDate(yesterday.getDate() - 1);
-  const yIso = yesterday.toISOString().slice(0, 10);
+  const yIso = dateToLocalISO(yesterday);
   const hasYesterday = STATE.workoutLog[yIso] && STATE.workoutLog[yIso].length > 0;
   const isReplace = UI.logCopyMode === 'replace';
 
@@ -142,7 +142,7 @@ function updateRestTimerDefault(val) {
 function shiftLogDate(days) {
   const d = new Date(UI.logDate + 'T00:00:00');
   d.setDate(d.getDate() + days);
-  UI.logDate = d.toISOString().slice(0, 10);
+  UI.logDate = dateToLocalISO(d);
   UI.logAddOpen = false;
   UI.logCopyOpen = false;
   UI.editingExercise = null;
