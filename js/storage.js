@@ -94,7 +94,7 @@ function defaultState() {
     // Secret pet companion feature, off by default. Toggled from a hidden panel
     // in Themes.
     pet: {
-      enabled: true,
+      enabled: false,
       species: null,          // key into PET_ANIMALS, null until first chosen
       name: '',
       equipped: {},           // slot -> item key, e.g. { hat: 'top_hat' }
@@ -157,7 +157,7 @@ function loadState() {
     const parsed = JSON.parse(raw);
     // shallow-merge with defaults so new fields added later don't break old saves
     const def = defaultState();
-    return deepMerge(def, parsed);
+    return normalizeStateShape(deepMerge(def, sanitizeJsonValue(parsed)));
   } catch (e) {
     console.error('Failed to load state, resetting.', e);
     return defaultState();
@@ -177,6 +177,7 @@ function deepMerge(base, override) {
   const out = Array.isArray(base) ? [...base] : { ...base };
   if (!override || typeof override !== 'object') return out;
   for (const key of Object.keys(override)) {
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') continue;
     if (
       typeof base[key] === 'object' && base[key] !== null && !Array.isArray(base[key]) &&
       typeof override[key] === 'object' && override[key] !== null && !Array.isArray(override[key])
@@ -187,6 +188,149 @@ function deepMerge(base, override) {
     }
   }
   return out;
+}
+
+function isPlainObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+// Backups are user-controlled files/text. Keep JSON bounded, remove prototype
+// keys, and reject values that cannot be safely represented by the app.
+function sanitizeJsonValue(value, depth) {
+  depth = depth || 0;
+  if (depth > 14) throw new Error('Backup nesting is too deep.');
+  if (value == null || typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.slice(0, 2000);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (Array.isArray(value)) {
+    if (value.length > 10000) throw new Error('Backup contains an unexpectedly large list.');
+    return value.map(v => sanitizeJsonValue(v, depth + 1));
+  }
+  if (!isPlainObject(value)) throw new Error('Backup contains an unsupported value.');
+  const out = {};
+  const keys = Object.keys(value);
+  if (keys.length > 20000) throw new Error('Backup contains too many fields.');
+  keys.forEach(key => {
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') return;
+    out[key] = sanitizeJsonValue(value[key], depth + 1);
+  });
+  return out;
+}
+
+function normalizeStateShape(state) {
+  const def = defaultState();
+  if (!isPlainObject(state)) throw new Error('Backup root must be an object.');
+  const objectFields = ['profile', 'goal', 'workoutPlan', 'workoutLog', 'foodLog', 'bodyFat', 'uiPrefs', 'usdaCache', 'dailyCheckins', 'dailyWater', 'pet', 'achievements', 'theme'];
+  objectFields.forEach(key => { if (!isPlainObject(state[key])) state[key] = def[key]; });
+  const arrayFields = ['weightLog', 'recentExercises', 'recentFoods', 'savedMeals', 'foodIndexPool'];
+  arrayFields.forEach(key => { if (!Array.isArray(state[key])) state[key] = def[key]; });
+  state.recentFoods = state.recentFoods.slice(0, 50).map(normalizeFoodEntry).filter(Boolean);
+  state.foodIndexPool = state.foodIndexPool.slice(0, 1000).map(normalizeFoodEntry).filter(Boolean);
+  state.recentExercises = state.recentExercises.slice(0, 50).filter(isPlainObject).map(item => ({
+    key: String(item.key || '').slice(0, 200),
+    label: String(item.label || 'Exercise').slice(0, 120),
+    snapshot: normalizeExerciseEntry(item.snapshot),
+  })).filter(item => item.snapshot);
+  state.savedMeals = state.savedMeals.slice(0, 500).filter(isPlainObject).map(meal => {
+    const items = Array.isArray(meal.items) ? meal.items.slice(0, 200).map(normalizeFoodEntry).filter(Boolean) : [];
+    return {
+      id: safeStateId(meal.id),
+      name: String(meal.name || 'Saved meal').slice(0, 120),
+      items,
+      kcal: Math.max(0, Number(meal.kcal) || 0),
+      protein: Math.max(0, Number(meal.protein) || 0),
+      carbs: Math.max(0, Number(meal.carbs) || 0),
+      fat: Math.max(0, Number(meal.fat) || 0),
+    };
+  });
+  if (!Array.isArray(state.workoutPlan.days)) state.workoutPlan.days = [];
+  state.workoutPlan.days = state.workoutPlan.days.slice(0, 100).filter(isPlainObject).map(day => ({
+    id: safeStateId(day.id),
+    name: String(day.name || 'Training day').slice(0, 100),
+    exercises: Array.isArray(day.exercises) ? day.exercises.slice(0, 500).map(normalizeExerciseEntry).filter(Boolean) : [],
+  }));
+  state.workoutLog = normalizeDatedLog(state.workoutLog, entry => normalizeExerciseEntry(entry));
+  state.foodLog = normalizeDatedLog(state.foodLog, normalizeFoodEntry);
+  if (!Array.isArray(state.uiPrefs.collapsedNotices)) state.uiPrefs.collapsedNotices = [];
+  if (!Array.isArray(state.pet.ownedItems)) state.pet.ownedItems = [];
+  if (!Array.isArray(state.pet.travelCelebrated)) state.pet.travelCelebrated = [];
+  if (!isPlainObject(state.pet.equipped)) state.pet.equipped = {};
+  if (!isPlainObject(state.pet.rewardedDates)) state.pet.rewardedDates = {};
+  if (!isPlainObject(state.pet.rewardedWeeks)) state.pet.rewardedWeeks = {};
+  if (!isPlainObject(state.pet.foodRewardedDates)) state.pet.foodRewardedDates = {};
+  if (!isPlainObject(state.pet.waterRewardedDates)) state.pet.waterRewardedDates = {};
+  if (!isPlainObject(state.achievements.unlocked)) state.achievements.unlocked = {};
+  state.profile.name = String(state.profile.name || '').slice(0, 80);
+  state.profile.sex = state.profile.sex === 'male' ? 'male' : 'female';
+  state.profile.unitSystem = state.profile.unitSystem === 'metric' ? 'metric' : 'imperial';
+  const age = Number(state.profile.age);
+  const heightCm = Number(state.profile.heightCm);
+  const weightKg = Number(state.profile.weightKg);
+  state.profile.age = age >= 18 && age <= 100 ? age : null;
+  state.profile.heightCm = heightCm >= 120 && heightCm <= 230 ? heightCm : null;
+  state.profile.weightKg = weightKg >= 20 && weightKg <= 400 ? weightKg : null;
+  state.workoutPlan.restTimerSeconds = Math.max(10, Math.min(900, Number(state.workoutPlan.restTimerSeconds) || 90));
+  state.workoutPlan.stepsPerDay = Math.max(0, Math.min(200000, Number(state.workoutPlan.stepsPerDay) || 0));
+  return state;
+}
+
+function safeStateId(value) {
+  const text = String(value || '');
+  return /^[A-Za-z0-9_-]{1,100}$/.test(text) ? text : uid();
+}
+
+function normalizeExerciseEntry(entry) {
+  if (!isPlainObject(entry)) return null;
+  const out = { ...entry, id: safeStateId(entry.id), completed: !!entry.completed };
+  out.exerciseId = typeof entry.exerciseId === 'string' ? entry.exerciseId.slice(0, 100) : null;
+  if (isPlainObject(entry.custom)) {
+    out.custom = {
+      name: String(entry.custom.name || 'Custom exercise').slice(0, 120),
+      met: Math.max(1, Math.min(25, Number(entry.custom.met) || 5)),
+      inputMode: 'duration',
+      category: 'Custom',
+    };
+  }
+  ['sets', 'reps', 'durationMin', 'weightKg'].forEach(key => {
+    if (out[key] != null) out[key] = Math.max(0, Number(out[key]) || 0);
+  });
+  if (Array.isArray(entry.perSetWeights)) {
+    out.perSetWeights = entry.perSetWeights.slice(0, 100).filter(isPlainObject).map(set => ({
+      reps: Math.max(0, Number(set.reps) || 0),
+      weightKg: Math.max(0, Number(set.weightKg) || 0),
+      weightIsPerSide: !!set.weightIsPerSide,
+      completed: !!set.completed,
+    }));
+  }
+  return out;
+}
+
+function normalizeFoodEntry(entry) {
+  if (!isPlainObject(entry)) return null;
+  return {
+    name: String(entry.name || 'Food').slice(0, 200),
+    kcal: Math.max(0, Number(entry.kcal) || 0),
+    protein: Math.max(0, Number(entry.protein) || 0),
+    carbs: Math.max(0, Number(entry.carbs) || 0),
+    fat: Math.max(0, Number(entry.fat) || 0),
+    qty: Math.max(0.01, Number(entry.qty) || 1),
+  };
+}
+
+function normalizeDatedLog(log, normalizeEntry) {
+  const out = {};
+  Object.keys(log || {}).slice(0, 5000).forEach(date => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Array.isArray(log[date])) return;
+    out[date] = log[date].slice(0, 1000).map(normalizeEntry).filter(Boolean);
+  });
+  return out;
+}
+
+function prepareImportedState(incoming) {
+  if (!isPlainObject(incoming)) throw new Error('That file is not a Forge backup object.');
+  return normalizeStateShape(deepMerge(defaultState(), sanitizeJsonValue(incoming)));
 }
 
 function uid() {

@@ -10,7 +10,7 @@ const inToCm = inch => inch * 2.54;
 
 // --- BMR: Mifflin-St Jeor equation ---
 function calcBMR({ sex, age, heightCm, weightKg }) {
-  if (!age || !heightCm || !weightKg) return null;
+  if (!age || age < 18 || age > 100 || !heightCm || !weightKg) return null;
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
   return sex === 'male' ? base + 5 : base - 161;
 }
@@ -34,6 +34,41 @@ function effectiveLoadKg(entry) {
   }
   const w = Number(entry.weightKg) || 0;
   return entry.weightIsPerSide ? w * 2 : w;
+}
+
+// Workout entries are plain persisted data, but several flows copy entries.
+// Keep nested per-set objects independent so completion/editing in one log can
+// never mutate a plan template, a recent-item snapshot, or another date.
+function cloneExerciseEntry(entry, overrides) {
+  const cloned = {
+    ...entry,
+    custom: entry.custom ? { ...entry.custom } : entry.custom,
+    perSetWeights: entry.perSetWeights ? entry.perSetWeights.map(s => ({ ...s })) : entry.perSetWeights,
+  };
+  return Object.assign(cloned, overrides || {});
+}
+
+function hasCompletedWork(entry) {
+  if (!entry) return false;
+  if (entry.perSetWeights && entry.perSetWeights.length) {
+    return entry.perSetWeights.some(s => !!s.completed);
+  }
+  return !!entry.completed;
+}
+
+function completedExerciseEntry(entry) {
+  if (!hasCompletedWork(entry)) return null;
+  if (entry.perSetWeights && entry.perSetWeights.length) {
+    const completedSets = entry.perSetWeights.filter(s => s.completed).map(s => ({ ...s }));
+    return cloneExerciseEntry(entry, { perSetWeights: completedSets, sets: completedSets.length, completed: true });
+  }
+  return cloneExerciseEntry(entry);
+}
+
+function isExerciseFullyCompleted(entry) {
+  if (!entry) return false;
+  if (entry.perSetWeights && entry.perSetWeights.length) return entry.perSetWeights.every(s => !!s.completed);
+  return !!entry.completed;
 }
 
 // Estimate an effective duration for strength sets (time under tension + rest)
@@ -149,22 +184,34 @@ function evaluateGoal({ startWeightKg, targetWeightKg, startDate, targetDate, td
   const weeks = days / 7;
   const deltaLb = kgToLb(deltaKg);
   const ratePerWeekLb = deltaLb / weeks;
+  const ratePctBodyWeightPerWeek = startWeightKg > 0 ? (Math.abs(deltaKg) / startWeightKg / weeks) * 100 : null;
   const dailyDeficitNeeded = (Math.abs(deltaLb) * 3500) / days; // kcal/day required
-  const suggestedIntake = tdee ? tdee - (deltaLb < 0 ? dailyDeficitNeeded : -dailyDeficitNeeded) : null;
+  const suggestedIntakeRaw = tdee ? tdee - (deltaLb < 0 ? dailyDeficitNeeded : -dailyDeficitNeeded) : null;
 
   // Feasibility bands based on widely-cited safe rate of change (~0.5-1% bodyweight/week, capped ~2lb/week loss, ~0.5-1lb/week gain)
   const absRate = Math.abs(ratePerWeekLb);
+  const pctRate = ratePctBodyWeightPerWeek || 0;
   let feasibility = 'reasonable';
   if (deltaLb < 0) {
-    if (absRate > 2.5) feasibility = 'unlikely';
-    else if (absRate > 1.5) feasibility = 'ambitious';
+    if (pctRate > 1.25 || absRate > 2.5) feasibility = 'unlikely';
+    else if (pctRate > 1.0 || absRate > 2.0) feasibility = 'ambitious';
   } else if (deltaLb > 0) {
-    if (absRate > 1.5) feasibility = 'unlikely';
-    else if (absRate > 0.75) feasibility = 'ambitious';
+    if (pctRate > 1.0 || absRate > 1.5) feasibility = 'unlikely';
+    else if (pctRate > 0.5 || absRate > 0.75) feasibility = 'ambitious';
   }
 
+  // A timeline may be mathematically computable without being an appropriate
+  // calorie prescription. Do not operationalize targets below a conservative
+  // adult floor, deficits above 1,000 kcal/day, or a timeline already labeled
+  // unlikely. The UI asks the person to extend the date instead.
+  const unsafeTarget = deltaLb < 0 && !!tdee && (
+    suggestedIntakeRaw < 1200 || dailyDeficitNeeded > 1000 || feasibility === 'unlikely'
+  );
+  const suggestedIntake = unsafeTarget ? null : suggestedIntakeRaw;
+
   return {
-    deltaLb, ratePerWeekLb, dailyDeficitNeeded, suggestedIntake, feasibility, weeks, days,
+    deltaLb, ratePerWeekLb, ratePctBodyWeightPerWeek, dailyDeficitNeeded,
+    suggestedIntake, suggestedIntakeRaw, unsafeTarget, feasibility, weeks, days,
   };
 }
 
@@ -196,7 +243,19 @@ function calcNavyBodyFat({ sex, waistCm, neckCm, hipCm, heightCm }) {
     if (diff <= 0) return null;
     bf = 163.205 * Math.log10(diff) - 97.684 * Math.log10(height) - 78.387;
   }
-  return Math.max(2, Math.min(60, bf));
+  // Do not turn impossible measurements into a plausible-looking boundary
+  // value. Extremely low/high outputs are more likely measurement errors.
+  return Number.isFinite(bf) && bf >= 2 && bf <= 70 ? bf : null;
+}
+
+function getNavyMeasurementError({ sex, waistCm, neckCm, hipCm, heightCm }) {
+  if (!waistCm || !neckCm || !heightCm || (sex === 'female' && !hipCm)) return null;
+  if ([waistCm, neckCm, heightCm, hipCm].filter(v => v != null).some(v => v <= 0)) return 'Measurements must be greater than zero.';
+  if (sex === 'male' && waistCm <= neckCm) return 'Waist must be larger than neck for this equation. Recheck the tape positions.';
+  if (sex === 'female' && waistCm + hipCm <= neckCm) return 'These measurements cannot be evaluated. Recheck the tape positions and units.';
+  const value = calcNavyBodyFat({ sex, waistCm, neckCm, hipCm, heightCm });
+  if (value == null) return 'The result is outside this method\'s plausible range. Recheck the measurements and units.';
+  return null;
 }
 
 function getBodyFatCategory(bf, sex) {
@@ -251,7 +310,6 @@ function getWaterTargetMl(weightKg, sex) {
   if (!weightKg) return null;
   const mlPerKg = 33;
   let target = weightKg * mlPerKg;
-  if (sex === 'male') target *= 1.1;
   return Math.round(target / 50) * 50; // round to a clean number
 }
 
@@ -281,12 +339,15 @@ function explainExerciseCalc(entry, ex, bodyWeightKg) {
     if (adj < 1) text += ` (${rawMin} min logged, only ${Math.round(adj * 100)}% counted as active time since most of a gym session is rest between sets, not continuous effort.)`;
     return text;
   }
-  const minutes = estimateStrengthMinutesFromEntry(entry);
+  let minutes = estimateStrengthMinutesFromEntry(entry);
+  const loadRatio = ex.inputMode === 'setsRepsWeight' ? effectiveLoadKg(entry) / bodyWeightKg : 0;
+  const heavyAdjustment = loadRatio > 1 ? 1.15 : 1;
+  minutes *= heavyAdjustment;
   const kcal = metCalories(ex.met, bodyWeightKg, minutes);
   const totalReps = entry.perSetWeights
     ? entry.perSetWeights.reduce((s, st) => s + (Number(st.reps) || 0), 0)
     : (Number(entry.sets) || 0) * (Number(entry.reps) || 0);
-  return `Each rep is assumed to take about 3.5 seconds of active effort, plus a share of the rest between sets, ${totalReps} total reps works out to roughly ${minutes.toFixed(1)} min of estimated active time. At MET ${ex.met} for a ${bwRound}kg bodyweight, that's MET ${ex.met} x 3.5 x ${bwRound}kg / 200 x ${minutes.toFixed(1)} min = ${Math.round(kcal)} kcal.`;
+  return `Each rep is assumed to take about 3.5 seconds of active effort, plus a share of the rest between sets, ${totalReps} total reps works out to roughly ${minutes.toFixed(1)} min of estimated active time${heavyAdjustment > 1 ? ', including a small adjustment for a load above bodyweight' : ''}. At MET ${ex.met} for a ${bwRound}kg bodyweight, that's MET ${ex.met} x 3.5 x ${bwRound}kg / 200 x ${minutes.toFixed(1)} min = ${Math.round(kcal)} kcal.`;
 }
 
 // --- Strength standard ranking ---

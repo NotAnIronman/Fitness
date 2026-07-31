@@ -55,7 +55,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v12';
+const APP_VERSION = 'forge-v13';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -81,6 +81,8 @@ function persist() {
 function toast(msg) {
   const el = document.createElement('div');
   el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
   el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 2200);
@@ -90,7 +92,7 @@ function toast(msg) {
 // Hover shows it on desktop for free (CSS :hover). Tap toggles it on mobile via
 // the delegated click listener below, since touch devices have no hover state.
 function tip(label, title, bodyHtml) {
-  return `<span class="tip">${label}<span class="tip-box"><span class="tip-title">${escapeAttr(title)}</span>${bodyHtml}</span></span>`;
+  return `<span class="tip" tabindex="0" role="button" aria-label="More information: ${escapeAttr(title)}">${label}<span class="tip-box" role="tooltip"><span class="tip-title">${escapeAttr(title)}</span>${bodyHtml}</span></span>`;
 }
 
 // Tooltips default to centering under their trigger, which can push them off
@@ -125,6 +127,16 @@ document.addEventListener('mouseover', (e) => {
   const target = e.target.closest ? e.target.closest('.tip') : null;
   if (target) clampTipToViewport(target);
 });
+document.addEventListener('keydown', (e) => {
+  const target = e.target.closest ? e.target.closest('.tip') : null;
+  if (!target || (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Escape')) return;
+  e.preventDefault();
+  if (e.key === 'Escape') target.classList.remove('tip-open');
+  else {
+    target.classList.toggle('tip-open');
+    if (target.classList.contains('tip-open')) clampTipToViewport(target);
+  }
+});
 
 // ---------- Dismissible / collapsible notice component ----------
 // Used for one-time explanatory tips that would otherwise clutter the page.
@@ -132,7 +144,7 @@ document.addEventListener('mouseover', (e) => {
 function notice(id, bodyHtml) {
   const collapsed = STATE.uiPrefs.collapsedNotices.includes(id);
   if (collapsed) {
-    return `<div class="notice-pill" onclick="toggleNotice('${id}')"><span class="plus">+</span> Show tip</div>`;
+    return `<button type="button" class="notice-pill" onclick="toggleNotice('${id}')"><span class="plus">+</span> Show tip</button>`;
   }
   return `<div class="notice"><div class="notice-body">${bodyHtml}</div><button class="notice-collapse-btn" onclick="toggleNotice('${id}')" title="Collapse this tip">-</button></div>`;
 }
@@ -175,21 +187,29 @@ function weeklyPlanSummary() {
   const bw = currentWeightKg();
   let totalMinutes = 0;
   let totalKcal = 0;
+  let aerobicMinutes = 0;
+  let strengthDaysPerWeek = 0;
   activeDays.forEach(d => {
+    let hasStrength = false;
     d.exercises.forEach(e => {
       const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId) || e.custom;
       if (!ex) return;
       let minutes = 0;
       if (ex.inputMode === 'duration' || ex.inputMode === 'distance') minutes = Number(e.durationMin) || 0;
-      else minutes = estimateStrengthMinutes(Number(e.sets), Number(e.reps));
+      else minutes = estimateStrengthMinutesFromEntry(e);
       totalMinutes += minutes;
+      if (ex.category === 'Strength') hasStrength = true;
+      if (ex.category === 'Cardio' || ex.category === 'Sports') aerobicMinutes += minutes;
       totalKcal += calcExerciseCalories(e, bw);
     });
+    if (hasStrength) strengthDaysPerWeek++;
   });
   return {
     workoutDaysPerWeek: activeDays.length,
     avgSessionMinutes: activeDays.length ? totalMinutes / activeDays.length : 0,
     totalWeeklyExerciseKcal: totalKcal,
+    aerobicMinutes,
+    strengthDaysPerWeek,
     stepsPerDay: getStepsAverage(),
   };
 }
@@ -214,7 +234,10 @@ function getTDEE() {
 // to a calorie bonus so ordinary daily walking isn't double counted.
 function getStepBonus() {
   const lvl = getActivityLevel();
-  const stepsPerDay = STATE.workoutPlan.stepsPerDay;
+  // Use the same blended rolling average that drives activity detection. Using
+  // the one-time plan estimate here made the displayed activity level and the
+  // effective TDEE disagree after real check-ins had been logged.
+  const stepsPerDay = getStepsAverage();
   const dailyKcal = calcBonusStepCalories(stepsPerDay, lvl.baselineSteps);
   return {
     baselineSteps: lvl.baselineSteps,
@@ -257,7 +280,7 @@ function getWorkoutComplianceCheck() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(today); d.setDate(d.getDate() - i);
     const iso = dateToLocalISO(d);
-    if (STATE.workoutLog[iso] && STATE.workoutLog[iso].length > 0) loggedCount++;
+    if ((STATE.workoutLog[iso] || []).some(hasCompletedWork)) loggedCount++;
   }
   const ratio = loggedCount / plannedDays;
   let status = 'good';
@@ -450,6 +473,16 @@ function navigate(route) {
 }
 
 function afterRenderHooks() {
+  // Associate straightforward field labels with their first control. Existing
+  // explicit ids/labels win; this covers the many generated forms without
+  // requiring screen-reader users to infer unnamed number inputs.
+  document.querySelectorAll('.field').forEach((field, index) => {
+    const label = field.querySelector('label');
+    const control = field.querySelector('input, select, textarea');
+    if (!label || !control || label.htmlFor || control.getAttribute('aria-label')) return;
+    if (!control.id) control.id = `forge-field-${UI.route}-${index}`;
+    label.htmlFor = control.id;
+  });
   if (UI.route === 'goals') drawGoalChart();
   if (UI.route === 'progress') { drawProgressChart(); drawStepsChart(); }
   if (UI.route === 'food' && typeof loadZXing === 'function') {
@@ -485,6 +518,7 @@ function renderHome() {
   const stepBonus = getStepBonus();
   const summary = weeklyPlanSummary();
   const isImperial = p.unitSystem === 'imperial';
+  const roundedHeightIn = p.heightCm ? Math.round(cmToIn(p.heightCm)) : null;
 
   const weightDisplay = p.weightKg
     ? (isImperial ? kgToLb(p.weightKg).toFixed(1) : p.weightKg)
@@ -508,21 +542,21 @@ function renderHome() {
             <button class="${!isImperial ? 'active' : ''}" onclick="setUnitSystem('metric')">kg / cm</button>
           </div>
         </div>
-        <div class="field">
-          <label>Name</label>
-          <input type="text" data-focus-id="profile-name" value="${escapeAttr(p.name)}" onchange="updateProfile('name', this.value)" onkeydown="if(event.key==='Enter') this.blur()" placeholder="Optional">
+          <div class="field">
+            <label for="profile-name">Name</label>
+            <input id="profile-name" type="text" data-focus-id="profile-name" value="${escapeAttr(p.name)}" onchange="updateProfile('name', this.value)" onkeydown="if(event.key==='Enter') this.blur()" placeholder="Optional">
         </div>
         <div class="field-row">
           <div class="field">
-            <label>Sex (for BMR formula)</label>
-            <select data-focus-id="profile-sex" onchange="updateProfile('sex', this.value)">
+            <label for="profile-sex">Sex used by the BMR equation</label>
+            <select id="profile-sex" data-focus-id="profile-sex" onchange="updateProfile('sex', this.value)">
               <option value="female" ${p.sex === 'female' ? 'selected' : ''}>Female</option>
               <option value="male" ${p.sex === 'male' ? 'selected' : ''}>Male</option>
             </select>
           </div>
           <div class="field">
-            <label>Age</label>
-            <input type="number" data-focus-id="profile-age" min="10" max="100" value="${p.age ?? ''}" onchange="updateProfile('age', numOrNull(this.value))" onkeydown="if(event.key==='Enter') this.blur()">
+            <label for="profile-age">Age (18+)</label>
+            <input id="profile-age" type="number" data-focus-id="profile-age" min="18" max="100" value="${p.age ?? ''}" onchange="updateProfile('age', numOrNull(this.value))" onkeydown="if(event.key==='Enter') this.blur()">
           </div>
         </div>
         <div class="field-row">
@@ -530,16 +564,16 @@ function renderHome() {
             <label>Height ${isImperial ? '(ft / in)' : '(cm)'}</label>
             ${isImperial ? `
               <div class="field-row">
-                <input type="number" data-focus-id="profile-height-ft" min="1" max="8" placeholder="ft" value="${p.heightCm ? Math.floor(cmToIn(p.heightCm) / 12) : ''}" onchange="updateHeightImperial(this.value, null)" onkeydown="if(event.key==='Enter') this.blur()">
-                <input type="number" data-focus-id="profile-height-in" min="0" max="11" placeholder="in" value="${p.heightCm ? Math.round(cmToIn(p.heightCm) % 12) : ''}" onchange="updateHeightImperial(null, this.value)" onkeydown="if(event.key==='Enter') this.blur()">
+                <input aria-label="Height feet" type="number" data-focus-id="profile-height-ft" min="3" max="7" placeholder="ft" value="${roundedHeightIn != null ? Math.floor(roundedHeightIn / 12) : ''}" onchange="updateHeightImperial(this.value, null)" onkeydown="if(event.key==='Enter') this.blur()">
+                <input aria-label="Height inches" type="number" data-focus-id="profile-height-in" min="0" max="11" placeholder="in" value="${roundedHeightIn != null ? roundedHeightIn % 12 : ''}" onchange="updateHeightImperial(null, this.value)" onkeydown="if(event.key==='Enter') this.blur()">
               </div>
             ` : `
-              <input type="number" data-focus-id="profile-height-cm" min="100" max="230" value="${p.heightCm ?? ''}" onchange="updateProfile('heightCm', numOrNull(this.value))" onkeydown="if(event.key==='Enter') this.blur()">
+              <input aria-label="Height in centimeters" type="number" data-focus-id="profile-height-cm" min="120" max="230" value="${p.heightCm ?? ''}" onchange="updateProfile('heightCm', numOrNull(this.value))" onkeydown="if(event.key==='Enter') this.blur()">
             `}
           </div>
           <div class="field">
             <label>Weight ${isImperial ? '(lb)' : '(kg)'}</label>
-            <input type="number" data-focus-id="profile-weight" step="0.1" value="${weightDisplay}" onchange="updateWeight(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
+            <input aria-label="Weight in ${isImperial ? 'pounds' : 'kilograms'}" type="number" data-focus-id="profile-weight" min="1" step="0.1" value="${weightDisplay}" onchange="updateWeight(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
           </div>
         </div>
         <p class="hint">Weight updates here also log a new entry on the Weight Goals page.</p>
@@ -583,6 +617,7 @@ function renderHome() {
             Fill in your age, height, and weight to calculate BMR and TDEE.
           </div>
         `}
+        <p class="hint" style="margin-top:12px;">These estimates are designed for adults age 18 and older and are not intended for pregnancy, breastfeeding, or medical nutrition therapy. A clinician can help tailor targets when health conditions, medications, or eating-disorder history affect energy needs.</p>
       </div>
     </div>
 
@@ -621,6 +656,10 @@ function renderHome() {
         `;
       })()}
     </div>
+
+    ${notice('home-movement-basics', `
+      <strong>A useful starting target:</strong> current U.S. guidance recommends that adults work toward 150-300 minutes of moderate aerobic activity each week (or the vigorous equivalent), plus muscle-strengthening activity on at least 2 days. Start below that if needed and build gradually; some activity is better than none.
+    `)}
 
     ${notice('home-why-activity', `
       Most calculators ask you to self-report "activity level," and people reliably overestimate it.
@@ -703,15 +742,17 @@ function submitStepCheckin(value, date) {
 // from silently corrupting logs/streaks/goal math. Returns true if the date
 // looks sane enough to use.
 function isReasonableDateString(dateStr) {
-  if (!dateStr) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return false;
   const year = parseInt(dateStr.slice(0, 4), 10);
-  return year >= 1900 && year <= 2200;
+  if (year < 1900 || year > 2200) return false;
+  const parsed = new Date(dateStr + 'T00:00:00');
+  return !Number.isNaN(parsed.getTime()) && dateToLocalISO(parsed) === dateStr;
 }
 
 function cmToFeetInches(cm) {
-  const totalIn = cmToIn(cm);
-  const ft = Math.floor(totalIn / 12);
-  const inch = Math.round(totalIn % 12);
+  const roundedIn = Math.round(cmToIn(cm));
+  const ft = Math.floor(roundedIn / 12);
+  const inch = roundedIn % 12;
   return `${ft}'${inch}"`;
 }
 
@@ -722,7 +763,19 @@ function numOrNull(v) {
 }
 
 function escapeAttr(s) {
-  return (s || '').replace(/"/g, '&quot;');
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Safe string literal for inline handlers that have not yet been migrated to
+// addEventListener. JSON quoting handles apostrophes/backslashes; HTML escaping
+// keeps the quoted literal inside the surrounding attribute.
+function inlineArg(value) {
+  return escapeAttr(JSON.stringify(String(value ?? '')));
 }
 
 // Small reusable prev/next arrows to sit next to any date input. shiftFnName is
@@ -741,6 +794,16 @@ function setUnitSystem(sys) {
 }
 
 function updateProfile(field, value) {
+  if (field === 'age' && value != null && (value < 18 || value > 100)) {
+    toast('Forge currently supports adult estimates for ages 18-100.');
+    render();
+    return;
+  }
+  if (field === 'heightCm' && value != null && (value < 120 || value > 230)) {
+    toast('Enter a height between 120 and 230 cm.');
+    render();
+    return;
+  }
   STATE.profile[field] = value;
   persist(); render();
 }
@@ -752,13 +815,24 @@ function updateHeightImperial(ft, inch) {
   const curIn = Math.round(curTotalIn % 12);
   const newFt = ft !== null ? Number(ft) || 0 : curFt;
   const newIn = inch !== null ? Number(inch) || 0 : curIn;
-  p.heightCm = inToCm(newFt * 12 + newIn);
+  const heightCm = inToCm(newFt * 12 + newIn);
+  if (heightCm < 120 || heightCm > 230 || newIn < 0 || newIn > 11) {
+    toast('Enter a height between about 3 ft 11 in and 7 ft 7 in.');
+    render();
+    return;
+  }
+  p.heightCm = heightCm;
   persist(); render();
 }
 
 function updateWeight(value) {
   const n = numOrNull(value);
   const kg = STATE.profile.unitSystem === 'imperial' ? (n != null ? lbToKg(n) : null) : n;
+  if (kg != null && (kg < 20 || kg > 400)) {
+    toast('Enter a weight between 20 and 400 kg (44-882 lb).');
+    render();
+    return;
+  }
   STATE.profile.weightKg = kg;
   if (kg != null) {
     logWeightEntry(kg);
@@ -780,7 +854,7 @@ function logWeightEntry(kg) {
 // chip re-logs it exactly as before, not just the exercise name.
 function recordRecentExercise(key, label, snapshot) {
   const list = STATE.recentExercises.filter(r => r.key !== key);
-  list.unshift({ key, label, snapshot });
+  list.unshift({ key, label, snapshot: cloneExerciseEntry(snapshot) });
   STATE.recentExercises = list.slice(0, 8);
 }
 function recordRecentFood(food) {

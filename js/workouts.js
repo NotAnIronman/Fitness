@@ -11,6 +11,11 @@
    both the Plan and the Log (mode: 'workout' | 'log').
    ============================================================ */
 
+function workoutUsesImperial() { return STATE.profile.unitSystem === 'imperial'; }
+function workoutWeightUnit() { return workoutUsesImperial() ? 'lb' : 'kg'; }
+function workoutWeightToDisplay(kg) { return workoutUsesImperial() ? kgToLb(kg) : kg; }
+function workoutWeightFromDisplay(value) { return workoutUsesImperial() ? lbToKg(value) : value; }
+
 function renderWorkouts() {
   const days = STATE.workoutPlan.days;
   if (!UI.workoutDayId && days.length) UI.workoutDayId = days[0].id;
@@ -19,7 +24,7 @@ function renderWorkouts() {
   const summary = weeklyPlanSummary();
   const lvl = getActivityLevel();
   const stepBonus = getStepBonus();
-  const weeklyAssessment = assessWeeklyBurnForGoal(summary.totalWeeklyExerciseKcal);
+  const weeklyAssessment = bw ? assessWeeklyBurnForGoal(summary.totalWeeklyExerciseKcal) : null;
 
   return `
     <div class="page-head">
@@ -36,23 +41,24 @@ function renderWorkouts() {
         <div class="stat">
           <div class="stat-label">Weekly exercise burn</div>
           <div class="stat-value accent">
-            ${tip(`${Math.round(summary.totalWeeklyExerciseKcal)}<span class="unit">kcal</span>`, `${weeklyAssessment.label} for the week`, `${weeklyAssessment.note}${weeklyAssessment.goalNote}`)}
+            ${weeklyAssessment
+              ? tip(`${Math.round(summary.totalWeeklyExerciseKcal)}<span class="unit">kcal</span>`, `${weeklyAssessment.label} for the week`, `${weeklyAssessment.note}${weeklyAssessment.goalNote}`)
+              : '—'}
           </div>
         </div>
       </div>
       <div class="card">
-        <div class="stat-label">Starting step estimate ${tip('ⓘ', 'This is just a starting point', 'Once you check in your steps a few times on the Home page, your real rolling average takes over completely. This number only matters before that history builds up.')}</div>
-        <input type="number" data-focus-id="steps-per-day" step="500" value="${STATE.workoutPlan.stepsPerDay}" onchange="updateSteps(this.value)" onkeydown="if(event.key==='Enter') this.blur()" style="margin-top:6px;">
+        <div class="stat-label">Starting step estimate ${tip('ⓘ', 'This is just a starting point', 'Once you check in your steps a few times on the Workout Log page, your real rolling average takes over completely. This number only matters before that history builds up.')}</div>
+        <input aria-label="Starting daily step estimate" type="number" data-focus-id="steps-per-day" min="0" max="200000" step="500" value="${STATE.workoutPlan.stepsPerDay}" onchange="updateSteps(this.value)" onkeydown="if(event.key==='Enter') this.blur()" style="margin-top:6px;">
       </div>
     </div>
 
     ${summary.workoutDaysPerWeek > 0 ? `
       <div class="card">
         <div class="card-title">
-          Weekly volume check
-          ${tip(`<span class="badge ${weeklyAssessment.tier === 1 ? 'badge-warn' : 'badge-ok'}">${weeklyAssessment.label}</span>`, 'What this means', weeklyAssessment.note + weeklyAssessment.goalNote)}
+          Weekly movement check
         </div>
-        <p class="hint">${summary.workoutDaysPerWeek} day(s)/week, ${Math.round(summary.totalWeeklyExerciseKcal)} kcal total. Tap the badge for details.</p>
+        <p class="hint">Plan snapshot: ${summary.strengthDaysPerWeek} strength day(s) and about ${Math.round(summary.aerobicMinutes)} aerobic/sport minute(s). For general adult health, work gradually toward 150-300 minutes of moderate aerobic activity (or the vigorous equivalent) and muscle strengthening on at least 2 days each week. Your starting point and recovery capacity matter; doing some activity consistently is already valuable.</p>
       </div>
     ` : ''}
 
@@ -69,6 +75,8 @@ function renderWorkouts() {
     </div>
 
     ${notice('cardio-step-overlap-general', `Logging running or walking as a workout below can overlap with the step count above. If a walk/run is already part of your normal daily steps, log it in one place only.`)}
+
+    ${notice('strength-consistency-2026', `<strong>Keep strength training simple enough to repeat:</strong> current evidence supports many combinations of loads, sets, and equipment. Consistency is the biggest step up from doing none; multiple sets can help muscle growth and heavier loads tend to favor maximal strength, but training to failure and advanced programming are not required for most healthy adults.`)}
 
     ${notice('weight-vs-calories-tip', `
       <strong>Heads up on what "burning more calories" actually depends on:</strong> lifting heavier doesn't directly burn a lot
@@ -97,8 +105,7 @@ function renderDayCard(day, bw) {
   const rows = day.exercises.map(e => renderExerciseRow(e, bw, { scope: 'workout', dayId: day.id })).join('');
   day.exercises.forEach(e => { dayKcal += calcExerciseCalories(e, bw); });
 
-  const sessionFeedback = day.exercises.length ? getSessionIntensityFeedback(dayKcal) : null;
-  const nextTier = sessionFeedback ? getNextTierGap(dayKcal, EXERCISE_INTENSITY_BANDS.session) : null;
+  const sessionFeedback = dayKcal > 0 ? getSessionIntensityFeedback(dayKcal) : null;
 
   return `
     <div class="card">
@@ -127,7 +134,7 @@ function renderDayCard(day, bw) {
           <div class="stat">
             <div class="stat-label">Session feedback</div>
             <div style="font-size:13.5px; margin-top:4px;">
-              ${tip(`<span class="badge badge-ok">${sessionFeedback.label}</span>`, sessionFeedback.label, `${sessionFeedback.note}${nextTier ? ` Add about ${nextTier.gapKcal} more kcal of work to reach "${nextTier.nextLabel}."` : ' This is the top band already.'}`)}
+              ${tip(`<span class="badge badge-ok">${sessionFeedback.label}</span>`, sessionFeedback.label, `${sessionFeedback.note} Treat calorie burn as a rough estimate, not a score to maximize.`)}
             </div>
           </div>
         ` : ''}
@@ -145,8 +152,12 @@ function renderDayCard(day, bw) {
 // {scope:'log', date}. `showCheckbox` (Log only) adds a "did I do this" toggle.
 function renderExerciseRow(e, bw, target, showCheckbox) {
   const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId) || e.custom;
-  const kcal = calcExerciseCalories(e, bw);
-  const kcalTip = tip(`${Math.round(kcal)} kcal`, 'How this is calculated', explainExerciseCalc(e, ex, bw));
+  const calculationEntry = target.scope === 'log' ? completedExerciseEntry(e) : e;
+  const kcal = calculationEntry ? calcExerciseCalories(calculationEntry, bw) : 0;
+  const kcalBody = calculationEntry
+    ? `${target.scope === 'log' ? 'Only completed work is included. ' : ''}${explainExerciseCalc(calculationEntry, ex, bw)}`
+    : 'Check off completed work to include it in workout calories and progress.';
+  const kcalTip = tip(`${Math.round(kcal)} kcal`, 'How this is calculated', kcalBody);
   const editAttr = target.scope === 'workout'
     ? `openEditExercise('${target.dayId}', '${e.id}')`
     : `openEditExerciseLog('${e.id}')`;
@@ -159,14 +170,14 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
   if (ex.inputMode === 'setsRepsWeight' && e.perSetWeights && e.perSetWeights.length) {
     const allDone = e.perSetWeights.every(s => s.completed);
     const setRows = e.perSetWeights.map((s, i) => {
-      const loadLb = Math.round(kgToLb(s.weightIsPerSide ? s.weightKg * 2 : s.weightKg));
+      const displayLoad = Math.round(workoutWeightToDisplay(s.weightIsPerSide ? s.weightKg * 2 : s.weightKg) * 10) / 10;
       const checkboxAttr = target.scope === 'log' ? `onchange="toggleLogSetDone('${e.id}', ${i})"` : 'disabled';
       return `
         <div class="set-row ${s.completed ? 'set-done' : ''}">
           <span class="set-label">SET ${i + 1}</span>
           ${showCheckbox ? `<input type="checkbox" ${s.completed ? 'checked' : ''} ${checkboxAttr}>` : ''}
-          <span class="set-detail">${s.reps} reps @ ${loadLb} lb${s.weightIsPerSide ? ' per side' : ''}</span>
-          ${target.scope === 'log' ? `<button class="icon-btn" onclick="quickStartRestTimer('Rest, ${escapeAttr(ex.name)} set ${i + 1}')" title="Start rest timer">\u23F1</button>` : ''}
+          <span class="set-detail">${s.reps} reps @ ${displayLoad} ${workoutWeightUnit()}${s.weightIsPerSide ? ' per side' : ''}</span>
+          ${target.scope === 'log' ? `<button class="icon-btn" onclick="quickStartRestTimer(${inlineArg(`Rest, ${ex.name} set ${i + 1}`)})" title="Start rest timer" aria-label="Start rest timer after ${escapeAttr(ex.name)} set ${i + 1}">\u23F1</button>` : ''}
         </div>
       `;
     }).join('');
@@ -187,8 +198,8 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
   let meta;
   if (ex.inputMode === 'setsRepsWeight') {
     const load = effectiveLoadKg(e);
-    const loadLb = Math.round(kgToLb(load));
-    meta = `${e.sets}x${e.reps} @ ${loadLb ? loadLb + ' lb total' : 'bodyweight'}${e.weightIsPerSide ? ' (per side x2)' : ''}`;
+    const displayLoad = Math.round(workoutWeightToDisplay(load) * 10) / 10;
+    meta = `${e.sets}x${e.reps} @ ${displayLoad ? displayLoad + ' ' + workoutWeightUnit() + ' total' : 'bodyweight'}${e.weightIsPerSide ? ' (per side x2)' : ''}`;
   } else if (ex.inputMode === 'setsReps') {
     meta = `${e.sets}x${e.reps}`;
   } else {
@@ -202,7 +213,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
         <div class="meta">${meta} . ${ex.bodyPart || ex.category || 'Custom'}</div>
       </div>
       <div class="kcal">${kcalTip}</div>
-      ${target.scope === 'log' && ex.category === 'Strength' ? `<button class="icon-btn" onclick="quickStartRestTimer('Rest, ${escapeAttr(ex.name)}')" title="Start rest timer">\u23F1</button>` : ''}
+      ${target.scope === 'log' && ex.category === 'Strength' ? `<button class="icon-btn" onclick="quickStartRestTimer(${inlineArg(`Rest, ${ex.name}`)})" title="Start rest timer" aria-label="Start rest timer after ${escapeAttr(ex.name)}">\u23F1</button>` : ''}
       <button class="icon-btn" onclick="${editAttr}" title="Edit">\u270E</button>
       <button class="icon-btn" onclick="${removeAttr}" title="Remove">x</button>
     </div>
@@ -242,7 +253,7 @@ function renderAddExerciseForm(target) {
       ${!editing && recents.length ? `
         <p class="hint" style="margin-bottom:8px;">Recent:</p>
         <div class="chip-row" style="margin-bottom:14px;">
-          ${recents.map(r => `<button class="chip" onclick="quickAddRecent('${escapeAttr(r.key)}', '${target.scope}', '${target.dayId || ''}')">${escapeAttr(r.label)}</button>`).join('')}
+          ${recents.map(r => `<button class="chip" onclick="quickAddRecent(${inlineArg(r.key)}, ${inlineArg(target.scope)}, ${inlineArg(target.dayId || '')})">${escapeAttr(r.label)}</button>`).join('')}
         </div>
       ` : ''}
 
@@ -291,13 +302,16 @@ function renderExerciseInputFields(ex, existingEntry) {
   if (ex.inputMode === 'setsRepsWeight') {
     const sets = existingEntry ? (existingEntry.sets || (existingEntry.perSetWeights || []).length) : 3;
     const reps = existingEntry ? existingEntry.reps : 10;
-    const weightLb = existingEntry && !perSet ? Math.round(kgToLb(existingEntry.weightKg || 0)) : 45;
-    _weightIsPerSide = existingEntry ? !!existingEntry.weightIsPerSide : false;
+    const defaultWeight = workoutUsesImperial() ? 45 : 20;
+    const displayWeight = existingEntry && !perSet ? Math.round(workoutWeightToDisplay(existingEntry.weightKg || 0) * 10) / 10 : defaultWeight;
+    _weightIsPerSide = existingEntry
+      ? !!(perSet ? existingEntry.perSetWeights[0]?.weightIsPerSide : existingEntry.weightIsPerSide)
+      : false;
     return `
       <div class="field-row">
         <div class="field"><label>Sets</label><input type="number" id="f-sets" data-focus-id="f-sets" min="1" value="${sets}"></div>
         <div class="field"><label>Reps (if same across sets)</label><input type="number" id="f-reps" data-focus-id="f-reps" min="1" value="${reps}"></div>
-        <div class="field"><label>Weight (lb, if same across sets)</label><input type="number" id="f-weight" data-focus-id="f-weight" min="0" value="${weightLb}"></div>
+        <div class="field"><label for="f-weight">Weight (${workoutWeightUnit()}, if same across sets)</label><input type="number" id="f-weight" data-focus-id="f-weight" min="0" step="0.1" value="${displayWeight}"></div>
       </div>
       <div class="field">
         <label>Weight is</label>
@@ -310,7 +324,7 @@ function renderExerciseInputFields(ex, existingEntry) {
         <button type="button" class="btn btn-sm" onclick="togglePerSetWeights(${sets})">${perSet ? 'Edit per-set weights below' : 'Use a different weight per set (e.g. ramping sets)'}</button>
       </div>
       <div id="per-set-container">${perSet ? renderPerSetRows(existingEntry.perSetWeights) : ''}</div>
-      <p class="hint">Defaults to the same reps/weight for every set. Use the button above if, say, set 1 was 25 lb, set 2 was 35 lb, set 3 was 45 lb.</p>
+      <p class="hint">Defaults to the same reps/weight for every set. Use the button above for ramping sets (for example, ${workoutUsesImperial() ? '25, 35, then 45 lb' : '10, 15, then 20 kg'}).</p>
     `;
   }
   // setsReps (bodyweight)
@@ -328,7 +342,7 @@ function renderPerSetRows(rows) {
       ${rows.map((s, i) => `
         <div class="field-row" style="align-items:end;">
           <div class="field" style="margin-bottom:0;"><label>Set ${i + 1} reps</label><input type="number" class="per-set-reps" min="1" value="${s.reps}"></div>
-          <div class="field" style="margin-bottom:0;"><label>Set ${i + 1} weight (lb)</label><input type="number" class="per-set-weight" min="0" value="${Math.round(kgToLb(s.weightKg || 0))}"></div>
+          <div class="field" style="margin-bottom:0;"><label>Set ${i + 1} weight (${workoutWeightUnit()})</label><input type="number" class="per-set-weight" min="0" step="0.1" value="${Math.round(workoutWeightToDisplay(s.weightKg || 0) * 10) / 10}"></div>
         </div>
       `).join('')}
     </div>
@@ -355,8 +369,9 @@ function togglePerSetWeights(defaultSets) {
   }
   const sets = Number(document.getElementById('f-sets')?.value) || defaultSets || 3;
   const reps = Number(document.getElementById('f-reps')?.value) || 10;
-  const weightLb = Number(document.getElementById('f-weight')?.value) || 45;
-  const rows = Array.from({ length: sets }, () => ({ reps, weightKg: lbToKg(weightLb) }));
+  const defaultWeight = workoutUsesImperial() ? 45 : 20;
+  const displayWeight = Number(document.getElementById('f-weight')?.value) || defaultWeight;
+  const rows = Array.from({ length: sets }, () => ({ reps, weightKg: workoutWeightFromDisplay(displayWeight) }));
   container.innerHTML = renderPerSetRows(rows);
 }
 
@@ -411,7 +426,7 @@ function deleteDay(id) {
   persist(); render();
 }
 function updateSteps(val) {
-  STATE.workoutPlan.stepsPerDay = Number(val) || 0;
+  STATE.workoutPlan.stepsPerDay = Math.max(0, Math.min(200000, Number(val) || 0));
   persist(); render();
 }
 
@@ -503,6 +518,7 @@ function submitExerciseForm(scope, dayId) {
 function buildExerciseEntryFromForm() {
   const selectEl = document.getElementById('ex-select');
   const ex = EXERCISE_LIBRARY.find(x => x.id === selectEl.value);
+  if (!ex) { toast('Choose a valid exercise.'); return null; }
   const entry = { id: uid(), exerciseId: ex.id };
   if (ex.inputMode === 'duration' || ex.inputMode === 'distance') {
     entry.durationMin = Number(document.getElementById('f-duration').value) || 0;
@@ -510,21 +526,31 @@ function buildExerciseEntryFromForm() {
     const perSetContainer = document.getElementById('per-set-container');
     const perSetRows = perSetContainer ? perSetContainer.querySelectorAll('.field-row') : [];
     if (perSetRows.length) {
-      entry.perSetWeights = Array.from(perSetRows).map(row => ({
+      const previousSets = findExerciseEntry(UI.editingExercise)?.perSetWeights || [];
+      entry.perSetWeights = Array.from(perSetRows).map((row, index) => ({
         reps: Number(row.querySelector('.per-set-reps').value) || 0,
-        weightKg: lbToKg(Number(row.querySelector('.per-set-weight').value) || 0),
+        weightKg: workoutWeightFromDisplay(Number(row.querySelector('.per-set-weight').value) || 0),
         weightIsPerSide: _weightIsPerSide,
+        completed: !!previousSets[index]?.completed,
       }));
       entry.sets = entry.perSetWeights.length;
     } else {
       entry.sets = Number(document.getElementById('f-sets').value) || 0;
       entry.reps = Number(document.getElementById('f-reps').value) || 0;
-      entry.weightKg = lbToKg(Number(document.getElementById('f-weight').value) || 0);
+      entry.weightKg = workoutWeightFromDisplay(Number(document.getElementById('f-weight').value) || 0);
       entry.weightIsPerSide = _weightIsPerSide;
     }
   } else {
     entry.sets = Number(document.getElementById('f-sets').value) || 0;
     entry.reps = Number(document.getElementById('f-reps').value) || 0;
+  }
+  const durationInvalid = entry.durationMin != null && (entry.durationMin <= 0 || entry.durationMin > 1440);
+  const setInvalid = entry.perSetWeights
+    ? (!entry.perSetWeights.length || entry.perSetWeights.some(s => s.reps <= 0 || s.reps > 1000 || s.weightKg > 1000))
+    : (entry.sets != null && (entry.sets <= 0 || entry.sets > 100)) || (entry.reps != null && (entry.reps <= 0 || entry.reps > 1000)) || (entry.weightKg != null && entry.weightKg > 1000);
+  if (durationInvalid || setInvalid) {
+    toast('Check the exercise values: duration, sets, and reps must be positive and within a practical range.');
+    return null;
   }
   return entry;
 }
@@ -532,6 +558,10 @@ function buildCustomExerciseEntryFromForm() {
   const name = document.getElementById('c-name').value.trim() || 'Custom exercise';
   const met = Number(document.getElementById('c-met').value) || 5;
   const duration = Number(document.getElementById('c-duration').value) || 30;
+  if (met < 1 || met > 25 || duration < 1 || duration > 1440) {
+    toast('Use a MET value from 1-25 and a duration from 1-1,440 minutes.');
+    return null;
+  }
   return {
     id: uid(),
     exerciseId: null,
@@ -544,7 +574,8 @@ function buildCustomExerciseEntryFromForm() {
 function quickAddRecent(key, scope, dayId) {
   const recent = STATE.recentExercises.find(r => r.key === key);
   if (!recent) return;
-  const entry = { ...recent.snapshot, id: uid(), completed: false };
+  const entry = cloneExerciseEntry(recent.snapshot, { id: uid(), completed: false });
+  if (entry.perSetWeights) entry.perSetWeights.forEach(s => { s.completed = false; });
   if (scope === 'workout') {
     STATE.workoutPlan.days.find(d => d.id === dayId).exercises.push(entry);
   } else {
@@ -570,7 +601,7 @@ function copyDayInto(sourceDayId, targetDayId) {
   const source = STATE.workoutPlan.days.find(d => d.id === sourceDayId);
   const target = STATE.workoutPlan.days.find(d => d.id === targetDayId);
   if (!source || !target) return;
-  const copied = source.exercises.map(e => ({ ...e, id: uid() }));
+  const copied = source.exercises.map(e => cloneExerciseEntry(e, { id: uid() }));
   target.exercises = target.exercises.concat(copied);
   UI.copyDayOpenFor = null;
   persist(); render();

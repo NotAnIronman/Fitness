@@ -48,12 +48,12 @@ function buildGameContext() {
   const last7DayAvgSteps = last7CalendarDaysLogged ? last7Sum / last7CalendarDaysLogged : 0;
 
   // ---- Workouts ----
-  const logDatesWithExercises = Object.keys(STATE.workoutLog).filter(d => STATE.workoutLog[d].length > 0);
-  const totalExercisesLogged = Object.values(STATE.workoutLog).reduce((s, arr) => s + arr.length, 0);
+  const logDatesWithExercises = Object.keys(STATE.workoutLog).filter(d => STATE.workoutLog[d].some(hasCompletedWork));
+  const totalExercisesLogged = Object.values(STATE.workoutLog).reduce((s, arr) => s + arr.filter(hasCompletedWork).length, 0);
   const workoutStreak = computeCalendarStreak(logDatesWithExercises);
   const bodyPartsSet = new Set();
   let usedPerSetWeights = false;
-  Object.values(STATE.workoutLog).forEach(arr => arr.forEach(e => {
+  Object.values(STATE.workoutLog).forEach(arr => arr.filter(hasCompletedWork).forEach(e => {
     const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId) || e.custom;
     if (ex && ex.bodyPart) bodyPartsSet.add(ex.bodyPart);
     if (e.perSetWeights && e.perSetWeights.length) usedPerSetWeights = true;

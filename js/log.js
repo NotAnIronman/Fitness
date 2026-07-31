@@ -15,12 +15,13 @@ function renderLog() {
   const dateObj = new Date(date + 'T00:00:00');
   const dateLabel = dateObj.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
+  const performedEntries = entries.map(completedExerciseEntry).filter(Boolean);
   let dayKcal = 0;
-  entries.forEach(e => { dayKcal += calcExerciseCalories(e, bw); });
-  const completedCount = entries.filter(e => e.completed).length;
+  performedEntries.forEach(e => { dayKcal += calcExerciseCalories(e, bw); });
+  const completedCount = entries.filter(isExerciseFullyCompleted).length;
   const rows = entries.map(e => renderExerciseRow(e, bw, { scope: 'log', date }, true)).join('');
 
-  const sessionFeedback = entries.length ? getSessionIntensityFeedback(dayKcal) : null;
+  const sessionFeedback = dayKcal > 0 ? getSessionIntensityFeedback(dayKcal) : null;
 
   return `
     <div class="page-head">
@@ -38,7 +39,7 @@ function renderLog() {
       <div class="field-row" style="align-items:end;">
         <div class="field" style="margin-bottom:0;">
           <label>Default duration (seconds)</label>
-          <input type="number" data-focus-id="rest-timer-default" min="10" step="15" value="${STATE.workoutPlan.restTimerSeconds}" onchange="updateRestTimerDefault(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
+          <input type="number" data-focus-id="rest-timer-default" min="10" max="900" step="15" value="${STATE.workoutPlan.restTimerSeconds}" onchange="updateRestTimerDefault(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
         </div>
         <button class="btn btn-primary" onclick="quickStartRestTimer('Rest')" style="flex: 0 0 auto;">Start rest timer</button>
       </div>
@@ -50,7 +51,7 @@ function renderLog() {
         <button class="date-nav-btn" onclick="shiftLogDate(-1)" title="Previous day">‹</button>
         <div class="date-nav-bar date-nav-label">
           ${dateLabel}${isToday ? ' (today)' : ''}
-          <span class="sub">${entries.length} exercise(s)${entries.length ? `, ${completedCount}/${entries.length} checked off` : ''}, ${Math.round(dayKcal)} kcal</span>
+          <span class="sub">${entries.length} exercise(s)${entries.length ? `, ${completedCount}/${entries.length} fully completed` : ''}, ${Math.round(dayKcal)} completed-work kcal</span>
         </div>
         <button class="date-nav-btn" onclick="shiftLogDate(1)" title="Next day">›</button>
       </div>
@@ -102,7 +103,7 @@ function renderComplianceCard(c) {
   return `
     <div class="card">
       <div class="card-title">This week vs. your plan <span class="badge ${badgeClass}">${badgeText}</span></div>
-      <p class="hint" style="font-size:13px;">${c.message}</p>
+      <p class="hint" style="font-size:13px;">${c.message} Only completed exercises or sets count.</p>
     </div>
   `;
 }
@@ -135,7 +136,7 @@ function renderCopyIntoLogMenu() {
 // ---------- Actions ----------
 
 function updateRestTimerDefault(val) {
-  STATE.workoutPlan.restTimerSeconds = Math.max(10, Number(val) || 90);
+  STATE.workoutPlan.restTimerSeconds = Math.max(10, Math.min(900, Number(val) || 90));
   persist(); render();
 }
 
@@ -196,7 +197,20 @@ function toggleLogSetDone(entryId, setIndex) {
   const entry = (STATE.workoutLog[UI.logDate] || []).find(e => e.id === entryId);
   if (!entry || !entry.perSetWeights || !entry.perSetWeights[setIndex]) return;
   entry.perSetWeights[setIndex].completed = !entry.perSetWeights[setIndex].completed;
-  persist(); render();
+  const justCompleted = entry.perSetWeights[setIndex].completed;
+  persist();
+  if (justCompleted) {
+    const ex = EXERCISE_LIBRARY.find(x => x.id === entry.exerciseId) || entry.custom;
+    quickStartRestTimer(`Rest, ${ex?.name || 'set'} set ${setIndex + 1}`);
+  } else {
+    render();
+  }
+}
+
+function copyExerciseForLog(entry) {
+  const copy = cloneExerciseEntry(entry, { id: uid(), completed: false });
+  if (copy.perSetWeights) copy.perSetWeights.forEach(s => { s.completed = false; });
+  return copy;
 }
 
 function openCopyIntoLog(mode) {
@@ -212,7 +226,7 @@ function closeCopyIntoLog() {
 function copyPlanDayIntoLog(planDayId) {
   const planDay = STATE.workoutPlan.days.find(d => d.id === planDayId);
   if (!planDay) return;
-  const copied = planDay.exercises.map(e => ({ ...e, id: uid(), completed: false }));
+  const copied = planDay.exercises.map(copyExerciseForLog);
   ensureLogDate(UI.logDate).push(...copied);
   UI.logCopyOpen = false;
   persist(); render();
@@ -220,7 +234,7 @@ function copyPlanDayIntoLog(planDayId) {
 }
 function copyLogDateIntoLog(sourceDate) {
   const source = STATE.workoutLog[sourceDate] || [];
-  const copied = source.map(e => ({ ...e, id: uid(), completed: false }));
+  const copied = source.map(copyExerciseForLog);
   ensureLogDate(UI.logDate).push(...copied);
   UI.logCopyOpen = false;
   persist(); render();
@@ -231,7 +245,7 @@ function replacePlanDayIntoLog(planDayId) {
   if (existing.length && !confirm(`This clears the ${existing.length} exercise(s) already logged today and replaces them. This can't be undone. Continue?`)) return;
   const planDay = STATE.workoutPlan.days.find(d => d.id === planDayId);
   if (!planDay) return;
-  const copied = planDay.exercises.map(e => ({ ...e, id: uid(), completed: false }));
+  const copied = planDay.exercises.map(copyExerciseForLog);
   STATE.workoutLog[UI.logDate] = copied;
   UI.logCopyOpen = false;
   persist(); render();
@@ -241,7 +255,7 @@ function replaceLogDateIntoLog(sourceDate) {
   const existing = STATE.workoutLog[UI.logDate] || [];
   if (existing.length && !confirm(`This clears the ${existing.length} exercise(s) already logged today and replaces them. This can't be undone. Continue?`)) return;
   const source = STATE.workoutLog[sourceDate] || [];
-  const copied = source.map(e => ({ ...e, id: uid(), completed: false }));
+  const copied = source.map(copyExerciseForLog);
   STATE.workoutLog[UI.logDate] = copied;
   UI.logCopyOpen = false;
   persist(); render();

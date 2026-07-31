@@ -15,6 +15,7 @@ let _restTimer = {
   totalSeconds: 0,
   label: '',
   tickHandle: null,
+  dismissHandle: null,
 };
 
 // Primed during startRestTimer() (a user-gesture click), not at completion
@@ -56,13 +57,16 @@ function playRestTimerSound() {
 
 function startRestTimer(seconds, label) {
   stopRestTimerInterval();
+  stopRestTimerDismiss();
   primeRestTimerAudio();
+  const duration = Math.max(1, Number(seconds) || 90);
   _restTimer = {
     running: true,
-    secondsLeft: seconds,
-    totalSeconds: seconds,
+    secondsLeft: duration,
+    totalSeconds: duration,
     label: label || 'Rest',
     tickHandle: null,
+    dismissHandle: null,
   };
   _restTimer.tickHandle = setInterval(restTimerTick, 1000);
   render(); // one full render to mount the widget, then ticks update it directly
@@ -79,6 +83,9 @@ function restTimerTick() {
     if (navigator.vibrate) { try { navigator.vibrate([200, 100, 200]); } catch (e) { /* not supported */ } }
     toast(`${_restTimer.label} done!`);
     render();
+    // Leave the completed state visible long enough to notice, then get it out
+    // of the way until another set explicitly starts a new timer.
+    _restTimer.dismissHandle = setTimeout(stopRestTimer, 5000);
     return;
   }
   updateRestTimerDisplay();
@@ -97,18 +104,31 @@ function pauseRestTimer() {
 
 function stopRestTimer() {
   stopRestTimerInterval();
-  _restTimer = { running: false, secondsLeft: 0, totalSeconds: 0, label: '', tickHandle: null };
+  stopRestTimerDismiss();
+  _restTimer = { running: false, secondsLeft: 0, totalSeconds: 0, label: '', tickHandle: null, dismissHandle: null };
   render();
 }
 
 function addRestTimerSeconds(delta) {
+  stopRestTimerDismiss();
+  const wasComplete = _restTimer.secondsLeft <= 0;
   _restTimer.secondsLeft = Math.max(0, _restTimer.secondsLeft + delta);
   _restTimer.totalSeconds = Math.max(_restTimer.totalSeconds, _restTimer.secondsLeft);
+  if (wasComplete && _restTimer.secondsLeft > 0) {
+    _restTimer.running = true;
+    _restTimer.tickHandle = setInterval(restTimerTick, 1000);
+    render();
+    return;
+  }
   updateRestTimerDisplay();
 }
 
 function stopRestTimerInterval() {
   if (_restTimer.tickHandle) { clearInterval(_restTimer.tickHandle); _restTimer.tickHandle = null; }
+}
+
+function stopRestTimerDismiss() {
+  if (_restTimer.dismissHandle) { clearTimeout(_restTimer.dismissHandle); _restTimer.dismissHandle = null; }
 }
 
 // Updates just the countdown text/ring in place, no full render() per tick, so
@@ -134,15 +154,15 @@ function formatRestTime(totalSeconds) {
 function renderRestTimerWidget() {
   if (!_restTimer.totalSeconds) return '';
   return `
-    <div class="rest-timer-widget">
+    <div class="rest-timer-widget" role="timer" aria-live="polite" aria-label="Rest timer: ${escapeAttr(_restTimer.label)}">
       <div class="rest-timer-label">${escapeAttr(_restTimer.label)}</div>
       <div class="rest-timer-time" id="rest-timer-seconds">${formatRestTime(_restTimer.secondsLeft)}</div>
       <div class="rest-timer-track"><div class="rest-timer-fill" id="rest-timer-bar" style="width:${_restTimer.totalSeconds ? (_restTimer.secondsLeft / _restTimer.totalSeconds) * 100 : 0}%;"></div></div>
       <div class="rest-timer-controls">
         <button class="btn btn-sm" onclick="addRestTimerSeconds(-15)">-15s</button>
-        <button class="btn btn-sm" onclick="pauseRestTimer()">${_restTimer.running ? 'Pause' : 'Resume'}</button>
+        ${_restTimer.secondsLeft > 0 ? `<button class="btn btn-sm" onclick="pauseRestTimer()">${_restTimer.running ? 'Pause' : 'Resume'}</button>` : '<span class="badge badge-ok">Done</span>'}
         <button class="btn btn-sm" onclick="addRestTimerSeconds(15)">+15s</button>
-        <button class="btn btn-ghost btn-sm" onclick="stopRestTimer()">x</button>
+        <button class="btn btn-ghost btn-sm" onclick="stopRestTimer()" aria-label="Close rest timer">x</button>
       </div>
     </div>
   `;

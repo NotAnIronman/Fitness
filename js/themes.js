@@ -255,10 +255,35 @@ function base64ToArrayBuffer(base64) {
 // recently wins," which is a reasonable default for data that isn't
 // naturally date-keyed.
 function mergeImportedState(incoming) {
-  const mergedWeightLog = mergeWeightLogs(STATE.weightLog, incoming.weightLog || []);
-  const next = deepMerge(STATE, incoming);
+  const safeIncoming = prepareImportedState(incoming);
+  const mergedWeightLog = mergeWeightLogs(STATE.weightLog, safeIncoming.weightLog || []);
+  const next = deepMerge(STATE, safeIncoming);
   next.weightLog = mergedWeightLog;
+  next.workoutLog = mergeDatedEntryLogs(STATE.workoutLog, safeIncoming.workoutLog, true);
+  next.foodLog = mergeDatedEntryLogs(STATE.foodLog, safeIncoming.foodLog, false);
   return next;
+}
+
+function mergeDatedEntryLogs(existing, incoming, useId) {
+  const out = { ...(existing || {}) };
+  Object.keys(incoming || {}).forEach(date => {
+    const current = Array.isArray(out[date]) ? out[date] : [];
+    const added = Array.isArray(incoming[date]) ? incoming[date] : [];
+    if (useId) {
+      const byId = new Map();
+      current.forEach(e => byId.set(e.id || JSON.stringify(e), e));
+      added.forEach(e => byId.set(e.id || JSON.stringify(e), e));
+      out[date] = Array.from(byId.values());
+    } else {
+      const seen = new Set(current.map(e => JSON.stringify(e)));
+      out[date] = current.slice();
+      added.forEach(e => {
+        const signature = JSON.stringify(e);
+        if (!seen.has(signature)) { seen.add(signature); out[date].push(e); }
+      });
+    }
+  });
+  return out;
 }
 function mergeWeightLogs(existing, incoming) {
   const byDate = new Map();
@@ -381,5 +406,6 @@ function resetAllData() {
   STATE = defaultState();
   persist();
   UI.route = 'home';
+  saveLastRoute('home');
   render();
 }

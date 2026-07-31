@@ -82,6 +82,7 @@ function getLoggedExerciseOptions() {
   const seen = new Map(); // key -> label
   Object.values(STATE.workoutLog).forEach(entries => {
     entries.forEach(e => {
+      if (!hasCompletedWork(e)) return;
       if (e.exerciseId) {
         const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId);
         if (ex) seen.set('id:' + ex.id, ex.name);
@@ -99,14 +100,15 @@ function getExerciseHistory(key) {
   const points = [];
   dates.forEach(date => {
     const entries = STATE.workoutLog[date].filter(e =>
-      key.startsWith('id:') ? e.exerciseId === key.slice(3) : (e.custom && e.custom.name === key.slice(7))
-    );
+      (key.startsWith('id:') ? e.exerciseId === key.slice(3) : (e.custom && e.custom.name === key.slice(7))) && hasCompletedWork(e)
+    ).map(completedExerciseEntry).filter(Boolean);
     if (!entries.length) return;
     const ex = EXERCISE_LIBRARY.find(x => x.id === entries[0].exerciseId) || entries[0].custom;
     let value, unit;
     if (ex.inputMode === 'setsRepsWeight') {
-      value = Math.max(...entries.map(e => kgToLb(effectiveLoadKg(e))));
-      unit = 'lb (top load)';
+      const imperial = STATE.profile.unitSystem === 'imperial';
+      value = Math.max(...entries.map(e => imperial ? kgToLb(effectiveLoadKg(e)) : effectiveLoadKg(e)));
+      unit = `${imperial ? 'lb' : 'kg'} (top completed load)`;
     } else if (ex.inputMode === 'setsReps') {
       value = entries.reduce((s, e) => s + (Number(e.sets) || 0) * (Number(e.reps) || 0), 0);
       unit = 'total reps';
@@ -125,9 +127,9 @@ function getMostRecentEntryForExercise(key) {
   const dates = Object.keys(STATE.workoutLog).sort().reverse();
   for (const date of dates) {
     const match = (STATE.workoutLog[date] || []).find(e =>
-      key.startsWith('id:') ? e.exerciseId === key.slice(3) : (e.custom && e.custom.name === key.slice(7))
+      (key.startsWith('id:') ? e.exerciseId === key.slice(3) : (e.custom && e.custom.name === key.slice(7))) && hasCompletedWork(e)
     );
-    if (match) return { entry: match, date };
+    if (match) return { entry: completedExerciseEntry(match), date };
   }
   return null;
 }
@@ -135,7 +137,9 @@ function getMostRecentEntryForExercise(key) {
 function renderStandingCard(standing, exerciseId) {
   const isLoadBased = !!STRENGTH_STANDARDS[exerciseId];
   const nextTargetText = standing.nextTargetDisplay != null
-    ? (isLoadBased ? `${Math.round(kgToLb(standing.nextTargetDisplay))} lb` : `${Math.round(standing.nextTargetDisplay)} reps`)
+    ? (isLoadBased
+      ? `${Math.round((STATE.profile.unitSystem === 'imperial' ? kgToLb(standing.nextTargetDisplay) : standing.nextTargetDisplay) * 10) / 10} ${STATE.profile.unitSystem === 'imperial' ? 'lb' : 'kg'}`
+      : `${Math.round(standing.nextTargetDisplay)} reps`)
     : null;
   return `
     <div class="card">
@@ -197,7 +201,7 @@ function renderProgress() {
         <div class="field" style="max-width:340px;">
           <label>Exercise</label>
           <select data-focus-id="progress-exercise" onchange="setProgressExercise(this.value)">
-            ${options.map(o => `<option value="${o.key}" ${o.key === UI.progressExerciseId ? 'selected' : ''}>${escapeAttr(o.label)}</option>`).join('')}
+            ${options.map(o => `<option value="${escapeAttr(o.key)}" ${o.key === UI.progressExerciseId ? 'selected' : ''}>${escapeAttr(o.label)}</option>`).join('')}
           </select>
         </div>
 

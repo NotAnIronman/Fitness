@@ -20,7 +20,8 @@ const USDA_SEARCH_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 function renderFood() {
   const date = UI.foodDate;
   const entries = STATE.foodLog[date] || [];
-  const goalAdjustedTarget = getFoodTargetCalories();
+  const targetContext = getFoodTargetContext();
+  const goalAdjustedTarget = targetContext.target;
   const compliance = getFoodComplianceCheck();
 
   const totals = entries.reduce((acc, e) => {
@@ -52,6 +53,8 @@ function renderFood() {
         <p class="hint" style="font-size:13px;">${compliance.message}</p>
       </div>
     ` : ''}
+
+    ${targetContext.warning ? `<div class="card"><div class="card-title">Goal timeline needs adjustment <span class="badge badge-warn">Maintenance shown</span></div><p class="hint">${escapeAttr(targetContext.warning)}</p></div>` : ''}
 
     <div class="date-nav-row" style="max-width:400px;">
       ${renderDatePrevButton('shiftFoodDate')}
@@ -230,14 +233,15 @@ function renderFoodAdjustForm() {
 }
 
 function round1(n) { return Math.round(n * 10) / 10; }
+function nonNegativeFoodNumber(id) {
+  return Math.max(0, Number(document.getElementById(id)?.value) || 0);
+}
 
 function renderMacroBar(label, grams, color) {
-  const pct = Math.min(100, grams / 2); // purely visual scale, caps around 200g
   return `
     <div class="stat">
       <div class="stat-label">${label}</div>
       <div class="stat-value" style="font-size:18px;">${Math.round(grams)}g</div>
-      <div class="macro-bar-track" style="margin-top:6px;"><div class="macro-bar-fill" style="width:${pct}%; background:${color};"></div></div>
     </div>
   `;
 }
@@ -246,8 +250,8 @@ function renderSafetyWarning(safety, loggedKcal) {
   return `
     <div class="badge badge-danger">Very low intake</div>
     <p class="hint" style="margin-top:8px; line-height:1.6;">
-      ${Math.round(loggedKcal)} kcal logged is well under the roughly ${safety.floor} kcal/day general floor for unsupervised
-      eating. ${safety.severe ? 'This is low enough that it isn\u2019t healthy to sustain, regardless of weight goals, unless you\u2019re intentionally fasting or under a doctor\u2019s supervision.' : 'A day like this occasionally is normal (illness, fasting, a busy day), but if this is a regular pattern, it\u2019s worth talking to a doctor rather than pushing further.'}
+      ${Math.round(loggedKcal)} kcal logged is below Forge's coarse ${safety.floor} kcal/day review threshold for unsupervised
+      adult planning. ${safety.severe ? 'If this reflects repeated intake rather than an incomplete log, pause the deficit and seek individualized guidance.' : 'A single day may reflect illness, fasting, appetite changes, or incomplete tracking; a repeated pattern deserves individualized guidance rather than a more aggressive target.'}
       If this doesn't reflect what you actually ate, double check you haven't missed logging something.
     </p>
   `;
@@ -261,12 +265,12 @@ function renderFoodFeedback(logged, target) {
   if (diff > 0) {
     return `<div class="badge badge-warn">${Math.round(diff)} kcal over</div><p class="hint" style="margin-top:8px;">You're running above target today. Check for hidden extras (dressings, drinks, snacks) before assuming it's the meals themselves.</p>`;
   }
-  return `<div class="badge badge-ok">${Math.round(Math.abs(diff))} kcal under</div><p class="hint" style="margin-top:8px;">You're under target, good if that matches your goal, but don't drop too far below your BMR consistently.</p>`;
+  return `<div class="badge ${Math.abs(diff) > target * 0.10 ? 'badge-warn' : 'badge-ok'}">${Math.round(Math.abs(diff))} kcal under</div><p class="hint" style="margin-top:8px;">You are below today’s planning target. One day is not a trend; if this gap is frequent, check for missed items and choose a target you can sustain without persistent hunger, poor recovery, or declining performance.</p>`;
 }
 
-function getFoodTargetCalories() {
+function getFoodTargetContext() {
   const effTdee = getEffectiveTDEE();
-  if (!effTdee) return null;
+  if (!effTdee) return { target: null, goalApplied: false, warning: null };
   const g = STATE.goal;
   if (g.targetWeightKg != null && g.targetDate) {
     const evalResult = evaluateGoal({
@@ -276,9 +280,22 @@ function getFoodTargetCalories() {
       targetDate: g.targetDate,
       tdee: effTdee,
     });
-    if (evalResult && !evalResult.error && evalResult.suggestedIntake) return evalResult.suggestedIntake;
+    if (evalResult && !evalResult.error) {
+      if (evalResult.unsafeTarget || !evalResult.suggestedIntake) {
+        return {
+          target: effTdee,
+          goalApplied: false,
+          warning: 'The selected weight and date would require an intake Forge cannot responsibly recommend. Extend the goal date; until then, this page shows estimated maintenance calories.',
+        };
+      }
+      return { target: evalResult.suggestedIntake, goalApplied: true, warning: null };
+    }
   }
-  return effTdee;
+  return { target: effTdee, goalApplied: false, warning: null };
+}
+
+function getFoodTargetCalories() {
+  return getFoodTargetContext().target;
 }
 
 function formatQty(q) {
@@ -308,7 +325,7 @@ function renderWaterCard(date) {
           <div class="stat"><div class="stat-label">Target</div><div class="stat-value accent" style="font-size:20px;">${toDisplay(target)}</div></div>
         </div>
         <div class="macro-bar-track" style="margin-bottom:12px;"><div class="macro-bar-fill" style="width:${pct}%; background:#38BDF8;"></div></div>
-        <p class="hint" style="margin-bottom:10px;">Baseline of ~33ml per kg of bodyweight (a commonly cited general range), adjusted slightly by sex. Hotter days, altitude, and heavy sweating all push actual needs higher. Reach this target for the day and your pet earns a water item, not one per log, so it rewards actually hitting the goal.</p>
+        <p class="hint" style="margin-bottom:10px;">A practical starting estimate of ~33 ml/kg. This is not a precise requirement: water in food and other drinks contributes, while heat, altitude, illness, and sweat losses can raise needs. Thirst and urine color are useful day-to-day checks. Reach this logged-fluid target for the day and your pet earns one water item.</p>
         <div class="chip-row">
           ${[250, 350, 500, 750].map(ml => `<button class="chip" onclick="logWater(${ml}, '${date}')">+${toDisplay(ml)}</button>`).join('')}
           <button class="chip" onclick="undoLastWater('${date}')">Undo last</button>
@@ -321,6 +338,8 @@ function renderWaterCard(date) {
 function logWater(ml, date) {
   const entry = STATE.dailyWater[date] || { ml: 0 };
   entry.ml += ml;
+  if (!Array.isArray(entry.events)) entry.events = [];
+  entry.events.push(ml);
   STATE.dailyWater[date] = entry;
   grantPetWaterIfThresholdMet(date);
   persist(); render();
@@ -345,7 +364,8 @@ function grantPetWaterIfThresholdMet(date) {
 function undoLastWater(date) {
   const entry = STATE.dailyWater[date];
   if (!entry || entry.ml <= 0) return;
-  entry.ml = Math.max(0, entry.ml - 250);
+  const lastAmount = Array.isArray(entry.events) && entry.events.length ? entry.events.pop() : 250;
+  entry.ml = Math.max(0, entry.ml - lastAmount);
   persist(); render();
 }
 
@@ -586,10 +606,10 @@ function confirmFoodAdjust() {
   const isEdit = UI.editingFoodIndex != null;
   const f = {
     name: d.name,
-    kcal: Number(document.getElementById('fa-kcal').value) || 0,
-    protein: Number(document.getElementById('fa-protein').value) || 0,
-    carbs: Number(document.getElementById('fa-carbs').value) || 0,
-    fat: Number(document.getElementById('fa-fat').value) || 0,
+    kcal: nonNegativeFoodNumber('fa-kcal'),
+    protein: nonNegativeFoodNumber('fa-protein'),
+    carbs: nonNegativeFoodNumber('fa-carbs'),
+    fat: nonNegativeFoodNumber('fa-fat'),
   };
   const qty = 1; // scaling is already baked into the numbers above
 
@@ -597,8 +617,8 @@ function confirmFoodAdjust() {
     STATE.foodLog[UI.foodDate][UI.editingFoodIndex] = { ...f, qty };
   } else {
     addOrIncrementFood(f, qty);
-    grantPetFoodIfThresholdMet(UI.foodDate);
   }
+  grantPetFoodIfThresholdMet(UI.foodDate);
   recordRecentFood(f);
   UI.foodAdjustDraft = null;
   UI.editingFoodIndex = null;
@@ -616,10 +636,10 @@ function submitCustomFood() {
   if (!name) { toast('Give the food a name first'); return; }
   const f = {
     name,
-    kcal: Number(document.getElementById('cf-kcal').value) || 0,
-    protein: Number(document.getElementById('cf-protein').value) || 0,
-    carbs: Number(document.getElementById('cf-carbs').value) || 0,
-    fat: Number(document.getElementById('cf-fat').value) || 0,
+    kcal: nonNegativeFoodNumber('cf-kcal'),
+    protein: nonNegativeFoodNumber('cf-protein'),
+    carbs: nonNegativeFoodNumber('cf-carbs'),
+    fat: nonNegativeFoodNumber('cf-fat'),
   };
   addOrIncrementFood(f, 1);
   grantPetFoodIfThresholdMet(UI.foodDate);
@@ -663,6 +683,7 @@ function setFoodQty(index, value) {
   if (!entry) return;
   const n = Number(value);
   entry.qty = n > 0 ? n : 0.25;
+  grantPetFoodIfThresholdMet(UI.foodDate);
   persist(); render();
 }
 

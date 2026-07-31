@@ -33,8 +33,8 @@ function evaluatePetDailyRewards() {
     const lvl = getActivityLevel();
     if ((checkin.steps || 0) >= lvl.baselineSteps) grant('steps', 5, 'Hit your step baseline');
   }
-  if (STATE.workoutLog[date] && STATE.workoutLog[date].length > 0) {
-    grant('workout', 15, 'Logged a workout');
+  if ((STATE.workoutLog[date] || []).some(hasCompletedWork)) {
+    grant('workout', 15, 'Completed workout work');
   }
   const foodEntries = STATE.foodLog[date];
   if (foodEntries && foodEntries.length) {

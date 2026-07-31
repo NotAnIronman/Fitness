@@ -162,7 +162,7 @@ function renderPaceFeedback(isImperial) {
 }
 
 function renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) {
-  const { ratePerWeekLb, feasibility, suggestedIntake, deltaLb, weeks } = evalResult;
+  const { ratePerWeekLb, ratePctBodyWeightPerWeek, feasibility, suggestedIntake, unsafeTarget, deltaLb, weeks } = evalResult;
   const rateDisplay = isImperial ? `${Math.abs(ratePerWeekLb).toFixed(2)} lb/week` : `${Math.abs(lbToKg(ratePerWeekLb)).toFixed(2)} kg/week`;
   const direction = deltaLb < 0 ? 'loss' : deltaLb > 0 ? 'gain' : 'maintenance';
 
@@ -170,9 +170,9 @@ function renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) {
   const badgeText = feasibility === 'reasonable' ? 'On track' : feasibility === 'ambitious' ? 'Ambitious' : 'Unlikely as set';
 
   const messages = {
-    reasonable: `This is a well-supported, sustainable rate of ${direction}.`,
-    ambitious: `This is faster than typically recommended, but achievable with consistent adherence.`,
-    unlikely: `Based on standard energy-balance math, hitting this exact date is unlikely without extreme measures. Consider extending your timeline or adjusting the target, the math below shows why.`,
+    reasonable: `This is within a commonly used planning range for ${direction}, but individual response still varies.`,
+    ambitious: `This is faster than the usual planning range. Extend the timeline if recovery, hunger, performance, or adherence starts to suffer.`,
+    unlikely: `Based on this first-pass energy model, Forge should not turn this date into an intake prescription. Extend the timeline or adjust the target.`,
   };
 
   const stepBonus = getStepBonus();
@@ -181,13 +181,14 @@ function renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) {
     <div class="card">
       <div class="card-title">Feasibility check <span class="badge ${badgeClass}">${badgeText}</span></div>
       <div class="grid grid-3" style="margin-bottom:12px;">
-        <div class="stat"><div class="stat-label">Required rate</div><div class="stat-value">${rateDisplay}</div></div>
+        <div class="stat"><div class="stat-label">Required rate</div><div class="stat-value">${rateDisplay}</div><div class="hint">${ratePctBodyWeightPerWeek != null ? ratePctBodyWeightPerWeek.toFixed(2) : '-'}% of starting weight/week</div></div>
         <div class="stat"><div class="stat-label">Timeframe</div><div class="stat-value">${weeks.toFixed(1)}<span class="unit">wks</span></div></div>
-        <div class="stat"><div class="stat-label">Suggested daily intake</div><div class="stat-value accent">${suggestedIntake ? Math.round(suggestedIntake) : '-'}<span class="unit">kcal</span></div></div>
+        <div class="stat"><div class="stat-label">Suggested daily intake</div><div class="stat-value accent">${suggestedIntake ? Math.round(suggestedIntake) : 'Not provided'}${suggestedIntake ? '<span class="unit">kcal</span>' : ''}</div></div>
       </div>
       <p class="hint" style="font-size:13px; line-height:1.6;">${messages[feasibility]}
+        ${unsafeTarget ? ' This timeline would require an intake or deficit that Forge should not prescribe. Extend the target date; the Food page will keep showing estimated maintenance rather than turning an unsafe calculation into a target.' : ''}
         ${effTdee ? ` Your current maintenance is ~${Math.round(effTdee)} kcal/day (TDEE of ${Math.round(tdee)}${stepBonus.dailyKcal > 0 ? ` plus a ${Math.round(stepBonus.dailyKcal)} kcal step bonus` : ''}).` : ' Fill in your profile on Home to see a suggested intake target.'}
-        This uses the standard ~3,500 kcal-per-pound estimate, a widely used approximation, not an exact prediction: your maintenance calories actually drift a bit as your weight changes, so real-world progress is rarely perfectly linear even when adherence is.
+        This first-pass projection uses the familiar ~3,500 kcal-per-pound approximation. Human weight change is dynamic: energy needs and water weight change over time, so use the trend to adjust rather than treating the projection as a promise.
       </p>
     </div>
   `;
@@ -286,6 +287,7 @@ function drawGoalChart() {
 function updateGoalTargetWeight(val) {
   const n = numOrNull(val);
   const kg = n != null ? (STATE.profile.unitSystem === 'imperial' ? lbToKg(n) : n) : null;
+  if (kg != null && (kg < 20 || kg > 400)) { toast('Enter a target weight between 20 and 400 kg (44-882 lb).'); render(); return; }
   ensureGoalStart();
   STATE.goal.targetWeightKg = kg;
   persist(); render();
@@ -335,6 +337,7 @@ function openLogWeightPrompt() {
   const n = numOrNull(val);
   if (n == null) return;
   const kg = isImperial ? lbToKg(n) : n;
+  if (kg < 20 || kg > 400) { toast('Enter a weight between 20 and 400 kg (44-882 lb).'); return; }
   logWeightEntry(kg);
   STATE.profile.weightKg = kg;
   persist(); render();
