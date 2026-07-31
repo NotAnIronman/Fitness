@@ -23,7 +23,7 @@
    in sync with this).
    ============================================================ */
 
-const CACHE_VERSION = 'forge-v12';
+const CACHE_VERSION = 'forge-v13';
 
 const PRECACHE_URLS = [
   './',
@@ -47,6 +47,7 @@ const PRECACHE_URLS = [
   './js/pet.js',
   './js/achievements.js',
   './js/themes.js',
+  './js/vendor/chart.umd.min.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
