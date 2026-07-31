@@ -1156,6 +1156,66 @@ hr.div {
   font-size: 12px;
   color: var(--text-dim);
 }
+.pet-action-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.travel-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.travel-difficulty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 6px;
+}
+.pet-us-map {
+  display: grid;
+  grid-template-columns: repeat(14, 42px);
+  grid-template-rows: repeat(8, 44px);
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 14px 4px;
+  margin: 10px 0;
+}
+.pet-map-state {
+  min-width: 38px;
+  padding: 3px 1px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font: 700 10px var(--font-mono);
+}
+.pet-map-state small { font-size: 10px; margin-top: 3px; }
+.pet-map-state:hover, .pet-map-state.target { border-color: var(--accent); color: var(--text); }
+.pet-map-state.current { box-shadow: 0 0 0 2px var(--accent); color: var(--accent); }
+.pet-map-state.completed { color: var(--text); background: var(--surface-2); }
+.pet-map-state.tier-platinum { border-color: #B9F2FF; }
+.pet-map-state.tier-gold { border-color: #F5C542; }
+.pet-map-state.tier-silver { border-color: #B8C2CC; }
+.pet-map-state.tier-bronze { border-color: #CD7F32; }
+.travel-route-summary {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * .6);
+  background: var(--bg);
+}
+.travel-route-summary .macro-bar-track { margin-top: 9px; }
+.travel-paused { margin-top: 10px; }
+.souvenir-title { margin: 12px 0 6px; }
 
 /* ---- Feeding tray ---- */
 .pet-tray {
