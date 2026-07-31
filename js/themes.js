@@ -204,37 +204,113 @@ function updateFoodApiKey(value) {
   persist();
 }
 
+/* ---------- Compression for sync transport ----------
+   Uses the browser's native CompressionStream (no library, broadly supported
+   in current browsers), this meaningfully extends how much history fits in a
+   clipboard sync code or a shared file before hitting a practical limit,
+   fitness/food JSON is very repetitive and typically compresses 5-10x.
+   Falls back to plain JSON automatically if CompressionStream isn't
+   available, and decompress auto-detects which format it's looking at, so
+   old plain-JSON sync codes/files still import fine. */
+async function compressToBase64(str) {
+  if (typeof CompressionStream === 'undefined') return { data: str, compressed: false };
+  const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
+  const buffer = await new Response(stream).arrayBuffer();
+  return { data: arrayBufferToBase64(buffer), compressed: true };
+}
+async function decompressFromText(text) {
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{')) return JSON.parse(trimmed); // plain JSON, uncompressed
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error("This looks like a compressed sync code, but this browser can't decompress it. Try exporting/importing a plain .json file instead.");
+  }
+  const buffer = base64ToArrayBuffer(trimmed);
+  const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const json = await new Response(stream).text();
+  return JSON.parse(json);
+}
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+// Merges imported data onto the CURRENT state instead of a blank default,
+// so syncing between two devices that have both logged something since the
+// last sync doesn't wipe out whatever's only on the receiving device. Plain
+// objects (including date-keyed logs like foodLog/workoutLog/dailyCheckins)
+// merge key-by-key via deepMerge already; weightLog is a plain array so it
+// needs its own dedup-by-date merge, most other arrays (savedMeals, the
+// workout plan template, etc) are treated as "whichever was synced most
+// recently wins," which is a reasonable default for data that isn't
+// naturally date-keyed.
+function mergeImportedState(incoming) {
+  const mergedWeightLog = mergeWeightLogs(STATE.weightLog, incoming.weightLog || []);
+  const next = deepMerge(STATE, incoming);
+  next.weightLog = mergedWeightLog;
+  return next;
+}
+function mergeWeightLogs(existing, incoming) {
+  const byDate = new Map();
+  (existing || []).forEach(e => byDate.set(e.date, e));
+  (incoming || []).forEach(e => byDate.set(e.date, e)); // incoming wins on same-date conflicts
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 // Uses the OS's own native share sheet (AirDrop, Nearby Share, Bluetooth, or
 // any app that accepts a file) to send the backup directly to another device,
 // no server or account involved, this just hands the file to the OS. Not
-// every browser supports sharing files (desktop support is spotty), falls
-// back to a clear message pointing at the other options when unavailable.
+// every browser supports sharing files (desktop support is spotty). Android's
+// share sheet in particular has a real, fairly low size ceiling for files
+// passed this way (its underlying IPC mechanism caps out around ~1MB), so
+// this compresses first and, if the compressed result is still too large,
+// steps aside proactively rather than attempting a share that's likely to
+// fail with an unhelpful error.
+const SHARE_SIZE_WARNING_BYTES = 900000;
 async function shareBackup() {
   try {
-    const json = JSON.stringify(STATE, null, 2);
-    const file = new File([json], `forge-backup-${todayISO()}.json`, { type: 'application/json' });
+    const { data, compressed } = await compressToBase64(JSON.stringify(STATE));
+    const approxBytes = data.length;
+    if (approxBytes > SHARE_SIZE_WARNING_BYTES) {
+      toast("Your backup has grown too large for Android's share sheet to reliably handle, use Export or Copy sync code instead.");
+      return;
+    }
+    const filename = compressed ? `forge-backup-${todayISO()}.json.gz.txt` : `forge-backup-${todayISO()}.json`;
+    const file = new File([data], filename, { type: 'text/plain' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'Forge backup', text: 'Forge training log backup' });
+      await navigator.share({ files: [file], title: 'Forge backup', text: 'Forge training log backup (open with Forge > Themes > Import)' });
     } else {
       toast("Sharing files isn't supported in this browser, try Copy sync code or Export instead.");
     }
   } catch (e) {
     if (e && e.name !== 'AbortError') { // AbortError just means they closed the share sheet, not a real failure
       console.error(e);
-      toast('Could not open the share sheet, try Copy sync code or Export instead.');
+      toast(`Could not open the share sheet (${e.message || e.name || 'unknown error'}), try Copy sync code or Export instead.`);
     }
   }
 }
 
-// Copies the whole backup to the clipboard as text, works on essentially any
-// device/browser, paste it into the "Paste sync code" box on the other one.
+// Copies the whole backup to the clipboard as a compressed sync code, works
+// on essentially any device/browser, paste it into the "Paste sync code" box
+// on the other one.
 async function copySyncCode() {
   try {
-    await navigator.clipboard.writeText(JSON.stringify(STATE));
+    const { data } = await compressToBase64(JSON.stringify(STATE));
+    await navigator.clipboard.writeText(data);
     toast("Copied! Paste it into Forge on your other device (Themes -> Paste sync code).");
   } catch (e) {
     console.error(e);
-    toast('Could not copy automatically, try Export instead.');
+    toast(`Could not copy automatically (${e.message || 'unknown error'}), try Export instead.`);
   }
 }
 
@@ -243,20 +319,20 @@ function togglePasteSync() {
   render();
 }
 
-function importFromPasteSync() {
+async function importFromPasteSync() {
   const textEl = document.getElementById('paste-sync-text');
   const text = textEl ? textEl.value.trim() : '';
   if (!text) { toast('Paste your sync code first'); return; }
   try {
-    const parsed = JSON.parse(text);
-    STATE = deepMerge(defaultState(), parsed);
+    const parsed = await decompressFromText(text);
+    STATE = mergeImportedState(parsed);
     persist();
     UI.pasteSyncOpen = false;
     render();
     toast('Synced from pasted code!');
   } catch (e) {
     console.error(e);
-    alert("That doesn't look like a valid Forge sync code. Make sure you copied the whole thing.");
+    alert(e.message && e.message.includes('sync code') ? e.message : "That doesn't look like a valid Forge sync code. Make sure you copied the whole thing.");
   }
 }
 
@@ -277,7 +353,7 @@ function importData(event) {
   reader.onload = () => {
     try {
       const parsed = JSON.parse(reader.result);
-      STATE = deepMerge(defaultState(), parsed);
+      STATE = mergeImportedState(parsed);
       persist();
       render();
       toast('Backup imported');

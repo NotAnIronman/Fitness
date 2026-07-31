@@ -55,7 +55,8 @@ function renderBarcodeScanner() {
       <div style="display:flex; gap:8px; margin-top:10px;">
         <button class="btn btn-ghost btn-sm" onclick="closeBarcodeScanner()">Cancel</button>
       </div>
-      <p class="hint" style="margin-top:8px;">Not working? Barcode scanning needs camera access and a secure (https) connection. You can always search by name instead.</p>
+      <p class="hint" style="margin-top:8px;">Struggling to get a read? A few things that matter more than the software: good even lighting (avoid glare on the barcode), hold it flat and steady about 10-15cm from the camera, and make sure the whole barcode is in frame. Laptop webcams especially can have slow or fixed-distance autofocus, if it won't lock on, try tilting slightly or moving a bit further back.</p>
+      <p class="hint" style="margin-top:4px;">Still not working? Barcode scanning needs camera access and a secure (https) connection. You can always search by name instead.</p>
     </div>
   `;
 }
@@ -94,7 +95,17 @@ async function startBarcodeScan() {
     _zxingReader = new ZXingBrowser.BrowserMultiFormatReader(undefined, { delayBetweenScanAttempts: 100 });
     UI.barcodeStatus = 'Point your camera at a product barcode.';
     _zxingControls = await _zxingReader.decodeFromConstraints(
-      { video: { facingMode: 'environment' } },
+      {
+        video: {
+          facingMode: 'environment',
+          // Higher resolution gives a barcode more actual pixels to be read
+          // from, these are "ideal" hints, so a camera that can't do 1080p
+          // just falls back to its best available resolution instead of
+          // failing outright.
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      },
       video,
       (result, err, controls) => {
         if (result) {
@@ -105,6 +116,7 @@ async function startBarcodeScan() {
         // per-frame "not found" errors are normal while scanning, not fatal, ignore them
       }
     );
+    tryEnableContinuousFocus(video);
   } catch (e) {
     console.error(e);
     let msg;
@@ -118,6 +130,25 @@ async function startBarcodeScan() {
     UI.barcodeStatus = msg;
     render();
   }
+}
+
+// Many webcams (laptops especially) default to a fixed focus distance tuned
+// for video calls, which is often the wrong distance for holding a barcode
+// up close. Where the browser/hardware exposes focus control (support is
+// inconsistent, mainly Chrome on some devices), this asks for continuous
+// autofocus instead. Silently does nothing if unsupported, this is a
+// nice-to-have, not something to fail loudly over.
+function tryEnableContinuousFocus(video) {
+  try {
+    const stream = video.srcObject;
+    if (!stream) return;
+    const track = stream.getVideoTracks && stream.getVideoTracks()[0];
+    if (!track || !track.getCapabilities) return;
+    const caps = track.getCapabilities();
+    if (caps.focusMode && caps.focusMode.includes('continuous')) {
+      track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+    }
+  } catch (e) { /* focus control not supported here, that's fine */ }
 }
 
 function stopBarcodeScan() {

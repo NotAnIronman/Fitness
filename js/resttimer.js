@@ -17,8 +17,46 @@ let _restTimer = {
   tickHandle: null,
 };
 
+// Primed during startRestTimer() (a user-gesture click), not at completion
+// time, browsers require an AudioContext to be created/resumed within a user
+// gesture or it stays silently suspended, so priming it early and reusing it
+// is what makes the completion beep actually audible later.
+let _restTimerAudioCtx = null;
+function primeRestTimerAudio() {
+  try {
+    if (!_restTimerAudioCtx) {
+      _restTimerAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (_restTimerAudioCtx.state === 'suspended') _restTimerAudioCtx.resume();
+  } catch (e) { /* Web Audio not supported here, sound just won't play */ }
+}
+function playRestTimerSound() {
+  const ctx = _restTimerAudioCtx;
+  if (!ctx) return;
+  try {
+    const beep = (startTime, freq) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.25, startTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.28);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + 0.3);
+    };
+    const now = ctx.currentTime;
+    beep(now, 880);
+    beep(now + 0.32, 880);
+    beep(now + 0.64, 1108);
+  } catch (e) { /* not fatal, vibration/toast still fire */ }
+}
+
 function startRestTimer(seconds, label) {
   stopRestTimerInterval();
+  primeRestTimerAudio();
   _restTimer = {
     running: true,
     secondsLeft: seconds,
@@ -37,6 +75,7 @@ function restTimerTick() {
     _restTimer.secondsLeft = 0;
     _restTimer.running = false;
     stopRestTimerInterval();
+    playRestTimerSound();
     if (navigator.vibrate) { try { navigator.vibrate([200, 100, 200]); } catch (e) { /* not supported */ } }
     toast(`${_restTimer.label} done!`);
     render();
@@ -48,6 +87,7 @@ function restTimerTick() {
 function pauseRestTimer() {
   _restTimer.running = !_restTimer.running;
   if (_restTimer.running) {
+    primeRestTimerAudio();
     _restTimer.tickHandle = setInterval(restTimerTick, 1000);
   } else {
     stopRestTimerInterval();
