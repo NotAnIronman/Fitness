@@ -42,10 +42,7 @@
 <script>
   render();
 
-  // PWA: register the service worker so the app becomes installable and
-  // works offline. Wrapped defensively since some hosting setups (or the
-  // file:// protocol) don't support service workers, that shouldn't break
-  // the app itself.
+  // PWA: register the service worker so the app becomes installable and works offline.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').catch((err) => {
