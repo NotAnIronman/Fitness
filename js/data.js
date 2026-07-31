@@ -417,9 +417,8 @@ const PET_SLOT_LABELS = { hat: 'Hat', eyewear: 'Eyewear', face: 'Face', neck: 'N
 // Encouragement shown in the pet widget, some generic, some page-specific.
 /* ============================================================
    PET TRAVEL MINIGAME (US states, part of the secret pet feature)
-   Steps you log translate to pet-steps (see PET_STEP_MULTIPLIER) that
-   your pet spends walking a fixed tour route through all 50 states,
-   unlocking a souvenir item at each stop along the way. Distance
+   Steps you log translate to pet-steps at the selected difficulty and
+   your pet spends them walking to a chosen state. Distance
    between stops is computed from these coordinates via the haversine
    formula (js/pet.js), not hand-curated, so the route/order and
    distances stay consistent and are easy to extend later (e.g. for
@@ -433,8 +432,16 @@ const PET_SLOT_LABELS = { hat: 'Hat', eyewear: 'Eyewear', face: 'Face', neck: 'N
    avoid repeating the same item (cowboy hat, mountain, etc) across
    too many states.
    ============================================================ */
-const PET_STEP_MULTIPLIER = 100; // your logged steps count 100x toward pet travel
 const STEPS_PER_MILE = 2112; // ~2.5ft stride, a commonly cited average
+const PET_STEP_MULTIPLIER = 100; // legacy V13 helper; V14 uses the selected tier
+const PET_TRAVEL_DAILY_STEP_CAP = 40000;
+const PET_TRAVEL_MIN_HAPPINESS = 25;
+const PET_TRAVEL_DIFFICULTIES = {
+  platinum: { label: 'Platinum', multiplier: 1, rank: 4, medal: '💎' },
+  gold:     { label: 'Gold',     multiplier: 10, rank: 3, medal: '🥇' },
+  silver:   { label: 'Silver',   multiplier: 100, rank: 2, medal: '🥈' },
+  bronze:   { label: 'Bronze',   multiplier: 1000, rank: 1, medal: '🥉' },
+};
 
 const US_STATES = [
   { key: 'TX', name: 'Texas',          lat: 30.27, lng: -97.74, souvenir: { emoji: '\ud83e\udd20', name: 'Cowboy Hat' } },

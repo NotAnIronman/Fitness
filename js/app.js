@@ -48,6 +48,7 @@ let UI = {
   barcodeStatus: '',
   petShopGroupOpen: {},
   petChangePanelOpen: false,
+  petCustomizeOpen: false,
   pasteSyncOpen: false,
 };
 
@@ -55,7 +56,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v13';
+const APP_VERSION = 'forge-v14';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -102,10 +103,23 @@ function tip(label, title, bodyHtml) {
 function clampTipToViewport(tipEl) {
   const box = tipEl.querySelector('.tip-box');
   if (!box) return;
-  box.style.transform = '';
+  box.removeAttribute('style');
   requestAnimationFrame(() => {
-    const rect = box.getBoundingClientRect();
     const margin = 10;
+    // The brand lives inside an overflow-scrolling mobile nav. Positioning its
+    // version card against the viewport prevents that ancestor from clipping it.
+    if (tipEl.classList.contains('brand')) {
+      const trigger = tipEl.getBoundingClientRect();
+      const width = Math.min(260, window.innerWidth - margin * 2);
+      box.style.position = 'fixed';
+      box.style.width = `${width}px`;
+      box.style.left = `${Math.max(margin, Math.min(trigger.left, window.innerWidth - width - margin))}px`;
+      box.style.top = `${Math.min(window.innerHeight - box.offsetHeight - margin, trigger.bottom + 8)}px`;
+      box.style.bottom = 'auto';
+      box.style.transform = 'none';
+      return;
+    }
+    const rect = box.getBoundingClientRect();
     let shift = 0;
     if (rect.left < margin) shift = margin - rect.left;
     else if (rect.right > window.innerWidth - margin) shift = (window.innerWidth - margin) - rect.right;
@@ -410,6 +424,8 @@ const NAV_ITEMS = [
 
 function doRender() {
   applyTheme(STATE.theme);
+  const previousSidebar = document.querySelector('.sidebar');
+  const previousSidebarScroll = previousSidebar ? previousSidebar.scrollLeft : 0;
 
   // Idempotent (already-granted rewards/achievements are skipped), so it's safe
   // to run this on every render rather than only when visiting Pet/Achievements,
@@ -419,7 +435,7 @@ function doRender() {
     updatePetHappinessDecay();
     evaluatePetDailyRewards().forEach(g => toast(`+${g.points} pts: ${g.label}`));
     if (typeof evaluateTravelArrivals === 'function') {
-      evaluateTravelArrivals().forEach(s => toast(`${STATE.pet.name || 'Your pet'} arrived in ${s.name}! Got a ${s.souvenir.name.toLowerCase()} ${s.souvenir.emoji}`));
+      evaluateTravelArrivals().forEach(s => toast(`${STATE.pet.name || 'Your pet'} arrived in ${s.name} with a ${travelTier(s.medalTier).label} medal${s.gotSouvenir ? ` and ${s.souvenir.name.toLowerCase()} souvenir ${s.souvenir.emoji}` : ''}!`));
     }
   }
   evaluateAchievements().forEach(a => toast(`Achievement unlocked: ${a.name} (+${a.points}${STATE.pet.enabled ? ' pet pts' : ' pts'})`));
@@ -460,6 +476,18 @@ function doRender() {
   else { UI.route = 'home'; main.innerHTML = renderHome(); }
 
   afterRenderHooks();
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) {
+    sidebar.scrollLeft = previousSidebarScroll;
+    requestAnimationFrame(() => {
+      const active = sidebar.querySelector('.nav-item.active');
+      if (!active) return;
+      if (active.offsetLeft < sidebar.scrollLeft) sidebar.scrollLeft = active.offsetLeft - 12;
+      else if (active.offsetLeft + active.offsetWidth > sidebar.scrollLeft + sidebar.clientWidth) {
+        sidebar.scrollLeft = active.offsetLeft + active.offsetWidth - sidebar.clientWidth + 12;
+      }
+    });
+  }
 }
 
 function navigate(route) {

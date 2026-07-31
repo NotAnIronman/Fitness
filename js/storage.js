@@ -122,14 +122,20 @@ function defaultState() {
       thirst: 100,             // 0-100, decays like happiness, watering refills it
       lastFedAt: null,
       lastWateredAt: null,
-      // Travel minigame: progress is fully DERIVED from the daily step
-      // check-in log each time it's needed (see getTravelProgress in
-      // js/pet.js), not stored incrementally, so backfilling or editing a
-      // day's steps can never cause drift or double-counting. This just
-      // remembers which arrivals have already gotten their "you made it!"
-      // celebration, so revisiting the Pet page doesn't re-celebrate the
-      // same stop every time.
-      travelCelebrated: [], // state keys, e.g. ['TX', 'OK']
+      // V14 travel state. `processedSteps` is a per-calendar-day ledger that
+      // enforces the 40,000-step cap and prevents edit/down/up spam from being
+      // credited twice. Future dates stay untouched until that date arrives.
+      travelCelebrated: [], // legacy V13 arrival list, retained for migration
+      travel: {
+        currentState: 'TX',
+        targetState: null,
+        difficulty: 'silver',
+        leg: null,             // { from, to, distanceSteps, progressSteps, medalTier }
+        medals: {},            // state key -> platinum | gold | silver | bronze
+        souvenirs: [],         // state keys, only Silver or higher
+        processedSteps: {},    // ISO date -> highest user-step amount already credited
+        migratedV14: true,
+      },
     },
     achievements: {
       unlocked: {}, // achievementId -> 'YYYY-MM-DD' date unlocked
@@ -256,6 +262,11 @@ function normalizeStateShape(state) {
   if (!Array.isArray(state.uiPrefs.collapsedNotices)) state.uiPrefs.collapsedNotices = [];
   if (!Array.isArray(state.pet.ownedItems)) state.pet.ownedItems = [];
   if (!Array.isArray(state.pet.travelCelebrated)) state.pet.travelCelebrated = [];
+  if (!isPlainObject(state.pet.travel)) state.pet.travel = def.pet.travel;
+  if (!isPlainObject(state.pet.travel.medals)) state.pet.travel.medals = {};
+  if (!Array.isArray(state.pet.travel.souvenirs)) state.pet.travel.souvenirs = [];
+  if (!isPlainObject(state.pet.travel.processedSteps)) state.pet.travel.processedSteps = {};
+  if (state.pet.travel.leg != null && !isPlainObject(state.pet.travel.leg)) state.pet.travel.leg = null;
   if (!isPlainObject(state.pet.equipped)) state.pet.equipped = {};
   if (!isPlainObject(state.pet.rewardedDates)) state.pet.rewardedDates = {};
   if (!isPlainObject(state.pet.rewardedWeeks)) state.pet.rewardedWeeks = {};

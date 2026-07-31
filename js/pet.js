@@ -142,6 +142,10 @@ function togglePetChangePanel() {
   UI.petChangePanelOpen = !UI.petChangePanelOpen;
   render();
 }
+function togglePetCustomizePanel() {
+  UI.petCustomizeOpen = !UI.petCustomizeOpen;
+  render();
+}
 function buyPetItem(key) {
   const item = PET_ITEMS.find(i => i.key === key);
   if (!item) return;
@@ -149,8 +153,9 @@ function buyPetItem(key) {
   if (STATE.pet.points < item.cost) { toast("Not enough points yet"); return; }
   STATE.pet.points -= item.cost;
   STATE.pet.ownedItems.push(key);
+  STATE.pet.equipped[item.slot] = key;
   persist(); render();
-  toast(`Bought ${item.name}!`);
+  toast(`Bought and equipped ${item.name}!`);
 }
 function equipPetItem(slot, key) {
   STATE.pet.equipped[slot] = key;
@@ -339,6 +344,164 @@ function renderTravelCard() {
   `;
 }
 
+/* ---------- V14 choose-your-own-route travel ---------- */
+const PET_US_MAP_LAYOUT = {
+  WA:[1,1],OR:[1,2],CA:[1,4],AK:[1,8],HI:[2,8],ID:[2,2],NV:[2,4],AZ:[3,5],MT:[3,1],WY:[3,3],UT:[3,4],
+  CO:[4,4],NM:[4,5],ND:[5,1],SD:[5,2],NE:[5,3],KS:[5,4],OK:[5,5],TX:[5,6],MN:[6,1],IA:[6,3],MO:[6,4],
+  AR:[6,5],LA:[6,6],WI:[7,2],IL:[7,3],MS:[7,6],MI:[8,2],IN:[8,3],KY:[8,4],TN:[8,5],AL:[8,6],OH:[9,3],
+  WV:[9,4],GA:[9,6],PA:[10,3],VA:[10,4],NC:[10,5],SC:[10,6],FL:[10,7],NY:[11,2],NJ:[11,3],MD:[11,4],
+  VT:[12,1],MA:[12,2],CT:[12,3],DE:[12,4],NH:[13,1],RI:[13,3],ME:[14,1],
+};
+
+function getState(key) { return US_STATES.find(state => state.key === key); }
+function travelTier(key) { return PET_TRAVEL_DIFFICULTIES[key] || PET_TRAVEL_DIFFICULTIES.silver; }
+function lowerTravelTier(key) {
+  const nextRank = Math.max(1, travelTier(key).rank - 1);
+  return Object.keys(PET_TRAVEL_DIFFICULTIES).find(k => PET_TRAVEL_DIFFICULTIES[k].rank === nextRank) || 'bronze';
+}
+
+function ensurePetTravelState() {
+  const travel = STATE.pet.travel;
+  if (!getState(travel.currentState)) travel.currentState = 'TX';
+  if (!PET_TRAVEL_DIFFICULTIES[travel.difficulty]) travel.difficulty = 'silver';
+  travel.souvenirs = Array.from(new Set(travel.souvenirs.filter(key => getState(key))));
+  Object.keys(travel.medals).forEach(key => {
+    if (!getState(key) || !PET_TRAVEL_DIFFICULTIES[travel.medals[key]]) delete travel.medals[key];
+  });
+  Object.keys(travel.processedSteps).forEach(date => {
+    const value = Number(travel.processedSteps[date]);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(value) || value < 0) delete travel.processedSteps[date];
+    else travel.processedSteps[date] = Math.min(PET_TRAVEL_DAILY_STEP_CAP, value);
+  });
+  if (travel.leg) {
+    const validLeg = getState(travel.leg.from) && getState(travel.leg.to) && travel.leg.from !== travel.leg.to &&
+      Number.isFinite(Number(travel.leg.distanceSteps)) && Number(travel.leg.distanceSteps) > 0;
+    if (!validLeg) { travel.leg = null; travel.targetState = null; }
+    else {
+      travel.leg.distanceSteps = Number(travel.leg.distanceSteps);
+      travel.leg.progressSteps = Math.max(0, Math.min(travel.leg.distanceSteps, Number(travel.leg.progressSteps) || 0));
+      if (!PET_TRAVEL_DIFFICULTIES[travel.leg.medalTier]) travel.leg.medalTier = travel.difficulty;
+      travel.targetState = travel.leg.to;
+    }
+  }
+  // V13 saves stored only arrived state keys. Preserve those as Silver and
+  // consume historical entries once so upgrading cannot replay old steps.
+  if (!travel.migratedV14 || (STATE.pet.travelCelebrated.length && !Object.keys(travel.medals).length)) {
+    const legacy = STATE.pet.travelCelebrated.filter(key => getState(key));
+    legacy.forEach(key => {
+      travel.medals[key] = 'silver';
+      if (!travel.souvenirs.includes(key)) travel.souvenirs.push(key);
+    });
+    if (legacy.length) travel.currentState = legacy[legacy.length - 1];
+    Object.keys(STATE.dailyCheckins).filter(date => date <= todayISO()).forEach(date => {
+      travel.processedSteps[date] = Math.min(PET_TRAVEL_DAILY_STEP_CAP, Math.max(0, Number(STATE.dailyCheckins[date].steps) || 0));
+    });
+    travel.migratedV14 = true;
+    persist();
+  }
+  return travel;
+}
+
+function createTravelLeg(fromKey, toKey, medalTier) {
+  const from = getState(fromKey), to = getState(toKey);
+  if (!from || !to || fromKey === toKey) return null;
+  return { from: fromKey, to: toKey,
+    distanceSteps: Math.max(1, Math.round(haversineMiles(from.lat, from.lng, to.lat, to.lng) * STEPS_PER_MILE)),
+    progressSteps: 0, medalTier: medalTier || ensurePetTravelState().difficulty };
+}
+
+function selectPetTravelTarget(key) {
+  const travel = ensurePetTravelState();
+  if (!getState(key) || key === travel.currentState) return;
+  let medalTier = travel.difficulty, retained = 0;
+  if (travel.leg && travel.leg.progressSteps > 0) {
+    if (!window.confirm(`Reroute to ${getState(key).name}? Earned progress carries over, but this leg's best possible medal drops one tier.`)) return;
+    retained = travel.leg.progressSteps;
+    medalTier = lowerTravelTier(travel.leg.medalTier);
+  }
+  travel.targetState = key;
+  travel.leg = createTravelLeg(travel.currentState, key, medalTier);
+  travel.leg.progressSteps = Math.min(retained, travel.leg.distanceSteps);
+  persist(); render();
+}
+
+function setPetTravelDifficulty(key) {
+  if (!PET_TRAVEL_DIFFICULTIES[key]) return;
+  const travel = ensurePetTravelState();
+  if (key === travel.difficulty) return;
+  if (travel.leg && travel.leg.progressSteps > 0) {
+    const lowest = travelTier(key).rank < travelTier(travel.leg.medalTier).rank ? key : travel.leg.medalTier;
+    if (!window.confirm(`Change to ${travelTier(key).label}? This trip will earn the lower tier used (${travelTier(lowest).label}).`)) return;
+    travel.leg.medalTier = lowest;
+  }
+  travel.difficulty = key;
+  if (travel.leg && travelTier(key).rank < travelTier(travel.leg.medalTier).rank) travel.leg.medalTier = key;
+  persist(); render();
+}
+
+// Applies only unused, non-future steps. The highest amount ever credited for
+// a date is retained so reducing then re-adding a log cannot duplicate travel.
+function evaluateTravelArrivals() {
+  if (!STATE.pet.enabled || !STATE.pet.species) return [];
+  const travel = ensurePetTravelState();
+  if (!travel.leg || STATE.pet.happiness < PET_TRAVEL_MIN_HAPPINESS) return [];
+  const arrivals = [];
+  let changed = false;
+  const dates = Object.keys(STATE.dailyCheckins).filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= todayISO()).sort();
+  for (const date of dates) {
+    if (!travel.leg) break;
+    const eligible = Math.min(PET_TRAVEL_DAILY_STEP_CAP, Math.max(0, Number(STATE.dailyCheckins[date].steps) || 0));
+    const used = Math.min(eligible, Math.max(0, Number(travel.processedSteps[date]) || 0));
+    const available = eligible - used;
+    if (available <= 0) continue;
+    const multiplier = travelTier(travel.difficulty).multiplier;
+    const consumed = Math.min(available, (travel.leg.distanceSteps - travel.leg.progressSteps) / multiplier);
+    travel.leg.progressSteps += consumed * multiplier;
+    travel.processedSteps[date] = used + consumed;
+    changed = true;
+    if (travel.leg.progressSteps + 0.001 >= travel.leg.distanceSteps) {
+      const arrived = getState(travel.leg.to), tierKey = travel.leg.medalTier;
+      const oldTier = travel.medals[arrived.key];
+      if (!oldTier || travelTier(tierKey).rank > travelTier(oldTier).rank) travel.medals[arrived.key] = tierKey;
+      const gotSouvenir = travelTier(tierKey).rank >= travelTier('silver').rank;
+      if (gotSouvenir && !travel.souvenirs.includes(arrived.key)) travel.souvenirs.push(arrived.key);
+      travel.currentState = arrived.key;
+      travel.targetState = null;
+      travel.leg = null;
+      arrivals.push({ ...arrived, medalTier: tierKey, gotSouvenir });
+    }
+  }
+  if (changed) persist();
+  return arrivals;
+}
+
+function renderTravelMap(travel) {
+  return `<div class="pet-us-map" role="group" aria-label="Choose a destination state">${US_STATES.map(state => {
+    const pos = PET_US_MAP_LAYOUT[state.key];
+    const tierKey = travel.medals[state.key], tier = tierKey ? travelTier(tierKey) : null;
+    const status = state.key === travel.currentState ? 'Here' : tier ? tier.label : 'Not completed';
+    return `<button class="pet-map-state ${tier ? `completed tier-${tierKey}` : ''} ${state.key === travel.currentState ? 'current' : ''} ${state.key === travel.targetState ? 'target' : ''}" style="grid-column:${pos[0]};grid-row:${pos[1]};" onclick="selectPetTravelTarget('${state.key}')" title="${escapeAttr(state.name)}: ${status}" aria-label="${escapeAttr(state.name)}, ${status}"><span>${state.key}</span><small>${state.key === travel.currentState ? '●' : tier ? tier.medal : '○'}</small></button>`;
+  }).join('')}</div>`;
+}
+
+function renderTravelCard() {
+  const travel = ensurePetTravelState(), current = getState(travel.currentState);
+  const target = travel.leg ? getState(travel.leg.to) : null;
+  const pct = travel.leg ? Math.min(100, travel.leg.progressSteps / travel.leg.distanceSteps * 100) : 0;
+  const locked = STATE.pet.happiness < PET_TRAVEL_MIN_HAPPINESS;
+  return `<div class="card">
+    <div class="card-title">Pet Travel <span class="travel-count">${Object.keys(travel.medals).length} / ${US_STATES.length} completed</span></div>
+    <p class="hint">Choose any state on the map. Up to ${PET_TRAVEL_DAILY_STEP_CAP.toLocaleString()} logged steps per calendar day can move your pet; future entries wait until their date.</p>
+    <div class="travel-difficulty">${Object.entries(PET_TRAVEL_DIFFICULTIES).map(([key,tier]) => `<button class="chip ${travel.difficulty === key ? 'active' : ''}" onclick="setPetTravelDifficulty('${key}')">${tier.medal} ${tier.label} 1:${tier.multiplier}</button>`).join('')}</div>
+    <p class="hint">The arrival medal is the lowest tier used for the entire trip. Souvenirs require Silver or higher.</p>
+    ${renderTravelMap(travel)}
+    <div class="travel-route-summary"><strong>${escapeAttr(current.name)}</strong> ${target ? `→ <strong>${escapeAttr(target.name)}</strong>` : '· Select a destination'}
+      ${travel.leg ? `<div class="macro-bar-track"><div class="macro-bar-fill" style="width:${pct}%;background:var(--accent);"></div></div><p class="hint">${Math.round(travel.leg.progressSteps/STEPS_PER_MILE).toLocaleString()} of ${Math.round(travel.leg.distanceSteps/STEPS_PER_MILE).toLocaleString()} pet-miles · ${travelTier(travel.leg.medalTier).medal} ${travelTier(travel.leg.medalTier).label} medal</p>` : ''}</div>
+    ${locked ? `<div class="notice travel-paused"><div class="notice-body">💤 Travel paused: happiness must be at least ${PET_TRAVEL_MIN_HAPPINESS}%. Care for ${escapeAttr(STATE.pet.name)} and saved eligible steps can move them again.</div></div>` : ''}
+    ${travel.souvenirs.length ? `<p class="hint souvenir-title">Souvenirs collected:</p><div class="chip-row">${travel.souvenirs.map(getState).filter(Boolean).map(s => `<span class="chip" title="${escapeAttr(s.name)}">${s.souvenir.emoji} ${escapeAttr(s.name)}</span>`).join('')}</div>` : ''}
+  </div>`;
+}
+
 function renderPetTab() {
 
   if (!STATE.pet.species) {
@@ -400,10 +563,14 @@ function renderPetTab() {
       <div class="grid grid-3" style="margin-top:6px;">
         <div class="stat"><div class="stat-label">Points</div><div class="stat-value accent">${STATE.pet.points}</div></div>
         <div class="stat"><div class="stat-label">Check-in streak</div><div class="stat-value" style="font-size:18px;">${ctx.checkinStreak}d</div></div>
-        <div class="stat"><div class="stat-label">Needs attention every</div><div class="stat-value" style="font-size:18px;">${PET_CARE_INTERVAL_HOURS}h</div></div>
+        <div class="stat"><div class="stat-label">Grace before bars drain</div><div class="stat-value" style="font-size:18px;">${PET_CARE_INTERVAL_HOURS}h</div></div>
       </div>
+      <p class="hint" style="margin-top:8px;">Bars only begin draining after ${PET_CARE_INTERVAL_HOURS} hours without a care interaction. You do not need to return on a schedule—normal logging, feeding, watering, or a pet tap refreshes care.</p>
 
-      <button class="btn btn-sm" style="margin-top:14px;" onclick="togglePetChangePanel()">${UI.petChangePanelOpen ? 'Close' : 'Change Pet'}</button>
+      <div class="pet-action-row">
+        <button class="btn btn-sm" onclick="togglePetChangePanel()">${UI.petChangePanelOpen ? 'Close Pet Editor' : 'Change Pet'}</button>
+        <button class="btn btn-sm ${UI.petCustomizeOpen ? 'btn-primary' : ''}" onclick="togglePetCustomizePanel()">${UI.petCustomizeOpen ? 'Close Customize' : 'Customize'}</button>
+      </div>
       ${UI.petChangePanelOpen ? `
         <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px; margin-top:10px; text-align:left;">
           <div class="field" style="max-width:260px; margin:0 auto 12px;">
@@ -431,7 +598,7 @@ function renderPetTab() {
       <p class="hint" style="margin-top:8px;">Hit all four, every day, for 7 days straight: <strong style="color:var(--accent)">+100 bonus</strong>.</p>
     </div>
 
-    ${renderPetShop()}
+    ${UI.petCustomizeOpen ? renderPetShop() : ''}
 
     ${(PET_ANIMALS.some(a => a.img) || PET_ITEMS.some(i => i.img)) ? `
       <p class="hint" style="text-align:center; margin-top:8px;">Some art by <a href="https://openmoji.org" target="_blank" rel="noopener">OpenMoji</a>, licensed CC BY-SA 4.0.</p>
