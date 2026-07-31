@@ -406,6 +406,11 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {
   border-color: var(--accent);
 }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
 input[type="color"] {
   padding: 3px;
   height: 38px;
@@ -865,7 +870,7 @@ hr.div {
   text-transform: none;
   letter-spacing: normal;
 }
-.tip:hover .tip-box, .tip.tip-open .tip-box {
+.tip:hover .tip-box, .tip:focus .tip-box, .tip.tip-open .tip-box {
   display: block;
 }
 .tip-box .tip-title {
@@ -1232,6 +1237,7 @@ hr.div {
   box-shadow: var(--shadow);
   z-index: 40;
   min-width: 150px;
+  max-width: min(320px, calc(100vw - 24px));
 }
 .rest-timer-label {
   font-size: 11px;
@@ -1269,7 +1275,19 @@ hr.div {
 }
 @media (max-width: 900px), (max-aspect-ratio: 0.65) {
   .rest-timer-widget {
-    bottom: calc(12px + env(safe-area-inset-bottom));
+    /* Keep the floating timer away from add/edit Save buttons near the bottom
+       of workout forms. It sits below the sticky horizontal navigation. */
+    top: calc(72px + env(safe-area-inset-top));
+    bottom: auto;
     left: calc(12px + env(safe-area-inset-left));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
