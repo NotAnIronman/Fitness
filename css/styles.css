@@ -1,11 +1,66 @@
 /* ============================================================
    FORGE - personal training log
-   Theming: every color/spacing/font decision routes through
-   CSS custom properties on :root, set live by js/theme.js
+
+   Theming: every color/spacing/font decision routes through CSS
+   custom properties on :root, set live by js/theme.js. Change a
+   variable, the whole app re-skins, nothing below should ever
+   hardcode a color/radius/font that already has a variable for it.
+
+   TABLE OF CONTENTS
+     1. Font imports
+     2. Theme variables (:root)
+     3. Base / reset
+     4. Layout shell (sidebar, main, responsive breakpoints)
+     5. Page header
+     6. Cards & grid utilities
+     7. Stat blocks
+     8. Forms (inputs, buttons)
+     9. Tables / lists (rows, day tabs)
+    10. Progress bars & badges
+    11. Macro bars
+    12. Theme picker (swatches, presets)
+    13. Empty states
+    14. Food search
+    15. Toast
+    16. Pill toggle & misc small utilities
+    17. Collapsible notices
+    18. Tooltips
+    19. Exercise blocks (ramping sets)
+    20. Date navigation (back/date/forward controls)
+    21. Chips
+    22. Energy breakdown bar
+    23. Body-fat table
+    24. Pet companion (sprite, shop, tray, widget)
+    25. Rest timer widget
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Space+Grotesk:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&family=Cormorant+Garamond:wght@500;600;700&family=Quicksand:wght@500;600;700&family=Nunito:wght@400;500;600;700&family=Bebas+Neue&family=Work+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&family=Baloo+2:wght@500;600;700&display=swap');
+/* ============================================================
+   1. FONT IMPORTS
+   One @import per family instead of one giant line, CSS allows
+   multiple @import rules (they just all have to come before any
+   other rule), this is the easiest way to add/remove a font
+   without editing one unreadable line.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&display=swap');
 
+/* ============================================================
+   2. THEME VARIABLES
+   These are the defaults; js/theme.js overwrites them inline for
+   whichever preset/custom colors the user has picked.
+   ============================================================ */
 :root {
   --bg: #0B0F14;
   --surface: #141B22;
@@ -22,12 +77,23 @@
   --font-display: 'Oswald', sans-serif;
   --font-body: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px rgba(0,0,0,0.35);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-* { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-html, body { height: 100%; overflow-x: hidden; }
+/* ============================================================
+   3. BASE / RESET
+   ============================================================ */
+* {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -36,23 +102,29 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background 0.25s ease, color 0.25s ease;
 }
-
-::selection { background: var(--accent); color: #05100E; }
-
-a { color: var(--accent); }
-
+::selection {
+  background: var(--accent);
+  color: #05100E;
+}
+a {
+  color: var(--accent);
+}
 button {
   font-family: var(--font-body);
   cursor: pointer;
 }
+img, canvas, svg {
+  max-width: 100%;
+}
 
-/* ---------- Layout shell ---------- */
+/* ============================================================
+   4. LAYOUT SHELL
+   ============================================================ */
 .shell {
   display: grid;
   grid-template-columns: 232px 1fr;
   min-height: 100vh;
 }
-
 .sidebar {
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -64,7 +136,6 @@ button {
   top: 0;
   height: 100vh;
 }
-
 .brand {
   font-family: var(--font-display);
   font-weight: 700;
@@ -76,9 +147,16 @@ button {
   gap: 8px;
   padding: 4px 8px 20px;
 }
-.brand .mark { color: var(--accent); }
-.brand small { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); font-weight: 400; letter-spacing: 0.08em; }
-
+.brand .mark {
+  color: var(--accent);
+}
+.brand small {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
 .nav-item {
   display: flex;
   align-items: center;
@@ -93,10 +171,21 @@ button {
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
 }
-.nav-item .num { font-family: var(--font-mono); font-size: 11px; opacity: 0.6; width: 18px; }
-.nav-item:hover { background: var(--surface-2); color: var(--text); }
-.nav-item.active { background: var(--surface-2); color: var(--text); box-shadow: inset 3px 0 0 var(--accent); }
-
+.nav-item .num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.6;
+  width: 18px;
+}
+.nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.nav-item.active {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .sidebar-foot {
   margin-top: auto;
   font-family: var(--font-mono);
@@ -105,12 +194,76 @@ button {
   padding: 8px;
   line-height: 1.6;
 }
-
 .main {
   padding: 32px 40px 80px;
   max-width: 1080px;
 }
 
+/* ---- Responsive: below 900px width, or any unusually tall/narrow
+   viewport (foldable cover screens etc, see max-aspect-ratio) ---- */
+@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    height: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+    gap: 6px;
+    align-items: center;
+    -webkit-overflow-scrolling: touch;
+  }
+  .brand {
+    padding: 4px 8px;
+    flex-shrink: 0;
+  }
+  .brand small {
+    display: none;
+  }
+  .nav-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 8px 12px;
+  }
+  .sidebar-foot {
+    display: none;
+  }
+  .main {
+    padding: 16px;
+    max-width: 100%;
+  }
+  .page-title {
+    font-size: 24px;
+  }
+  .page-sub {
+    font-size: 13px;
+  }
+  .card {
+    padding: 16px;
+  }
+  .stat-value {
+    font-size: 24px;
+  }
+  canvas {
+    max-width: 100%;
+  }
+}
+@media (max-width: 480px) {
+  .field-row {
+    flex-direction: column;
+  }
+  .grid-3 > *, .grid-4 > * {
+    grid-column: auto;
+  }
+}
+
+/* ============================================================
+   5. PAGE HEADER
+   ============================================================ */
 .page-head {
   margin-bottom: 28px;
 }
@@ -136,7 +289,9 @@ button {
   max-width: 60ch;
 }
 
-/* ---------- Cards ---------- */
+/* ============================================================
+   6. CARDS & GRID UTILITIES
+   ============================================================ */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -144,7 +299,9 @@ button {
   padding: 20px 22px;
   box-shadow: var(--shadow);
 }
-.card + .card { margin-top: 16px; }
+.card + .card {
+  margin-top: 16px;
+}
 .card-title {
   font-family: var(--font-display);
   font-size: 15px;
@@ -157,41 +314,28 @@ button {
   align-items: center;
   justify-content: space-between;
 }
-
-.grid { display: grid; gap: 16px; }
-.grid-2 { grid-template-columns: 1fr 1fr; }
-.grid-3 { grid-template-columns: repeat(3, 1fr); }
-.grid-4 { grid-template-columns: repeat(4, 1fr); }
-/* The (max-aspect-ratio: 0.65) fallback catches unusually tall/narrow
-   viewports (e.g. foldable cover screens) that might report a CSS width the
-   plain max-width check alone wouldn't catch, even if some OS/browser
-   compatibility layer scales the reported viewport up. */
+.grid {
+  display: grid;
+  gap: 16px;
+}
+.grid-2 {
+  grid-template-columns: 1fr 1fr;
+}
+.grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+.grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
 @media (max-width: 900px), (max-aspect-ratio: 0.65) {
-  .shell { grid-template-columns: 1fr; }
-  .sidebar {
-    position: sticky; top: 0; z-index: 20;
-    height: auto; flex-direction: row; overflow-x: auto;
-    padding: calc(10px + env(safe-area-inset-top)) 12px 10px; gap: 6px; align-items: center;
-    -webkit-overflow-scrolling: touch;
+  .grid-2, .grid-3, .grid-4 {
+    grid-template-columns: 1fr;
   }
-  .brand { padding: 4px 8px; flex-shrink: 0; }
-  .brand small { display: none; }
-  .nav-item { flex-shrink: 0; white-space: nowrap; padding: 8px 12px; }
-  .sidebar-foot { display: none; }
-  .main { padding: 16px; max-width: 100%; }
-  .page-title { font-size: 24px; }
-  .page-sub { font-size: 13px; }
-  .card { padding: 16px; }
-  .stat-value { font-size: 24px; }
-  canvas { max-width: 100%; }
 }
-@media (max-width: 480px) {
-  .field-row { flex-direction: column; }
-  .grid-3 > *, .grid-4 > * { grid-column: auto; }
-}
-img, canvas, svg { max-width: 100%; }
 
-/* ---------- Stat blocks ---------- */
+/* ============================================================
+   7. STAT BLOCKS
+   ============================================================ */
 .stat {
   display: flex;
   flex-direction: column;
@@ -211,10 +355,19 @@ img, canvas, svg { max-width: 100%; }
   color: var(--text);
   line-height: 1.1;
 }
-.stat-value .unit { font-size: 14px; color: var(--text-dim); font-weight: 500; margin-left: 4px; }
-.stat-value.accent { color: var(--accent); }
+.stat-value .unit {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-weight: 500;
+  margin-left: 4px;
+}
+.stat-value.accent {
+  color: var(--accent);
+}
 
-/* ---------- Forms ---------- */
+/* ============================================================
+   8. FORMS
+   ============================================================ */
 label {
   display: block;
   font-size: 12.5px;
@@ -231,9 +384,8 @@ input, select, textarea {
   color: var(--text);
   border-radius: calc(var(--radius) * 0.6);
   padding: 9px 11px;
-  /* 16px minimum stops iOS Safari from auto-zooming (and visually shunting the
-     layout) when a field gets focus - this is the fix for the "header jumps"
-     bug on mobile. */
+  /* 16px minimum stops iOS Safari from auto-zooming (and visually
+     shunting the layout) when a field gets focus. */
   font-size: 16px;
   font-family: var(--font-body);
   outline: none;
@@ -241,15 +393,41 @@ input, select, textarea {
   -webkit-appearance: none;
   appearance: none;
 }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
-input[type="range"] { padding: 0; accent-color: var(--accent); height: 24px; }
-input[type="date"] { color-scheme: light dark; }
-.field { margin-bottom: 14px; }
-.field-row { display: flex; gap: 10px; }
-.field-row > * { flex: 1; min-width: 0; }
-.hint { font-size: 12px; color: var(--text-dim); margin-top: 4px; line-height: 1.5; }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+}
+input[type="color"] {
+  padding: 3px;
+  height: 38px;
+  cursor: pointer;
+}
+input[type="range"] {
+  padding: 0;
+  accent-color: var(--accent);
+  height: 24px;
+}
+input[type="date"] {
+  color-scheme: light dark;
+}
+.field {
+  margin-bottom: 14px;
+}
+.field-row {
+  display: flex;
+  gap: 10px;
+}
+.field-row > * {
+  flex: 1;
+  min-width: 0;
+}
+.hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  line-height: 1.5;
+}
 
+/* ---- Buttons ---- */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -263,22 +441,46 @@ input[type="date"] { color-scheme: light dark; }
   font-weight: 500;
   transition: transform 0.1s, border-color 0.15s, background 0.15s;
 }
-.btn:hover { border-color: var(--accent); }
-.btn:active { transform: scale(0.98); }
+.btn:hover {
+  border-color: var(--accent);
+}
+.btn:active {
+  transform: scale(0.98);
+}
 .btn-primary {
   background: var(--accent);
   color: #05100E;
   border-color: var(--accent);
   font-weight: 600;
 }
-.btn-primary:hover { filter: brightness(1.08); }
-.btn-danger { color: var(--danger); }
-.btn-sm { padding: 6px 10px; font-size: 12.5px; }
-.btn-ghost { background: transparent; border-color: transparent; color: var(--text-dim); }
-.btn-ghost:hover { color: var(--text); background: var(--surface-2); }
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+.btn-danger {
+  color: var(--danger);
+}
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+.btn-ghost:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
 
-/* ---------- Tables / lists ---------- */
-.row-list { display: flex; flex-direction: column; gap: 8px; }
+/* ============================================================
+   9. TABLES / LISTS
+   ============================================================ */
+.row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .exercise-row {
   display: flex;
   align-items: center;
@@ -288,10 +490,23 @@ input[type="date"] { color-scheme: light dark; }
   border-radius: calc(var(--radius) * 0.6);
   padding: 10px 12px;
 }
-.exercise-row .name { font-weight: 600; font-size: 13.5px; flex: 1; }
-.exercise-row .meta { font-size: 12px; color: var(--text-dim); font-family: var(--font-mono); }
-.exercise-row .kcal { font-family: var(--font-mono); color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
-
+.exercise-row .name {
+  font-weight: 600;
+  font-size: 13.5px;
+  flex: 1;
+}
+.exercise-row .meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+.exercise-row .kcal {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
 .day-tab {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -302,10 +517,23 @@ input[type="date"] { color-scheme: light dark; }
   font-weight: 500;
   white-space: nowrap;
 }
-.day-tab.active { background: var(--accent); color: #05100E; border-color: var(--accent); font-weight: 600; }
-.day-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 18px; }
+.day-tab.active {
+  background: var(--accent);
+  color: #05100E;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.day-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 18px;
+}
 
-/* ---------- Progress bar (goal) ---------- */
+/* ============================================================
+   10. PROGRESS BARS & BADGES
+   ============================================================ */
 .progress-track {
   height: 10px;
   border-radius: 999px;
@@ -320,8 +548,14 @@ input[type="date"] { color-scheme: light dark; }
   border-radius: 999px;
   transition: width 0.4s ease;
 }
-.progress-labels { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); margin-top: 6px; }
-
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
 .badge {
   display: inline-block;
   padding: 3px 9px;
@@ -332,11 +566,22 @@ input[type="date"] { color-scheme: light dark; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.badge-ok { background: rgba(127,216,122,0.15); color: var(--ok); }
-.badge-warn { background: rgba(245,198,76,0.15); color: var(--warn); }
-.badge-danger { background: rgba(240,101,77,0.15); color: var(--danger); }
+.badge-ok {
+  background: rgba(127, 216, 122, 0.15);
+  color: var(--ok);
+}
+.badge-warn {
+  background: rgba(245, 198, 76, 0.15);
+  color: var(--warn);
+}
+.badge-danger {
+  background: rgba(240, 101, 77, 0.15);
+  color: var(--danger);
+}
 
-/* ---------- Macro bars ---------- */
+/* ============================================================
+   11. MACRO BARS
+   ============================================================ */
 .macro-bar-track {
   height: 8px;
   border-radius: 999px;
@@ -344,10 +589,20 @@ input[type="date"] { color-scheme: light dark; }
   overflow: hidden;
   border: 1px solid var(--border);
 }
-.macro-bar-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+.macro-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
 
-/* ---------- Theme swatches ---------- */
-.swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; }
+/* ============================================================
+   12. THEME PICKER
+   ============================================================ */
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 10px;
+}
 .swatch {
   height: 46px;
   border-radius: calc(var(--radius) * 0.6);
@@ -355,9 +610,12 @@ input[type="date"] { color-scheme: light dark; }
   cursor: pointer;
   transition: transform 0.1s, border-color 0.15s;
 }
-.swatch:hover { transform: scale(1.05); }
-.swatch.active { border-color: var(--text); }
-
+.swatch:hover {
+  transform: scale(1.05);
+}
+.swatch.active {
+  border-color: var(--text);
+}
 .theme-preset-card {
   border: 2px solid var(--border);
   border-radius: var(--radius);
@@ -365,20 +623,45 @@ input[type="date"] { color-scheme: light dark; }
   cursor: pointer;
   transition: border-color 0.15s, transform 0.1s;
 }
-.theme-preset-card:hover { transform: translateY(-2px); }
-.theme-preset-card.active { border-color: var(--accent); }
-.theme-preset-swatch { height: 40px; border-radius: 6px; margin-bottom: 8px; display: flex; overflow: hidden; }
-.theme-preset-swatch span { flex: 1; }
-.theme-preset-name { font-size: 12.5px; font-weight: 600; }
+.theme-preset-card:hover {
+  transform: translateY(-2px);
+}
+.theme-preset-card.active {
+  border-color: var(--accent);
+}
+.theme-preset-swatch {
+  height: 40px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: flex;
+  overflow: hidden;
+}
+.theme-preset-swatch span {
+  flex: 1;
+}
+.theme-preset-name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
 
+/* ============================================================
+   13. EMPTY STATES
+   ============================================================ */
 .empty-state {
   text-align: center;
   padding: 40px 20px;
   color: var(--text-dim);
   font-size: 13.5px;
 }
-.empty-state .big { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+.empty-state .big {
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
 
+/* ============================================================
+   14. FOOD SEARCH
+   ============================================================ */
 .food-search-results {
   position: absolute;
   z-index: 10;
@@ -390,11 +673,24 @@ input[type="date"] { color-scheme: light dark; }
   overflow-y: auto;
   box-shadow: var(--shadow);
 }
-.food-search-item { padding: 10px 12px; font-size: 13.5px; border-bottom: 1px solid var(--border); }
-.food-search-item:hover { background: var(--surface-2); }
-.food-search-item:last-child { border-bottom: none; }
-.search-wrap { position: relative; }
+.food-search-item {
+  padding: 10px 12px;
+  font-size: 13.5px;
+  border-bottom: 1px solid var(--border);
+}
+.food-search-item:hover {
+  background: var(--surface-2);
+}
+.food-search-item:last-child {
+  border-bottom: none;
+}
+.search-wrap {
+  position: relative;
+}
 
+/* ============================================================
+   15. TOAST
+   ============================================================ */
 .toast {
   position: fixed;
   bottom: 24px;
@@ -409,20 +705,50 @@ input[type="date"] { color-scheme: light dark; }
   z-index: 100;
   animation: toast-in 0.2s ease;
 }
-@keyframes toast-in { from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: translateY(0);} }
-
-.pill-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
-.pill-toggle button { border: none; background: transparent; color: var(--text-dim); padding: 7px 14px; font-size: 12.5px; font-weight: 500; }
-.pill-toggle button.active { background: var(--accent); color: #05100E; font-weight: 600; }
-
-hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
-
-.icon-btn {
-  background: transparent; border: none; color: var(--text-dim);
-  font-size: 16px; padding: 4px 8px; border-radius: 6px;
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.icon-btn:hover { color: var(--danger); background: var(--surface-2); }
 
+/* ============================================================
+   16. PILL TOGGLE & MISC SMALL UTILITIES
+   ============================================================ */
+.pill-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pill-toggle button {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.pill-toggle button.active {
+  background: var(--accent);
+  color: #05100E;
+  font-weight: 600;
+}
+hr.div {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 18px 0;
+}
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.icon-btn:hover {
+  color: var(--danger);
+  background: var(--surface-2);
+}
 .section-note {
   font-size: 12.5px;
   color: var(--text-dim);
@@ -433,7 +759,9 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   margin-bottom: 16px;
 }
 
-/* ---------- Dismissible / collapsible notices ---------- */
+/* ============================================================
+   17. COLLAPSIBLE NOTICES
+   ============================================================ */
 .notice {
   display: flex;
   align-items: flex-start;
@@ -447,21 +775,31 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   color: var(--text-dim);
   line-height: 1.55;
 }
-.notice strong { color: var(--text); }
-.notice .notice-body { flex: 1; }
+.notice strong {
+  color: var(--text);
+}
+.notice .notice-body {
+  flex: 1;
+}
 .notice-collapse-btn {
   flex-shrink: 0;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-dim);
-  width: 20px; height: 20px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   font-size: 12px;
   line-height: 1;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
 }
-.notice-collapse-btn:hover { color: var(--text); border-color: var(--accent); }
+.notice-collapse-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
 .notice-pill {
   display: inline-flex;
   align-items: center;
@@ -475,12 +813,21 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   margin-bottom: 16px;
   cursor: pointer;
 }
-.notice-pill:hover { color: var(--text); border-color: var(--accent); }
-.notice-pill .plus { font-size: 13px; line-height: 1; }
+.notice-pill:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.notice-pill .plus {
+  font-size: 13px;
+  line-height: 1;
+}
 
-/* ---------- Tooltips ----------
-   Hover shows on desktop; a matching onclick toggles a .tip-open class for
-   mobile taps (JS-added), since touch devices have no hover state. */
+/* ============================================================
+   18. TOOLTIPS
+   Hover shows on desktop; a matching onclick toggles a .tip-open
+   class for mobile taps (added in js/app.js), since touch devices
+   have no hover state.
+   ============================================================ */
 .tip {
   position: relative;
   cursor: help;
@@ -508,10 +855,19 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   text-transform: none;
   letter-spacing: normal;
 }
-.tip:hover .tip-box, .tip.tip-open .tip-box { display: block; }
-.tip-box .tip-title { color: var(--accent); font-weight: 600; display: block; margin-bottom: 3px; }
+.tip:hover .tip-box, .tip.tip-open .tip-box {
+  display: block;
+}
+.tip-box .tip-title {
+  color: var(--accent);
+  font-weight: 600;
+  display: block;
+  margin-bottom: 3px;
+}
 
-/* ---------- Ramping-set exercise block ---------- */
+/* ============================================================
+   19. EXERCISE BLOCKS (ramping sets)
+   ============================================================ */
 .exercise-block {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -525,8 +881,18 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   gap: 10px;
   margin-bottom: 8px;
 }
-.exercise-block-header .name { font-weight: 600; font-size: 13.5px; flex: 1; }
-.exercise-block-header .kcal { font-family: var(--font-mono); color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.exercise-block-header .name {
+  font-weight: 600;
+  font-size: 13.5px;
+  flex: 1;
+}
+.exercise-block-header .kcal {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
 .set-row {
   display: flex;
   align-items: center;
@@ -535,18 +901,38 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   font-size: 13px;
   border-top: 1px dashed var(--border);
 }
-.set-row:first-child { border-top: none; }
-.set-row .set-label { color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; width: 44px; flex-shrink: 0; }
-.set-row .set-detail { flex: 1; }
-.set-row input[type="checkbox"] { width: auto; flex-shrink: 0; }
-.set-row.set-done .set-detail { opacity: 0.5; text-decoration: line-through; }
+.set-row:first-child {
+  border-top: none;
+}
+.set-row .set-label {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  width: 44px;
+  flex-shrink: 0;
+}
+.set-row .set-detail {
+  flex: 1;
+}
+.set-row input[type="checkbox"] {
+  width: auto;
+  flex-shrink: 0;
+}
+.set-row.set-done .set-detail {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
 
-/* ---------- Quick day navigation ---------- */
-/* ---------- Date navigation (prev/next arrows either side of a date field
-   or label). Used for every "back / date / forward" control in the app.
-   Explicit percentage flex-basis so this can never get stretched by a
-   parent's own flex rules (e.g. a wrapping .field-row that gives all its
-   children flex:1), that was the earlier bug that turned these into ovals. ---------- */
+/* ============================================================
+   20. DATE NAVIGATION
+   Back/date/forward controls used everywhere a date field exists
+   (Food, Goals, Workout Log). Explicit percentage flex-basis so
+   this can never get stretched by a parent's own flex rules (e.g.
+   a wrapping .field-row that gives all its children flex:1), that
+   was the bug that turned these into stretched ovals earlier.
+   Buttons are rectangular, 10%/10% width with a 70% middle bar and
+   a 5% gap on each side.
+   ============================================================ */
 .date-nav-row {
   display: flex;
   align-items: stretch;
@@ -560,16 +946,40 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   color: var(--text);
   border-radius: calc(var(--radius) * 0.5);
   font-size: 16px;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 36px;
 }
-.date-nav-btn:hover { border-color: var(--accent); }
-.date-nav-bar { flex: 0 0 70%; min-width: 0; }
-.date-nav-label { text-align: center; font-weight: 600; font-size: 14px; }
-.date-nav-label .sub { display: block; font-size: 11px; color: var(--text-dim); font-weight: 400; margin-top: 1px; }
+.date-nav-btn:hover {
+  border-color: var(--accent);
+}
+.date-nav-bar {
+  flex: 0 0 70%;
+  min-width: 0;
+}
+.date-nav-label {
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+.date-nav-label .sub {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-top: 1px;
+}
 
-/* ---------- Quick-add serving chips ---------- */
-.chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+/* ============================================================
+   21. CHIPS
+   ============================================================ */
+.chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
 .chip {
   border: 1px solid var(--border);
   background: var(--bg);
@@ -579,10 +989,20 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   font-size: 12px;
   font-weight: 500;
 }
-.chip:hover { border-color: var(--accent); color: var(--text); }
-.chip.active { background: var(--accent); color: #05100E; border-color: var(--accent); font-weight: 600; }
+.chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.chip.active {
+  background: var(--accent);
+  color: #05100E;
+  border-color: var(--accent);
+  font-weight: 600;
+}
 
-/* ---------- Energy breakdown bar ---------- */
+/* ============================================================
+   22. ENERGY BREAKDOWN BAR
+   ============================================================ */
 .energy-bar {
   display: flex;
   height: 28px;
@@ -590,19 +1010,66 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   overflow: hidden;
   border: 1px solid var(--border);
 }
-.energy-bar-seg { display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; font-family: var(--font-mono); color: #05100E; white-space: nowrap; overflow: hidden; }
-.energy-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
-.energy-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
-.energy-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.energy-bar-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #05100E;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.energy-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 12px;
+}
+.energy-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.energy-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
 
-/* ---------- Body-fat category table ---------- */
-.bf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.bf-table th, .bf-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-.bf-table th { color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
-.bf-table tr.current-row { background: var(--surface-2); }
-.bf-table tr.current-row td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+/* ============================================================
+   23. BODY-FAT TABLE
+   ============================================================ */
+.bf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.bf-table th, .bf-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.bf-table th {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.bf-table tr.current-row {
+  background: var(--surface-2);
+}
+.bf-table tr.current-row td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 
-/* ---------- Pet companion ---------- */
+/* ============================================================
+   24. PET COMPANION
+   ============================================================ */
 .pet-sprite {
   position: relative;
   display: inline-flex;
@@ -612,18 +1079,70 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   margin: 0 auto;
   user-select: none;
 }
-.pet-sprite:active { transform: scale(0.95); }
-.pet-base { line-height: 1; }
-.pet-overlay { position: absolute; line-height: 1; pointer-events: none; }
-.pet-slot-hat { top: -38%; left: 50%; transform: translateX(-50%); }
-.pet-slot-eyewear { top: 18%; left: 50%; transform: translateX(-50%); }
-.pet-slot-face { top: 42%; left: 50%; transform: translateX(-50%); }
-.pet-slot-neck { top: 68%; left: 50%; transform: translateX(-50%); }
-.pet-slot-accessory { top: 5%; right: -10%; }
+.pet-sprite:active {
+  transform: scale(0.95);
+}
+.pet-base {
+  line-height: 1;
+}
+.pet-overlay {
+  position: absolute;
+  line-height: 1;
+  pointer-events: none;
+}
+.pet-slot-hat {
+  top: -38%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pet-slot-eyewear {
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pet-slot-face {
+  top: 42%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pet-slot-neck {
+  top: 68%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pet-slot-accessory {
+  top: 5%;
+  right: -10%;
+}
+.pet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+}
+.pet-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.6);
+  padding: 14px 8px;
+  color: var(--text);
+}
+.pet-pick:hover {
+  border-color: var(--accent);
+}
+.pet-pick-emoji {
+  font-size: 32px;
+  line-height: 1;
+}
+.pet-pick-name {
+  font-size: 12px;
+  color: var(--text-dim);
+}
 
-.pet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
-
-/* ---------- Feeding tray ---------- */
+/* ---- Feeding tray ---- */
 .pet-tray {
   display: flex;
   flex-wrap: wrap;
@@ -644,17 +1163,15 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   padding: 6px 8px;
   cursor: pointer;
 }
-.pet-tray-item:hover { border-color: var(--accent); transform: scale(1.08); }
-.pet-tray-item:active { transform: scale(0.95); }
-.pet-pick {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  background: var(--bg); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.6);
-  padding: 14px 8px; color: var(--text);
+.pet-tray-item:hover {
+  border-color: var(--accent);
+  transform: scale(1.08);
 }
-.pet-pick:hover { border-color: var(--accent); }
-.pet-pick-emoji { font-size: 32px; line-height: 1; }
-.pet-pick-name { font-size: 12px; color: var(--text-dim); }
+.pet-tray-item:active {
+  transform: scale(0.95);
+}
 
+/* ---- Floating pet widget (bottom-right, every page) ---- */
 .pet-widget {
   position: fixed;
   bottom: calc(18px + env(safe-area-inset-bottom));
@@ -676,13 +1193,24 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   box-shadow: var(--shadow);
   margin-bottom: 8px;
 }
-.pet-widget .pet-sprite { filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); }
+.pet-widget .pet-sprite {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
 @media (max-width: 900px), (max-aspect-ratio: 0.65) {
-  .pet-widget { bottom: calc(12px + env(safe-area-inset-bottom)); right: calc(12px + env(safe-area-inset-right)); }
-  .pet-widget-bubble { display: none; }
+  .pet-widget {
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    right: calc(12px + env(safe-area-inset-right));
+  }
+  .pet-widget-bubble {
+    display: none;
+  }
 }
 
-/* ---------- Rest timer widget (opposite corner from the pet widget) ---------- */
+/* ============================================================
+   25. REST TIMER WIDGET
+   Floating, bottom-left, opposite corner from the pet widget so
+   the two never overlap if both are active at once.
+   ============================================================ */
 .rest-timer-widget {
   position: fixed;
   bottom: calc(18px + env(safe-area-inset-bottom));
@@ -695,12 +1223,43 @@ hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   z-index: 40;
   min-width: 150px;
 }
-.rest-timer-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; font-family: var(--font-mono); }
-.rest-timer-time { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--accent); line-height: 1.2; }
-.rest-timer-track { height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin: 6px 0; }
-.rest-timer-fill { height: 100%; background: var(--accent); border-radius: 999px; }
-.rest-timer-controls { display: flex; gap: 4px; }
-.rest-timer-controls .btn { padding: 4px 7px; font-size: 11px; }
+.rest-timer-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+}
+.rest-timer-time {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.2;
+}
+.rest-timer-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+  margin: 6px 0;
+}
+.rest-timer-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+.rest-timer-controls {
+  display: flex;
+  gap: 4px;
+}
+.rest-timer-controls .btn {
+  padding: 4px 7px;
+  font-size: 11px;
+}
 @media (max-width: 900px), (max-aspect-ratio: 0.65) {
-  .rest-timer-widget { bottom: calc(12px + env(safe-area-inset-bottom)); left: calc(12px + env(safe-area-inset-left)); }
+  .rest-timer-widget {
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: calc(12px + env(safe-area-inset-left));
+  }
 }
