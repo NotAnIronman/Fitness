@@ -2,7 +2,7 @@
    SERVICE WORKER - Caches this app's own files so it still works offline. 
    ====================================================================== */
 
-const CACHE_VERSION = 'forge-v8';
+const CACHE_VERSION = 'forge-v9';
 
 const PRECACHE_URLS = [
   './',
