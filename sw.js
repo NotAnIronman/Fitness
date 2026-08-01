@@ -23,7 +23,7 @@
    in sync with this).
    ============================================================ */
 
-const CACHE_VERSION = 'forge-v16';
+const CACHE_VERSION = 'forge-v17';
 
 const PRECACHE_URLS = [
   './',
@@ -34,9 +34,11 @@ const PRECACHE_URLS = [
   './js/data.js',
   './js/storage.js',
   './js/calc.js',
+  './js/guidance.js',
   './js/theme.js',
   './js/gamestats.js',
   './js/app.js',
+  './js/health.js',
   './js/workouts.js',
   './js/resttimer.js',
   './js/log.js',
