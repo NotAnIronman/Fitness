@@ -23,13 +23,14 @@
    in sync with this).
    ============================================================ */
 
-const CACHE_VERSION = 'forge-v15';
+const CACHE_VERSION = 'forge-v16';
 
 const PRECACHE_URLS = [
   './',
   './index.html',
   './manifest.json',
   './css/styles.css',
+  './assets/us-states-cc0.svg',
   './js/data.js',
   './js/storage.js',
   './js/calc.js',
