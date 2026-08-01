@@ -17,7 +17,7 @@ const ONBOARDING_STEPS = [
   },
   {
     route: 'home', title: 'Choose your guidance level',
-    body: `Tell me how familiar you are with health and fitness. This only changes how much optional explanation you see—it never hides safety warnings.`,
+    body: `Tell me how familiar you are with health and fitness. This only changes how much optional explanation you see, it never hides safety warnings.`,
     action: 'Show the guidance slider',
   },
   {
