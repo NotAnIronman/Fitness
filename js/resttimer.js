@@ -153,9 +153,18 @@ function formatRestTime(totalSeconds) {
 // Log page (checking Progress, etc.) without losing the countdown.
 function renderRestTimerWidget() {
   if (!_restTimer.totalSeconds) return '';
+  if (STATE.uiPrefs.restTimerWidgetCollapsed) {
+    return `
+      <div class="rest-timer-widget minimized" role="timer" aria-live="polite" aria-label="Rest timer: ${escapeAttr(_restTimer.label)}">
+        <button class="rest-timer-minimized-btn" onclick="toggleRememberedPanel('restTimerWidgetCollapsed')" aria-label="Expand rest timer">
+          <span>${escapeAttr(_restTimer.label)}</span><strong id="rest-timer-seconds">${formatRestTime(_restTimer.secondsLeft)}</strong><span aria-hidden="true">□</span>
+        </button>
+      </div>
+    `;
+  }
   return `
     <div class="rest-timer-widget" role="timer" aria-live="polite" aria-label="Rest timer: ${escapeAttr(_restTimer.label)}">
-      <div class="rest-timer-label">${escapeAttr(_restTimer.label)}</div>
+      <div class="rest-timer-label"><span>${escapeAttr(_restTimer.label)}</span><button class="rest-timer-minimize" onclick="toggleRememberedPanel('restTimerWidgetCollapsed')" aria-label="Minimize rest timer">−</button></div>
       <div class="rest-timer-time" id="rest-timer-seconds">${formatRestTime(_restTimer.secondsLeft)}</div>
       <div class="rest-timer-track"><div class="rest-timer-fill" id="rest-timer-bar" style="width:${_restTimer.totalSeconds ? (_restTimer.secondsLeft / _restTimer.totalSeconds) * 100 : 0}%;"></div></div>
       <div class="rest-timer-controls">

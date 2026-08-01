@@ -167,7 +167,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
 
   // Ramping/per-set weights get their own block with one line per set, instead
   // of being crammed into a single hard-to-read row.
-  if (ex.inputMode === 'setsRepsWeight' && e.perSetWeights && e.perSetWeights.length) {
+  if (e.perSetWeights && e.perSetWeights.length) {
     const allDone = e.perSetWeights.every(s => s.completed);
     const setRows = e.perSetWeights.map((s, i) => {
       const displayLoad = Math.round(workoutWeightToDisplay(s.weightIsPerSide ? s.weightKg * 2 : s.weightKg) * 10) / 10;
@@ -176,7 +176,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
         <div class="set-row ${s.completed ? 'set-done' : ''}">
           <span class="set-label">SET ${i + 1}</span>
           ${showCheckbox ? `<input type="checkbox" ${s.completed ? 'checked' : ''} ${checkboxAttr}>` : ''}
-          <span class="set-detail">${s.reps} reps @ ${displayLoad} ${workoutWeightUnit()}${s.weightIsPerSide ? ' per side' : ''}</span>
+          <span class="set-detail">${s.reps} reps${displayLoad ? ` @ ${displayLoad} ${workoutWeightUnit()}${s.weightIsPerSide ? ' per side' : ''}` : ''}</span>
           ${target.scope === 'log' ? `<button class="icon-btn" onclick="quickStartRestTimer(${inlineArg(`Rest, ${ex.name} set ${i + 1}`)})" title="Start rest timer" aria-label="Start rest timer after ${escapeAttr(ex.name)} set ${i + 1}">\u23F1</button>` : ''}
         </div>
       `;
@@ -482,30 +482,31 @@ function submitExerciseForm(scope, dayId) {
   if (!entry) return;
 
   const editing = UI.editingExercise;
+  const loggedScope = editing ? editing.scope : scope;
+  const finalEntry = loggedScope === 'log' ? expandExerciseEntryForLog(entry, false) : entry;
   if (editing) {
-    entry.id = editing.entryId; // preserve identity so progress history stays continuous
-    entry.completed = findExerciseEntry(editing)?.completed || false;
+    finalEntry.id = editing.entryId; // preserve identity so progress history stays continuous
+    finalEntry.completed = findExerciseEntry(editing)?.completed || false;
     if (editing.scope === 'workout') {
       const day = STATE.workoutPlan.days.find(d => d.id === editing.dayId);
       const idx = day.exercises.findIndex(e => e.id === editing.entryId);
-      if (idx >= 0) day.exercises[idx] = entry;
+      if (idx >= 0) day.exercises[idx] = finalEntry;
     } else {
       const list = STATE.workoutLog[editing.date];
       const idx = list.findIndex(e => e.id === editing.entryId);
-      if (idx >= 0) list[idx] = entry;
+      if (idx >= 0) list[idx] = finalEntry;
     }
   } else if (scope === 'workout') {
-    STATE.workoutPlan.days.find(d => d.id === dayId).exercises.push(entry);
+    STATE.workoutPlan.days.find(d => d.id === dayId).exercises.push(finalEntry);
   } else {
-    ensureLogDate(UI.logDate).push(entry);
+    ensureLogDate(UI.logDate).push(finalEntry);
   }
 
-  const ex = EXERCISE_LIBRARY.find(x => x.id === entry.exerciseId);
-  const label = ex ? ex.name : (entry.custom ? entry.custom.name : 'Exercise');
-  const key = entry.exerciseId || ('custom:' + (entry.custom ? entry.custom.name : label));
-  recordRecentExercise(key, label, entry);
+  const ex = EXERCISE_LIBRARY.find(x => x.id === finalEntry.exerciseId);
+  const label = ex ? ex.name : (finalEntry.custom ? finalEntry.custom.name : 'Exercise');
+  const key = finalEntry.exerciseId || ('custom:' + (finalEntry.custom ? finalEntry.custom.name : label));
+  recordRecentExercise(key, label, finalEntry);
 
-  const loggedScope = editing ? editing.scope : scope;
   if (loggedScope === 'log' && typeof markPetInteraction === 'function') markPetInteraction(3);
 
   UI.addExerciseOpenFor = null;
@@ -579,7 +580,7 @@ function quickAddRecent(key, scope, dayId) {
   if (scope === 'workout') {
     STATE.workoutPlan.days.find(d => d.id === dayId).exercises.push(entry);
   } else {
-    ensureLogDate(UI.logDate).push(entry);
+    ensureLogDate(UI.logDate).push(expandExerciseEntryForLog(entry, true));
   }
   UI.addExerciseOpenFor = null;
   UI.logAddOpen = false;

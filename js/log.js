@@ -22,28 +22,14 @@ function renderLog() {
   const rows = entries.map(e => renderExerciseRow(e, bw, { scope: 'log', date }, true)).join('');
 
   const sessionFeedback = dayKcal > 0 ? getSessionIntensityFeedback(dayKcal) : null;
+  const restCollapsed = STATE.uiPrefs.restTimerPanelCollapsed;
+  const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
 
   return `
     <div class="page-head">
       <p class="page-eyebrow">Log</p>
       <h1 class="page-title">Workout log</h1>
       <p class="page-sub">What you actually did on a given day. Copy a plan day in, check items off as you go, and edit anything that doesn't match reality.</p>
-    </div>
-
-    ${compliance ? renderComplianceCard(compliance) : ''}
-
-    ${renderStepCheckinCard(date)}
-
-    <div class="card">
-      <div class="card-title">Rest timer</div>
-      <div class="field-row" style="align-items:end;">
-        <div class="field" style="margin-bottom:0;">
-          <label>Default duration (seconds)</label>
-          <input type="number" data-focus-id="rest-timer-default" min="10" max="900" step="15" value="${STATE.workoutPlan.restTimerSeconds}" onchange="updateRestTimerDefault(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
-        </div>
-        <button class="btn btn-primary" onclick="quickStartRestTimer('Rest')" style="flex: 0 0 auto;">Start rest timer</button>
-      </div>
-      <p class="hint">Also available next to any exercise or set below, once you're actually logging (not on the Plan template).</p>
     </div>
 
     <div class="card">
@@ -61,6 +47,24 @@ function renderLog() {
         </div>
         ${!isToday ? `<button class="btn btn-sm" onclick="setLogDate('${todayISO()}')" style="flex: 0 0 auto; white-space: nowrap;">Jump to today</button>` : ''}
       </div>
+    </div>
+
+    ${compliance ? renderComplianceCard(compliance) : ''}
+
+    ${renderStepCheckinCard(date)}
+
+    <div class="card">
+      <div class="card-title">Rest timer <button class="panel-collapse-btn" onclick="toggleRememberedPanel('restTimerPanelCollapsed')" aria-expanded="${!restCollapsed}" aria-label="${restCollapsed ? 'Expand' : 'Minimize'} rest timer settings">${restCollapsed ? '+' : '−'}</button></div>
+      ${restCollapsed ? `<p class="panel-collapsed-summary">Default: ${STATE.workoutPlan.restTimerSeconds} seconds</p>` : `
+      <div class="field-row" style="align-items:end;">
+        <div class="field" style="margin-bottom:0;">
+          <label>Default duration (seconds)</label>
+          <input type="number" data-focus-id="rest-timer-default" min="10" max="900" step="15" value="${STATE.workoutPlan.restTimerSeconds}" onchange="updateRestTimerDefault(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
+        </div>
+        <button class="btn btn-primary" onclick="quickStartRestTimer('Rest')" style="flex: 0 0 auto;">Start rest timer</button>
+      </div>
+      ${expert ? '' : `<p class="hint">Also available next to any exercise or set below, once you're actually logging (not on the Plan template).</p>`}
+      `}
     </div>
 
     <div class="card">
@@ -208,8 +212,7 @@ function toggleLogSetDone(entryId, setIndex) {
 }
 
 function copyExerciseForLog(entry) {
-  const copy = cloneExerciseEntry(entry, { id: uid(), completed: false });
-  if (copy.perSetWeights) copy.perSetWeights.forEach(s => { s.completed = false; });
+  const copy = expandExerciseEntryForLog(cloneExerciseEntry(entry, { id: uid(), completed: false }), true);
   return copy;
 }
 

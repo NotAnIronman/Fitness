@@ -315,6 +315,7 @@ function renderWaterCard(date) {
   const target = getWaterTargetMl(p.weightKg, p.sex);
   const toDisplay = ml => isImperial ? `${(ml / 29.5735).toFixed(0)} fl oz` : `${(ml / 1000).toFixed(2)} L`;
   const pct = target ? Math.min(100, (loggedMl / target) * 100) : 0;
+  const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
 
   return `
     <div class="card">
@@ -325,7 +326,7 @@ function renderWaterCard(date) {
           <div class="stat"><div class="stat-label">Target</div><div class="stat-value accent" style="font-size:20px;">${toDisplay(target)}</div></div>
         </div>
         <div class="macro-bar-track" style="margin-bottom:12px;"><div class="macro-bar-fill" style="width:${pct}%; background:#38BDF8;"></div></div>
-        <p class="hint" style="margin-bottom:10px;">A practical starting estimate of ~33 ml/kg. This is not a precise requirement: water in food and other drinks contributes, while heat, altitude, illness, and sweat losses can raise needs. Thirst and urine color are useful day-to-day checks. Reach this logged-fluid target for the day and your pet earns one water item.</p>
+        <p class="hint" style="margin-bottom:10px;">${expert ? 'Starting estimate: 33 ml/kg. Adjust for thirst, heat, and sweat.' : 'A practical starting estimate of ~33 ml/kg. This is not a precise requirement: water in food and other drinks contributes, while heat, altitude, illness, and sweat losses can raise needs. Thirst and urine color are useful day-to-day checks. Reach this logged-fluid target for the day and your pet earns one water item.'}</p>
         <div class="chip-row">
           ${[250, 350, 500, 750].map(ml => `<button class="chip" onclick="logWater(${ml}, '${date}')">+${toDisplay(ml)}</button>`).join('')}
           <button class="chip" onclick="undoLastWater('${date}')">Undo last</button>

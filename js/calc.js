@@ -48,6 +48,22 @@ function cloneExerciseEntry(entry, overrides) {
   return Object.assign(cloned, overrides || {});
 }
 
+function expandExerciseEntryForLog(entry, resetCompletion) {
+  const out = cloneExerciseEntry(entry);
+  if (!out.perSetWeights && Number(out.sets) >= 2 && Number(out.reps) > 0) {
+    out.perSetWeights = Array.from({ length: Math.min(100, Math.round(Number(out.sets))) }, () => ({
+      reps: Number(out.reps) || 0,
+      weightKg: Number(out.weightKg) || 0,
+      weightIsPerSide: !!out.weightIsPerSide,
+      completed: resetCompletion ? false : !!out.completed,
+    }));
+    out.sets = out.perSetWeights.length;
+  }
+  if (resetCompletion && out.perSetWeights) out.perSetWeights.forEach(set => { set.completed = false; });
+  if (resetCompletion) out.completed = false;
+  return out;
+}
+
 function hasCompletedWork(entry) {
   if (!entry) return false;
   if (entry.perSetWeights && entry.perSetWeights.length) {
@@ -330,12 +346,14 @@ function checkIntakeSafety(loggedKcal, sex) {
 function explainExerciseCalc(entry, ex, bodyWeightKg) {
   if (!ex || !bodyWeightKg) return 'Add your weight on Home to see this breakdown.';
   const bwRound = Math.round(bodyWeightKg);
+  const bwLb = Math.round(kgToLb(bodyWeightKg));
   if (ex.inputMode === 'duration' || ex.inputMode === 'distance') {
     const rawMin = Number(entry.durationMin) || 0;
     const adj = (ex.category === 'Strength' && typeof ex.restAdjust === 'number') ? ex.restAdjust : 1;
     const minutes = rawMin * adj;
     const kcal = metCalories(ex.met, bodyWeightKg, minutes);
-    let text = `MET ${ex.met} x 3.5 x ${bwRound}kg bodyweight / 200 x ${minutes.toFixed(1)} min = ${Math.round(kcal)} kcal.`;
+    const perMinute = rawMin > 0 ? kcal / rawMin : 0;
+    let text = `<strong>${perMinute.toFixed(2)} kcal/min × ${rawMin} min = ${Math.round(kcal)} kcal</strong><br>Uses ${bwLb} lb (${bwRound} kg) bodyweight and MET ${ex.met}: ${ex.met} × 3.5 × ${bwRound} kg ÷ 200 × ${minutes.toFixed(1)} active min.`;
     if (adj < 1) text += ` (${rawMin} min logged, only ${Math.round(adj * 100)}% counted as active time since most of a gym session is rest between sets, not continuous effort.)`;
     return text;
   }
@@ -347,7 +365,10 @@ function explainExerciseCalc(entry, ex, bodyWeightKg) {
   const totalReps = entry.perSetWeights
     ? entry.perSetWeights.reduce((s, st) => s + (Number(st.reps) || 0), 0)
     : (Number(entry.sets) || 0) * (Number(entry.reps) || 0);
-  return `Each rep is assumed to take about 3.5 seconds of active effort, plus a share of the rest between sets, ${totalReps} total reps works out to roughly ${minutes.toFixed(1)} min of estimated active time${heavyAdjustment > 1 ? ', including a small adjustment for a load above bodyweight' : ''}. At MET ${ex.met} for a ${bwRound}kg bodyweight, that's MET ${ex.met} x 3.5 x ${bwRound}kg / 200 x ${minutes.toFixed(1)} min = ${Math.round(kcal)} kcal.`;
+  const perRep = totalReps > 0 ? kcal / totalReps : 0;
+  const load = effectiveLoadKg(entry);
+  const metric = load > 0 ? `; top load ${Math.round(kgToLb(load))} lb (${Math.round(load)} kg)` : '';
+  return `<strong>${perRep.toFixed(2)} kcal/rep × ${totalReps} reps = ${Math.round(kcal)} kcal</strong><br>Uses ${bwLb} lb (${bwRound} kg) bodyweight${metric}, MET ${ex.met}, about 3.5 seconds per rep, and a small low-intensity allowance between sets. Estimated active time: ${minutes.toFixed(1)} min${heavyAdjustment > 1 ? ' (load-above-bodyweight adjustment included)' : ''}.`;
 }
 
 // --- Strength standard ranking ---

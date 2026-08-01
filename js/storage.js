@@ -57,6 +57,9 @@ function defaultState() {
       noticeOverrides: {},  // notice id -> explicit open/closed choice
       knowledgeLevel: 0,    // 0 beginner ... 4 "I know it all"
       knowledgeLevelTouched: false,
+      stepCheckinCollapsed: false,
+      restTimerPanelCollapsed: false,
+      restTimerWidgetCollapsed: false,
     },
     onboarding: {
       active: true,          // fresh installs get a guided, pet-led setup
@@ -274,12 +277,15 @@ function normalizeStateShape(state) {
     name: String(day.name || 'Training day').slice(0, 100),
     exercises: Array.isArray(day.exercises) ? day.exercises.slice(0, 500).map(normalizeExerciseEntry).filter(Boolean) : [],
   }));
-  state.workoutLog = normalizeDatedLog(state.workoutLog, entry => normalizeExerciseEntry(entry));
+  state.workoutLog = normalizeDatedLog(state.workoutLog, normalizeLoggedExerciseEntry);
   state.foodLog = normalizeDatedLog(state.foodLog, normalizeFoodEntry);
   if (!Array.isArray(state.uiPrefs.collapsedNotices)) state.uiPrefs.collapsedNotices = [];
   if (!isPlainObject(state.uiPrefs.noticeOverrides)) state.uiPrefs.noticeOverrides = {};
   state.uiPrefs.knowledgeLevel = Math.max(0, Math.min(4, Math.round(Number(state.uiPrefs.knowledgeLevel) || 0)));
   state.uiPrefs.knowledgeLevelTouched = !!state.uiPrefs.knowledgeLevelTouched;
+  state.uiPrefs.stepCheckinCollapsed = !!state.uiPrefs.stepCheckinCollapsed;
+  state.uiPrefs.restTimerPanelCollapsed = !!state.uiPrefs.restTimerPanelCollapsed;
+  state.uiPrefs.restTimerWidgetCollapsed = !!state.uiPrefs.restTimerWidgetCollapsed;
   if (!Array.isArray(state.onboarding.skippedSteps)) state.onboarding.skippedSteps = [];
   state.onboarding.step = Math.max(0, Math.min(7, Math.round(Number(state.onboarding.step) || 0)));
   state.onboarding.active = !!state.onboarding.active;
@@ -339,6 +345,21 @@ function normalizeExerciseEntry(entry) {
       completed: !!set.completed,
     }));
   }
+  return out;
+}
+
+// V16 logs every multi-set exercise as individually completable work. Plans
+// remain compact templates; only dated log entries are expanded during load.
+function normalizeLoggedExerciseEntry(entry) {
+  const out = normalizeExerciseEntry(entry);
+  if (!out || out.perSetWeights || Number(out.sets) < 2 || Number(out.reps) <= 0) return out;
+  out.perSetWeights = Array.from({ length: Math.min(100, Math.round(Number(out.sets))) }, () => ({
+    reps: Number(out.reps) || 0,
+    weightKg: Number(out.weightKg) || 0,
+    weightIsPerSide: !!out.weightIsPerSide,
+    completed: !!out.completed,
+  }));
+  out.sets = out.perSetWeights.length;
   return out;
 }
 

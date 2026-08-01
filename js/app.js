@@ -56,7 +56,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v15';
+const APP_VERSION = 'forge-v16';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -789,12 +789,18 @@ function renderStepCheckinCard(date) {
   const isToday = date === todayISO();
   const entry = STATE.dailyCheckins[date];
   const ctx = buildGameContext();
+  const collapsed = STATE.uiPrefs.stepCheckinCollapsed;
+  const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
   return `
     <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 4 ? 'onboarding-focus' : ''}">
       <div class="card-title">
         ${isToday ? "Today's step check-in" : 'Step check-in'}
-        ${isToday && ctx.checkinStreak > 1 ? `<span class="badge badge-ok">${ctx.checkinStreak} day streak</span>` : ''}
+        <span class="panel-heading-actions">
+          ${isToday && ctx.checkinStreak > 1 ? `<span class="badge badge-ok">${ctx.checkinStreak} day streak</span>` : ''}
+          <button class="panel-collapse-btn" onclick="toggleRememberedPanel('stepCheckinCollapsed')" aria-expanded="${!collapsed}" aria-label="${collapsed ? 'Expand' : 'Minimize'} step check-in">${collapsed ? '+' : '−'}</button>
+        </span>
       </div>
+      ${collapsed ? `<p class="panel-collapsed-summary">${entry ? `${Number(entry.steps).toLocaleString()} steps logged` : 'No steps logged'}</p>` : `
       <div class="field-row" style="align-items:end;">
         <div class="field" style="margin-bottom:0;">
           <label>${isToday ? 'Steps so far today' : 'Steps that day'}</label>
@@ -802,9 +808,16 @@ function renderStepCheckinCard(date) {
         </div>
         ${entry ? `<div class="badge badge-ok" style="flex-shrink:0;">Logged</div>` : ''}
       </div>
-      <p class="hint" style="margin-top:8px;">${isToday ? "Update it any time today, your latest number is what counts." : "Backfilling a missed day is fine, it still counts toward your average."} Your rolling average (currently ${getStepsAverage().toLocaleString()}/day) is what drives your activity level, not a one-time guess, so the more you check in, the more accurate it gets.</p>
+      <p class="hint" style="margin-top:8px;">${expert ? `Rolling average: ${getStepsAverage().toLocaleString()}/day.` : `${isToday ? "Update it any time today, your latest number is what counts." : "Backfilling a missed day is fine, it still counts toward your average."} Your rolling average (currently ${getStepsAverage().toLocaleString()}/day) is what drives your activity level, not a one-time guess, so the more you check in, the more accurate it gets.`}</p>
+      `}
     </div>
   `;
+}
+
+function toggleRememberedPanel(key) {
+  if (!['stepCheckinCollapsed', 'restTimerPanelCollapsed', 'restTimerWidgetCollapsed'].includes(key)) return;
+  STATE.uiPrefs[key] = !STATE.uiPrefs[key];
+  persist(); render();
 }
 
 function submitStepCheckin(value, date) {

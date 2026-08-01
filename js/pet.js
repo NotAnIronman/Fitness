@@ -345,12 +345,14 @@ function renderTravelCard() {
 }
 
 /* ---------- V14 choose-your-own-route travel ---------- */
-const PET_US_MAP_LAYOUT = {
-  WA:[1,1],OR:[1,2],CA:[1,4],AK:[1,8],HI:[2,8],ID:[2,2],NV:[2,4],AZ:[3,5],MT:[3,1],WY:[3,3],UT:[3,4],
-  CO:[4,4],NM:[4,5],ND:[5,1],SD:[5,2],NE:[5,3],KS:[5,4],OK:[5,5],TX:[5,6],MN:[6,1],IA:[6,3],MO:[6,4],
-  AR:[6,5],LA:[6,6],WI:[7,2],IL:[7,3],MS:[7,6],MI:[8,2],IN:[8,3],KY:[8,4],TN:[8,5],AL:[8,6],OH:[9,3],
-  WV:[9,4],GA:[9,6],PA:[10,3],VA:[10,4],NC:[10,5],SC:[10,6],FL:[10,7],NY:[11,2],NJ:[11,3],MD:[11,4],
-  VT:[12,1],MA:[12,2],CT:[12,3],DE:[12,4],NH:[13,1],RI:[13,3],ME:[14,1],
+// Label anchors for the CC0 Albers-projection map. Keeping these in one small
+// table makes later hand-tuning straightforward without touching the SVG.
+const PET_US_MAP_POINTS = {
+  WA:[8,13],OR:[7,28],CA:[8,50],AK:[16,88],HI:[34,91],ID:[18,27],NV:[17,45],AZ:[24,63],MT:[29,17],WY:[29,35],UT:[25,47],
+  CO:[37,48],NM:[36,66],ND:[47,19],SD:[47,33],NE:[48,44],KS:[49,54],OK:[52,64],TX:[49,77],MN:[57,23],IA:[59,42],MO:[61,54],
+  AR:[62,66],LA:[64,79],WI:[65,31],IL:[68,47],MS:[68,74],MI:[72,29],IN:[73,47],KY:[74,56],TN:[73,63],AL:[74,73],OH:[78,44],
+  WV:[80,52],GA:[80,72],PA:[84,39],VA:[83,55],NC:[84,62],SC:[83,68],FL:[84,86],NY:[88,30],NJ:[91,42],MD:[88,49],
+  VT:[91,20],MA:[95,29],CT:[93,35],DE:[91,50],NH:[94,18],RI:[97,35],ME:[97,11],
 };
 
 function getState(key) { return US_STATES.find(state => state.key === key); }
@@ -476,12 +478,14 @@ function evaluateTravelArrivals() {
 }
 
 function renderTravelMap(travel) {
-  return `<div class="pet-us-map" role="group" aria-label="Choose a destination state">${US_STATES.map(state => {
-    const pos = PET_US_MAP_LAYOUT[state.key];
+  return `<div class="pet-us-map-scroll"><div class="pet-us-map" role="group" aria-label="Choose a destination state">
+    <img class="pet-us-map-art" src="assets/us-states-cc0.svg" alt="Map of the United States with state boundaries">
+    <div class="pet-us-map-markers">${US_STATES.map(state => {
+    const pos = PET_US_MAP_POINTS[state.key];
     const tierKey = travel.medals[state.key], tier = tierKey ? travelTier(tierKey) : null;
     const status = state.key === travel.currentState ? 'Here' : tier ? tier.label : 'Not completed';
-    return `<button class="pet-map-state ${tier ? `completed tier-${tierKey}` : ''} ${state.key === travel.currentState ? 'current' : ''} ${state.key === travel.targetState ? 'target' : ''}" style="grid-column:${pos[0]};grid-row:${pos[1]};" onclick="selectPetTravelTarget('${state.key}')" title="${escapeAttr(state.name)}: ${status}" aria-label="${escapeAttr(state.name)}, ${status}"><span>${state.key}</span><small>${state.key === travel.currentState ? '●' : tier ? tier.medal : '○'}</small></button>`;
-  }).join('')}</div>`;
+    return `<button class="pet-map-state ${tier ? `completed tier-${tierKey}` : ''} ${state.key === travel.currentState ? 'current' : ''} ${state.key === travel.targetState ? 'target' : ''}" style="left:${pos[0]}%;top:${pos[1]}%;" onclick="selectPetTravelTarget('${state.key}')" title="${escapeAttr(state.name)}: ${status}" aria-label="${escapeAttr(state.name)}, ${status}"><span>${state.key}</span><small>${state.key === travel.currentState ? '●' : tier ? tier.medal : '○'}</small></button>`;
+  }).join('')}</div></div></div><p class="map-credit">Map outline: <a href="https://commons.wikimedia.org/wiki/File:Blank_US_Map_(states_only).svg" target="_blank" rel="noopener noreferrer">Heitordp / Wikimedia Commons, CC0</a></p>`;
 }
 
 function renderTravelCard() {
