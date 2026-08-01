@@ -149,6 +149,14 @@ function renderSecretSettings() {
         </div>
         <button class="btn ${STATE.pet.enabled ? 'btn-primary' : ''}" onclick="togglePetEnabled()">${STATE.pet.enabled ? 'Disable' : 'Enable'} pet</button>
       </div>
+      <hr class="div">
+      <div class="field-row" style="align-items:center;">
+        <div class="field" style="margin-bottom:0;">
+          <label>Guided setup</label>
+          <p class="hint">Restart Coach's data-aware walkthrough of profile, training, steps, goals, and food logging.</p>
+        </div>
+        <button class="btn" onclick="restartOnboarding()">Restart guide</button>
+      </div>
     </div>
   `;
 }
@@ -397,6 +405,10 @@ function toggleSecretPanel() {
 }
 function togglePetEnabled() {
   STATE.pet.enabled = !STATE.pet.enabled;
+  if (!STATE.pet.enabled && STATE.onboarding.active) {
+    STATE.onboarding.active = false;
+    STATE.onboarding.dismissed = true;
+  }
   persist(); render();
   if (STATE.pet.enabled) toast('Pet companion enabled! Check the new Pet tab.');
 }

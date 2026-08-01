@@ -74,9 +74,9 @@ function renderWorkouts() {
       </div>
     </div>
 
-    ${notice('cardio-step-overlap-general', `Logging running or walking as a workout below can overlap with the step count above. If a walk/run is already part of your normal daily steps, log it in one place only.`)}
+    ${notice('cardio-step-overlap-general', `Logging running or walking as a workout below can overlap with the step count above. If a walk/run is already part of your normal daily steps, log it in one place only.`, { maxLevel: 3, defaultOpenThrough: 1, brief: 'Avoid double counting: if a walk or run is already included in your step total, do not also log the same activity as extra exercise.' })}
 
-    ${notice('strength-consistency-2026', `<strong>Keep strength training simple enough to repeat:</strong> current evidence supports many combinations of loads, sets, and equipment. Consistency is the biggest step up from doing none; multiple sets can help muscle growth and heavier loads tend to favor maximal strength, but training to failure and advanced programming are not required for most healthy adults.`)}
+    ${notice('strength-consistency-2026', `<strong>Keep strength training simple enough to repeat:</strong> current evidence supports many combinations of loads, sets, and equipment. Consistency is the biggest step up from doing none; multiple sets can help muscle growth and heavier loads tend to favor maximal strength, but training to failure and advanced programming are not required for most healthy adults.`, { maxLevel: 2, defaultOpenThrough: 1, brief: '<strong>Repeatable beats elaborate:</strong> multiple sets can support muscle growth and heavier loads favor maximal strength, but failure training and advanced programming are optional.' })}
 
     ${notice('weight-vs-calories-tip', `
       <strong>Heads up on what "burning more calories" actually depends on:</strong> lifting heavier doesn't directly burn a lot
@@ -85,7 +85,7 @@ function renderWorkouts() {
       calorie burn happens outside the gym, workouts are usually a smaller slice of the day than people assume (see the energy
       breakdown on Home). And muscle itself is built during recovery, not during the set, your body repairs and grows tissue in
       the hours and days after training, which is part of why rest and protein matter as much as the workout itself.
-    `)}
+    `, { maxLevel: 0, defaultOpenThrough: 0 })}
 
     <div class="day-tabs">
       ${days.map(d => `
@@ -108,7 +108,7 @@ function renderDayCard(day, bw) {
   const sessionFeedback = dayKcal > 0 ? getSessionIntensityFeedback(dayKcal) : null;
 
   return `
-    <div class="card">
+    <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 3 ? 'onboarding-focus' : ''}">
       <div class="card-title">
         <span>
           <input type="text" data-focus-id="day-name-${day.id}" value="${escapeAttr(day.name)}" onchange="renameDay('${day.id}', this.value)" onkeydown="if(event.key==='Enter') this.blur()"

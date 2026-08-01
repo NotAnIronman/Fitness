@@ -29,7 +29,7 @@ function renderBodyFat() {
       doesn't separate muscle from fat. A body-fat estimate adds context, but no field method is perfectly accurate. Use the same
       method and conditions each time and focus on the trend alongside strength, waist measurements, health, and how you feel.
       This isn't about judgment: bodies vary a lot, and a number here does not define health or worth.
-    `)}
+    `, { maxLevel: 2, defaultOpenThrough: 1, brief: '<strong>Use body-fat estimates as trends, not verdicts:</strong> repeat the same method under similar conditions and consider strength, waist, health, and how you feel.' })}
 
     <div class="card">
       <div class="card-title">
@@ -95,7 +95,7 @@ function renderBodyFat() {
       <strong>A word on BMI:</strong> BMI is a screening measure, not a diagnosis. It does not distinguish muscle from fat and can
       misrepresent some individuals, especially highly muscular people. Tape-based body-fat estimates also have error. For personal
       decisions, look at several signals together: weight trend, waist trend, fitness, blood pressure/labs when available, and clinician context.
-    `)}
+    `, { maxLevel: 2, defaultOpenThrough: 1, brief: '<strong>BMI and tape estimates are screening tools, not diagnoses.</strong> Use several health and performance signals together.' })}
   `;
 }
 

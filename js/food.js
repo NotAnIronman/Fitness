@@ -41,11 +41,11 @@ function renderFood() {
       <p class="page-sub">Search for and log things you've eaten.</p>
     </div>
 
-    ${notice('food-hidden-cals', `The most common reason a diet stops adding up isn't the meals, it's the extras: sauces, dressings, cooking oil, coffee add-ins, drinks, and snacks eaten standing up. If your numbers aren't matching your results, that's usually the first place to look.`)}
+    ${notice('food-hidden-cals', `The most common reason a diet stops adding up isn't the meals, it's the extras: sauces, dressings, cooking oil, coffee add-ins, drinks, and snacks eaten standing up. If your numbers aren't matching your results, that's usually the first place to look.`, { maxLevel: 2, defaultOpenThrough: 1, brief: `If intake and results do not match, first check easy-to-miss extras such as oils, sauces, drinks, and snacks.` })}
 
-    ${notice('food-pet-reward', `Your pet earns a meal once your day's total logged calories pass ${STATE.profile.sex === 'male' ? MIN_SAFE_INTAKE.male : MIN_SAFE_INTAKE.female} kcal, not once per item logged, so it rewards actually eating enough for the day rather than logging lots of tiny entries.`)}
+    ${notice('food-pet-reward', `Your pet earns a meal once your day's total logged calories pass ${STATE.profile.sex === 'male' ? MIN_SAFE_INTAKE.male : MIN_SAFE_INTAKE.female} kcal, not once per item logged, so it rewards actually eating enough for the day rather than logging lots of tiny entries.`, { maxLevel: 0, defaultOpenThrough: 0 })}
 
-    ${notice('food-no-scale', renderPortionGuideBody())}
+    ${notice('food-no-scale', renderPortionGuideBody(), { maxLevel: 1, defaultOpenThrough: 0 })}
 
     ${compliance && compliance.status !== 'good' ? `
       <div class="card">
@@ -68,7 +68,7 @@ function renderFood() {
     ${renderWaterCard(date)}
 
     <div class="grid grid-2" style="margin-bottom:16px;">
-      <div class="card">
+      <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 6 ? 'onboarding-focus' : ''}">
         <div class="card-title">
           Log food
           <div style="display:flex; gap:6px;">

@@ -1,5 +1,5 @@
 /* ============================================================
-   PET COMPANION (secret feature, off by default)
+   PET COMPANION (enabled on fresh installs; optional in secret settings)
    Points are earned by completing workouts, hitting step check-ins/
    goals, and staying within calorie target, plus a weekly bonus for
    hitting everything all week. Spend points in the shop on wearables.

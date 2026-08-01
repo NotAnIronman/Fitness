@@ -36,7 +36,7 @@ function renderGoals() {
     </div>
 
     <div class="grid grid-2">
-      <div class="card">
+      <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 5 ? 'onboarding-focus' : ''}">
         <div class="card-title">Set your goal</div>
         <div class="field">
           <label>Target weight (${unit})</label>

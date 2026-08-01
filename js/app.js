@@ -56,7 +56,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v14';
+const APP_VERSION = 'forge-v15';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -155,18 +155,69 @@ document.addEventListener('keydown', (e) => {
 // ---------- Dismissible / collapsible notice component ----------
 // Used for one-time explanatory tips that would otherwise clutter the page.
 // Collapses to a small pill; state persists per notice id.
-function notice(id, bodyHtml) {
-  const collapsed = STATE.uiPrefs.collapsedNotices.includes(id);
-  if (collapsed) {
+function notice(id, bodyHtml, options) {
+  options = options || {};
+  const level = STATE.uiPrefs.knowledgeLevel || 0;
+  const maxLevel = options.maxLevel == null ? 2 : options.maxLevel;
+  if (level > maxLevel) return '';
+  const override = STATE.uiPrefs.noticeOverrides[id];
+  const legacyCollapsed = STATE.uiPrefs.collapsedNotices.includes(id);
+  const defaultOpenThrough = options.defaultOpenThrough == null ? 1 : options.defaultOpenThrough;
+  const isOpen = typeof override === 'boolean' ? override : (!legacyCollapsed && level <= defaultOpenThrough);
+  const content = level >= 2 && options.brief ? options.brief : bodyHtml;
+  if (!isOpen) {
     return `<button type="button" class="notice-pill" onclick="toggleNotice('${id}')"><span class="plus">+</span> Show tip</button>`;
   }
-  return `<div class="notice"><div class="notice-body">${bodyHtml}</div><button class="notice-collapse-btn" onclick="toggleNotice('${id}')" title="Collapse this tip">-</button></div>`;
+  return `<div class="notice"><div class="notice-body">${content}</div><button class="notice-collapse-btn" onclick="toggleNotice('${id}')" title="Collapse this tip">-</button></div>`;
 }
 function toggleNotice(id) {
-  const list = STATE.uiPrefs.collapsedNotices;
-  const idx = list.indexOf(id);
-  if (idx >= 0) list.splice(idx, 1); else list.push(id);
+  const current = STATE.uiPrefs.noticeOverrides[id];
+  const level = STATE.uiPrefs.knowledgeLevel || 0;
+  const defaultOpen = !STATE.uiPrefs.collapsedNotices.includes(id) && level <= 1;
+  STATE.uiPrefs.noticeOverrides[id] = !(typeof current === 'boolean' ? current : defaultOpen);
   persist(); render();
+}
+
+const KNOWLEDGE_LEVELS = [
+  { label: 'Complete Beginner', detail: 'All tips and fuller explanations' },
+  { label: 'I know a little bit', detail: 'Most guidance, without beginner-only tips' },
+  { label: 'I know a decent amount', detail: 'Useful tips, usually kept compact' },
+  { label: 'I know a lot', detail: 'Only important guidance' },
+  { label: 'I know it all!', detail: 'No optional tips or explanations' },
+];
+
+function setKnowledgeLevel(value) {
+  STATE.uiPrefs.knowledgeLevel = Math.max(0, Math.min(4, Math.round(Number(value) || 0)));
+  STATE.uiPrefs.knowledgeLevelTouched = true;
+  if (STATE.uiPrefs.knowledgeLevel === 4 && STATE.onboarding.active) {
+    STATE.onboarding.active = false;
+    STATE.onboarding.dismissed = true;
+  }
+  persist(); render();
+}
+
+function previewKnowledgeLevel(value) {
+  const index = Math.max(0, Math.min(4, Math.round(Number(value) || 0)));
+  const label = document.getElementById('knowledge-level-label');
+  const detail = document.getElementById('knowledge-level-detail');
+  if (label) label.textContent = KNOWLEDGE_LEVELS[index].label;
+  if (detail) detail.textContent = KNOWLEDGE_LEVELS[index].detail;
+}
+
+function confirmDefaultKnowledgeLevel() { setKnowledgeLevel(STATE.uiPrefs.knowledgeLevel || 0); }
+
+function renderKnowledgeLevelCard() {
+  const level = STATE.uiPrefs.knowledgeLevel || 0;
+  const info = KNOWLEDGE_LEVELS[level];
+  return `<div class="card knowledge-card ${STATE.onboarding.active && STATE.onboarding.step === 2 ? 'onboarding-focus' : ''}">
+    <div class="card-title">How much guidance would you like?</div>
+    <div class="knowledge-heading"><strong id="knowledge-level-label">${info.label}</strong><span>${level + 1} / 5</span></div>
+    <input type="range" min="0" max="4" step="1" value="${level}" aria-label="Health and fitness familiarity" oninput="previewKnowledgeLevel(this.value)" onchange="setKnowledgeLevel(this.value)">
+    <div class="knowledge-scale" aria-hidden="true"><span>More guidance</span><span>Cleaner app</span></div>
+    <p class="hint" id="knowledge-level-detail">${info.detail}</p>
+    ${!STATE.uiPrefs.knowledgeLevelTouched ? `<button class="btn btn-sm" onclick="confirmDefaultKnowledgeLevel()">Keep Complete Beginner</button>` : ''}
+    <p class="hint">You can change this any time. Safety warnings and calculation limits always remain visible.</p>
+  </div>`;
 }
 
 // ---------- Derived helpers shared across views ----------
@@ -424,6 +475,7 @@ const NAV_ITEMS = [
 
 function doRender() {
   applyTheme(STATE.theme);
+  document.documentElement.setAttribute('data-knowledge-level', String(STATE.uiPrefs.knowledgeLevel || 0));
   const previousSidebar = document.querySelector('.sidebar');
   const previousSidebarScroll = previousSidebar ? previousSidebar.scrollLeft : 0;
 
@@ -458,7 +510,8 @@ function doRender() {
         </div>
       </div>
       <div class="main" id="main-content"></div>
-      ${renderPetWidget(UI.route)}
+      ${typeof renderOnboardingGuide === 'function' ? renderOnboardingGuide() : ''}
+      ${STATE.onboarding.active ? '' : renderPetWidget(UI.route)}
       ${typeof renderRestTimerWidget === 'function' ? renderRestTimerWidget() : ''}
     </div>
   `;
@@ -562,7 +615,7 @@ function renderHome() {
     ${renderStepCheckinSummary()}
 
     <div class="grid grid-2">
-      <div class="card">
+      <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 1 ? 'onboarding-focus' : ''}">
         <div class="card-title">
           Basic info
           <div class="pill-toggle">
@@ -685,16 +738,18 @@ function renderHome() {
       })()}
     </div>
 
+    ${renderKnowledgeLevelCard()}
+
     ${notice('home-movement-basics', `
       <strong>A useful starting target:</strong> current U.S. guidance recommends that adults work toward 150-300 minutes of moderate aerobic activity each week (or the vigorous equivalent), plus muscle-strengthening activity on at least 2 days. Start below that if needed and build gradually; some activity is better than none.
-    `)}
+    `, { maxLevel: 3, defaultOpenThrough: 1, brief: '<strong>General target:</strong> work toward 150-300 weekly minutes of moderate aerobic activity plus strength work on at least 2 days; build gradually.' })}
 
     ${notice('home-why-activity', `
       Most calculators ask you to self-report "activity level," and people reliably overestimate it.
       This app instead reads your actual <a href="#" onclick="navigate('workouts'); return false;">workout plan</a>:
       how many days you train, how long sessions run, and your typical step count, and picks the closest activity
       multiplier for you. Build out your week on the Workout Plan page to sharpen this estimate.
-    `)}
+    `, { maxLevel: 0, defaultOpenThrough: 0 })}
   `;
 }
 
@@ -735,7 +790,7 @@ function renderStepCheckinCard(date) {
   const entry = STATE.dailyCheckins[date];
   const ctx = buildGameContext();
   return `
-    <div class="card">
+    <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 4 ? 'onboarding-focus' : ''}">
       <div class="card-title">
         ${isToday ? "Today's step check-in" : 'Step check-in'}
         ${isToday && ctx.checkinStreak > 1 ? `<span class="badge badge-ok">${ctx.checkinStreak} day streak</span>` : ''}

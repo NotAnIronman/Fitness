@@ -54,6 +54,16 @@ function defaultState() {
     },
     uiPrefs: {
       collapsedNotices: [], // notice ids the person has collapsed to a pill
+      noticeOverrides: {},  // notice id -> explicit open/closed choice
+      knowledgeLevel: 0,    // 0 beginner ... 4 "I know it all"
+      knowledgeLevelTouched: false,
+    },
+    onboarding: {
+      active: true,          // fresh installs get a guided, pet-led setup
+      dismissed: false,
+      step: 0,
+      skippedSteps: [],
+      completedAt: null,
     },
     // Most-recent-first quick-pick lists, since "recent items" was the most
     // requested feature: exercise ids (or 'custom:Name' for custom ones), and
@@ -91,12 +101,12 @@ function defaultState() {
     dailyWater: {
       // 'YYYY-MM-DD': { ml: 1500 }
     },
-    // Secret pet companion feature, off by default. Toggled from a hidden panel
-    // in Themes.
+    // Pet companion is on for fresh installs because it guides first-run setup.
+    // The hidden Themes setting remains available as the opt-out.
     pet: {
-      enabled: false,
-      species: null,          // key into PET_ANIMALS, null until first chosen
-      name: '',
+      enabled: true,
+      species: 'dog',         // fresh installs start with a friendly setup guide
+      name: 'Coach',
       equipped: {},           // slot -> item key, e.g. { hat: 'top_hat' }
       ownedItems: [],         // item keys purchased from the shop
       points: 0,
@@ -163,7 +173,14 @@ function loadState() {
     const parsed = JSON.parse(raw);
     // shallow-merge with defaults so new fields added later don't break old saves
     const def = defaultState();
-    return normalizeStateShape(deepMerge(def, sanitizeJsonValue(parsed)));
+    const normalized = normalizeStateShape(deepMerge(def, sanitizeJsonValue(parsed)));
+    // V14 and older users already have an established app state. Do not drop
+    // them into a first-run tutorial just because the onboarding field is new.
+    if (!isPlainObject(parsed.onboarding)) {
+      normalized.onboarding.active = false;
+      normalized.onboarding.dismissed = true;
+    }
+    return normalized;
   } catch (e) {
     console.error('Failed to load state, resetting.', e);
     return defaultState();
@@ -228,7 +245,7 @@ function sanitizeJsonValue(value, depth) {
 function normalizeStateShape(state) {
   const def = defaultState();
   if (!isPlainObject(state)) throw new Error('Backup root must be an object.');
-  const objectFields = ['profile', 'goal', 'workoutPlan', 'workoutLog', 'foodLog', 'bodyFat', 'uiPrefs', 'usdaCache', 'dailyCheckins', 'dailyWater', 'pet', 'achievements', 'theme'];
+  const objectFields = ['profile', 'goal', 'workoutPlan', 'workoutLog', 'foodLog', 'bodyFat', 'uiPrefs', 'onboarding', 'usdaCache', 'dailyCheckins', 'dailyWater', 'pet', 'achievements', 'theme'];
   objectFields.forEach(key => { if (!isPlainObject(state[key])) state[key] = def[key]; });
   const arrayFields = ['weightLog', 'recentExercises', 'recentFoods', 'savedMeals', 'foodIndexPool'];
   arrayFields.forEach(key => { if (!Array.isArray(state[key])) state[key] = def[key]; });
@@ -260,6 +277,13 @@ function normalizeStateShape(state) {
   state.workoutLog = normalizeDatedLog(state.workoutLog, entry => normalizeExerciseEntry(entry));
   state.foodLog = normalizeDatedLog(state.foodLog, normalizeFoodEntry);
   if (!Array.isArray(state.uiPrefs.collapsedNotices)) state.uiPrefs.collapsedNotices = [];
+  if (!isPlainObject(state.uiPrefs.noticeOverrides)) state.uiPrefs.noticeOverrides = {};
+  state.uiPrefs.knowledgeLevel = Math.max(0, Math.min(4, Math.round(Number(state.uiPrefs.knowledgeLevel) || 0)));
+  state.uiPrefs.knowledgeLevelTouched = !!state.uiPrefs.knowledgeLevelTouched;
+  if (!Array.isArray(state.onboarding.skippedSteps)) state.onboarding.skippedSteps = [];
+  state.onboarding.step = Math.max(0, Math.min(7, Math.round(Number(state.onboarding.step) || 0)));
+  state.onboarding.active = !!state.onboarding.active;
+  state.onboarding.dismissed = !!state.onboarding.dismissed;
   if (!Array.isArray(state.pet.ownedItems)) state.pet.ownedItems = [];
   if (!Array.isArray(state.pet.travelCelebrated)) state.pet.travelCelebrated = [];
   if (!isPlainObject(state.pet.travel)) state.pet.travel = def.pet.travel;
@@ -341,7 +365,12 @@ function normalizeDatedLog(log, normalizeEntry) {
 
 function prepareImportedState(incoming) {
   if (!isPlainObject(incoming)) throw new Error('That file is not a Forge backup object.');
-  return normalizeStateShape(deepMerge(defaultState(), sanitizeJsonValue(incoming)));
+  const prepared = normalizeStateShape(deepMerge(defaultState(), sanitizeJsonValue(incoming)));
+  if (!isPlainObject(incoming.onboarding)) {
+    prepared.onboarding.active = false;
+    prepared.onboarding.dismissed = true;
+  }
+  return prepared;
 }
 
 function uid() {
