@@ -56,7 +56,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v16';
+const APP_VERSION = 'forge-v17';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -506,7 +506,7 @@ function doRender() {
           </button>
         `).join('')}
         <div class="sidebar-foot">
-          Data saved locally in this browser only. No account, no sync yet.
+          Local-first. No Forge account. Transfer tools are in Themes.
         </div>
       </div>
       <div class="main" id="main-content"></div>
@@ -791,6 +791,7 @@ function renderStepCheckinCard(date) {
   const ctx = buildGameContext();
   const collapsed = STATE.uiPrefs.stepCheckinCollapsed;
   const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
+  const stepSource = typeof formatStepSource === 'function' ? formatStepSource(entry) : '';
   return `
     <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 4 ? 'onboarding-focus' : ''}">
       <div class="card-title">
@@ -806,7 +807,8 @@ function renderStepCheckinCard(date) {
           <label>${isToday ? 'Steps so far today' : 'Steps that day'}</label>
           <input type="number" data-focus-id="step-checkin" min="0" step="500" value="${entry ? entry.steps : ''}" placeholder="e.g. 8000" onchange="submitStepCheckin(this.value, '${date}')" onkeydown="if(event.key==='Enter') this.blur()">
         </div>
-        ${entry ? `<div class="badge badge-ok" style="flex-shrink:0;">Logged</div>` : ''}
+        ${entry ? `<div class="badge badge-ok" style="flex-shrink:0;">${stepSource ? `Imported · ${escapeAttr(stepSource)}` : 'Logged'}</div>` : ''}
+        ${typeof renderHealthImportControl === 'function' ? renderHealthImportControl(date) : ''}
       </div>
       <p class="hint" style="margin-top:8px;">${expert ? `Rolling average: ${getStepsAverage().toLocaleString()}/day.` : `${isToday ? "Update it any time today, your latest number is what counts." : "Backfilling a missed day is fine, it still counts toward your average."} Your rolling average (currently ${getStepsAverage().toLocaleString()}/day) is what drives your activity level, not a one-time guess, so the more you check in, the more accurate it gets.`}</p>
       `}
@@ -820,10 +822,15 @@ function toggleRememberedPanel(key) {
   persist(); render();
 }
 
-function submitStepCheckin(value, date) {
+function submitStepCheckin(value, date, source = 'manual') {
   date = date || todayISO();
   const steps = Math.max(0, Number(value) || 0);
-  STATE.dailyCheckins[date] = { steps };
+  const safeSources = ['manual', 'apple-health', 'health-connect', 'samsung-health'];
+  const safeSource = safeSources.includes(source) ? source : 'manual';
+  STATE.dailyCheckins[date] = {
+    steps,
+    ...(safeSource === 'manual' ? {} : { source: safeSource, importedAt: new Date().toISOString() }),
+  };
   persist();
   if (date === todayISO() && typeof markPetInteraction === 'function') markPetInteraction(3);
   const granted = (date === todayISO() && typeof evaluatePetDailyRewards === 'function') ? evaluatePetDailyRewards() : [];

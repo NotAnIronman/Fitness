@@ -17,6 +17,8 @@ function defaultState() {
       unitSystem: 'imperial', // 'imperial' | 'metric'
     },
     goal: {
+      focus: 'general',       // general | fat_loss | muscle_gain | recomposition | performance
+      trainingExperience: 'new', // new | consistent | advanced
       targetWeightKg: null,
       targetDate: null,     // ISO date string
       startWeightKg: null,
@@ -312,9 +314,26 @@ function normalizeStateShape(state) {
   state.profile.age = age >= 18 && age <= 100 ? age : null;
   state.profile.heightCm = heightCm >= 120 && heightCm <= 230 ? heightCm : null;
   state.profile.weightKg = weightKg >= 20 && weightKg <= 400 ? weightKg : null;
+  state.goal.focus = ['general', 'fat_loss', 'muscle_gain', 'recomposition', 'performance'].includes(state.goal.focus) ? state.goal.focus : 'general';
+  state.goal.trainingExperience = ['new', 'consistent', 'advanced'].includes(state.goal.trainingExperience) ? state.goal.trainingExperience : 'new';
+  state.dailyCheckins = normalizeDailyCheckins(state.dailyCheckins);
   state.workoutPlan.restTimerSeconds = Math.max(10, Math.min(900, Number(state.workoutPlan.restTimerSeconds) || 90));
   state.workoutPlan.stepsPerDay = Math.max(0, Math.min(200000, Number(state.workoutPlan.stepsPerDay) || 0));
   return state;
+}
+
+function normalizeDailyCheckins(checkins) {
+  const out = {};
+  Object.keys(checkins || {}).slice(0, 5000).forEach(date => {
+    const entry = checkins[date];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isPlainObject(entry)) return;
+    const steps = Math.max(0, Math.min(1000000, Math.round(Number(entry.steps) || 0)));
+    const normalized = { steps };
+    if (['manual', 'apple-health', 'health-connect', 'samsung-health'].includes(entry.source)) normalized.source = entry.source;
+    if (typeof entry.importedAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(entry.importedAt)) normalized.importedAt = entry.importedAt.slice(0, 40);
+    out[date] = normalized;
+  });
+  return out;
 }
 
 function safeStateId(value) {

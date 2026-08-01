@@ -35,6 +35,8 @@ function renderWorkouts() {
 
     ${!bw ? `<div class="section-note">Set your weight on the Home page first. Calorie estimates need it.</div>` : ''}
 
+    ${renderGoalTrainingLens()}
+
     <div class="grid grid-3" style="margin-bottom:16px;">
       <div class="card"><div class="stat"><div class="stat-label">Training days / week</div><div class="stat-value">${summary.workoutDaysPerWeek}</div></div></div>
       <div class="card">
@@ -98,6 +100,15 @@ function renderWorkouts() {
       <div class="card"><div class="empty-state"><div class="big">+</div>Add a training day to start building your plan.</div></div>
     `}
   `;
+}
+
+function renderGoalTrainingLens() {
+  const guidance = getGoalGuidance();
+  const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
+  return `<div class="card goal-training-lens">
+    <div class="card-title">Training lens: ${escapeAttr(guidance.focus.label)}</div>
+    <p class="hint">${escapeAttr(guidance.training)}${expert ? '' : ` ${escapeAttr(guidance.nuance)}`}</p>
+  </div>`;
 }
 
 function renderDayCard(day, bw) {

@@ -116,7 +116,7 @@ function renderThemes() {
       </div>
       ${UI.pasteSyncOpen ? `
         <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:12px; margin-bottom:16px;">
-          <p class="hint" style="margin-bottom:8px;">Paste the code copied from your other device. This replaces what's currently on this device, only do this on the device you want to overwrite.</p>
+          <p class="hint" style="margin-bottom:8px;">Paste the code copied from your other device. Forge merges dated logs and keeps the incoming copy when the same setting or date exists on both devices. Export a backup first if both devices contain changes you cannot recreate.</p>
           <textarea id="paste-sync-text" data-focus-id="paste-sync-text" rows="4" style="font-family:var(--font-mono); font-size:11px;" placeholder="Paste sync code here"></textarea>
           <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="importFromPasteSync()">Sync from pasted code</button>
         </div>

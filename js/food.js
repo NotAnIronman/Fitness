@@ -140,6 +140,8 @@ function renderFood() {
       </div>
     </div>
 
+    ${renderGoalNutritionGuidance(totals)}
+
     <div class="card">
       <div class="card-title">Logged today <span style="font-family:var(--font-mono); font-size:12px; color:var(--text-dim);">${entries.length} item(s)</span></div>
       ${entries.length ? `
@@ -172,6 +174,26 @@ function renderFood() {
       ` : ''}
     </div>
   `;
+}
+
+function renderGoalNutritionGuidance(totals) {
+  const guidance = getGoalGuidance();
+  if (!guidance.proteinLowGrams) return '';
+  const protein = Math.round(totals.protein);
+  const status = protein >= guidance.proteinLowGrams && protein <= guidance.proteinHighGrams
+    ? '<span class="badge badge-ok">In range</span>'
+    : protein > guidance.proteinHighGrams
+      ? '<span class="badge badge-warn">Above range</span>'
+      : '<span class="badge">Building</span>';
+  return `<div class="card goal-nutrition-card">
+    <div class="card-title">${escapeAttr(guidance.focus.label)} nutrition lens ${status}</div>
+    <div class="grid grid-3">
+      <div class="stat"><div class="stat-label">Protein logged</div><div class="stat-value" style="font-size:20px;">${protein}<span class="unit">g</span></div></div>
+      <div class="stat"><div class="stat-label">Planning range</div><div class="stat-value accent" style="font-size:20px;">${guidance.proteinLowGrams}-${guidance.proteinHighGrams}<span class="unit">g</span></div></div>
+      <div class="stat"><div class="stat-label">Reference</div><div class="stat-value" style="font-size:20px;">${Math.round(guidance.proteinReferenceKg)}<span class="unit">kg</span></div></div>
+    </div>
+    ${(STATE.uiPrefs.knowledgeLevel || 0) >= 4 ? '' : `<p class="hint" style="margin-top:10px;">${escapeAttr(guidance.energy)} Protein is a range, not a score; exceeding it does not guarantee better results.</p>`}
+  </div>`;
 }
 
 function renderPortionGuideBody() {

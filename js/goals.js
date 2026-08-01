@@ -35,6 +35,8 @@ function renderGoals() {
       <p class="page-sub">Set where you want to be and by when. We'll show your required rate of change and whether it's realistic - no scare tactics, just the math.</p>
     </div>
 
+    ${renderGoalFocusCard()}
+
     <div class="grid grid-2">
       <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 5 ? 'onboarding-focus' : ''}">
         <div class="card-title">Set your goal</div>
@@ -93,6 +95,36 @@ function renderGoals() {
       </div>
       <canvas id="goal-chart" height="90"></canvas>
       ${STATE.weightLog.length === 0 ? `<div class="empty-state">No entries yet - log your weight to start the trend line.</div>` : ''}
+    </div>
+  `;
+}
+
+function renderGoalFocusCard() {
+  const guidance = getGoalGuidance();
+  const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
+  return `
+    <div class="card goal-focus-card">
+      <div class="card-title">What result matters most?</div>
+      <div class="chip-row goal-focus-options">
+        ${GOAL_FOCUS_OPTIONS.map(option => `<button class="chip ${guidance.focus.key === option.key ? 'active' : ''}" onclick="setGoalFocus('${option.key}')">${escapeAttr(option.label)}</button>`).join('')}
+      </div>
+      <div class="field" style="max-width:340px; margin-top:12px;">
+        <label for="training-experience">Structured training history</label>
+        <select id="training-experience" data-focus-id="training-experience" onchange="setTrainingExperience(this.value)">
+          ${TRAINING_EXPERIENCE_OPTIONS.map(option => `<option value="${option.key}" ${guidance.experience.key === option.key ? 'selected' : ''}>${escapeAttr(option.label)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="goal-guidance-summary">
+        <strong>${escapeAttr(guidance.focus.label)}</strong>
+        <p>${escapeAttr(guidance.focus.short)}</p>
+        ${guidance.proteinLowGrams ? `<p><strong>Protein planning range:</strong> ${guidance.proteinLowGrams}-${guidance.proteinHighGrams} g/day (${guidance.proteinMin}-${guidance.proteinMax} g/kg using a ${Math.round(guidance.proteinReferenceKg)} kg reference).</p>` : '<p>Add your current weight to calculate a protein planning range.</p>'}
+        ${expert ? '' : `<p><strong>Energy:</strong> ${escapeAttr(guidance.energy)}</p><p><strong>Training:</strong> ${escapeAttr(guidance.training)}</p><p>${escapeAttr(guidance.nuance)}</p>`}
+      </div>
+      <details class="evidence-details">
+        <summary>Evidence and limitations</summary>
+        <p>These are adult planning ranges, not diagnoses or individualized medical nutrition therapy. Forge does not infer a goal from body size and does not silently change calorie targets; your selected weight/date still controls the calorie math.</p>
+        <ul>${GUIDANCE_EVIDENCE.map(source => `<li><a href="${source.url}" target="_blank" rel="noopener noreferrer">${escapeAttr(source.label)}</a> — ${escapeAttr(source.note)}</li>`).join('')}</ul>
+      </details>
     </div>
   `;
 }
