@@ -207,6 +207,9 @@ img, canvas, svg {
 .main {
   padding: 32px 40px 80px;
   max-width: 1080px;
+  width: 100%;
+  margin-inline: auto;
+  min-width: 0;
 }
 
 /* ---- Responsive: below 900px width, or any unusually tall/narrow
@@ -270,6 +273,23 @@ img, canvas, svg {
     grid-column: auto;
   }
 }
+
+/* Compact short landscape cover displays (including the Fold 7 outer screen).
+   These report phone-sized CSS pixels despite their high physical resolution. */
+@media (max-width: 900px) and (max-height: 500px) and (min-aspect-ratio: 1.5) {
+  .sidebar { padding: calc(3px + env(safe-area-inset-top)) 6px 3px; gap: 2px; }
+  .brand { font-size: 15px; padding: 2px 5px; }
+  .nav-item { padding: 5px 7px; font-size: 11px; gap: 3px; }
+  .nav-item .num { display: none; }
+  .main { padding: 10px 12px 54px; }
+  .page-head { margin-bottom: 14px; }
+  .page-title { font-size: 20px; }
+  .page-sub { margin-bottom: 0; }
+  .pet-widget { transform: scale(.78); transform-origin: bottom right; }
+  .rest-timer-widget { top: calc(43px + env(safe-area-inset-top)); transform: scale(.82); transform-origin: top left; }
+}
+
+html[data-knowledge-level="4"] .page-sub { display: none; }
 
 /* ============================================================
    5. PAGE HEADER
@@ -579,12 +599,14 @@ input[type="date"] {
 .exercise-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) * 0.6);
   padding: 10px 12px;
 }
+.exercise-row > div:not(.kcal) { min-width: 0; flex: 1 1 160px; }
 .exercise-row .name {
   font-weight: 600;
   font-size: 13.5px;
@@ -601,6 +623,9 @@ input[type="date"] {
   font-weight: 600;
   font-size: 14px;
   white-space: nowrap;
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .day-tab {
   border: 1px solid var(--border);
@@ -844,6 +869,20 @@ hr.div {
   color: var(--danger);
   background: var(--surface-2);
 }
+.panel-heading-actions { display: inline-flex; align-items: center; gap: 8px; }
+.panel-collapse-btn, .rest-timer-minimize {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-dim);
+  border-radius: 50%;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.panel-collapse-btn:hover, .rest-timer-minimize:hover { color: var(--accent); border-color: var(--accent); }
+.panel-collapsed-summary { margin: 0; color: var(--text-dim); font-size: 12.5px; }
 .section-note {
   font-size: 12.5px;
   color: var(--text-dim);
@@ -975,11 +1014,13 @@ hr.div {
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 .exercise-block-header .name {
   font-weight: 600;
   font-size: 13.5px;
   flex: 1;
+  min-width: 0;
 }
 .exercise-block-header .kcal {
   font-family: var(--font-mono);
@@ -987,6 +1028,8 @@ hr.div {
   font-weight: 600;
   font-size: 14px;
   white-space: nowrap;
+  margin-left: auto;
+  min-width: 0;
 }
 .set-row {
   display: flex;
@@ -1254,32 +1297,38 @@ hr.div {
   gap: 6px;
   margin: 12px 0 6px;
 }
+.pet-us-map-scroll { width: 100%; min-width: 0; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .pet-us-map {
-  display: grid;
-  grid-template-columns: repeat(14, 42px);
-  grid-template-rows: repeat(8, 44px);
-  gap: 4px;
+  position: relative;
   width: 100%;
-  min-width: 0;
-  overflow-x: auto;
-  padding: 14px 4px;
+  aspect-ratio: 959 / 593;
+  overflow: hidden;
   margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * .7);
+  background: var(--bg);
 }
+.pet-us-map-art { width: 100%; height: 100%; display: block; object-fit: contain; opacity: .52; }
+.pet-us-map-markers { position: absolute; inset: 0; }
 .pet-map-state {
-  min-width: 38px;
-  padding: 3px 1px;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: clamp(17px, 2.45vw, 26px);
+  height: clamp(17px, 2.45vw, 26px);
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
   color: var(--text-dim);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   line-height: 1;
-  font: 700 10px var(--font-mono);
+  font: 700 clamp(6px, .78vw, 9px) var(--font-mono);
+  z-index: 1;
 }
-.pet-map-state small { font-size: 10px; margin-top: 3px; }
+.pet-map-state small { position: absolute; right: -4px; bottom: -5px; font-size: 8px; }
 .pet-map-state:hover, .pet-map-state.target { border-color: var(--accent); color: var(--text); }
 .pet-map-state.current { box-shadow: 0 0 0 2px var(--accent); color: var(--accent); }
 .pet-map-state.completed { color: var(--text); background: var(--surface-2); }
@@ -1287,6 +1336,10 @@ hr.div {
 .pet-map-state.tier-gold { border-color: #F5C542; }
 .pet-map-state.tier-silver { border-color: #B8C2CC; }
 .pet-map-state.tier-bronze { border-color: #CD7F32; }
+.map-credit { margin: -6px 0 12px; text-align: right; font-size: 10px; color: var(--text-dim); }
+@media (max-width: 650px) {
+  .pet-us-map { min-width: 620px; }
+}
 .travel-route-summary {
   padding: 12px;
   border: 1px solid var(--border);
@@ -1347,6 +1400,12 @@ hr.div {
   max-width: 160px;
   box-shadow: var(--shadow);
   margin-bottom: 8px;
+  pointer-events: none;
+  animation: pet-bubble-five-seconds 5s ease forwards;
+}
+@keyframes pet-bubble-five-seconds {
+  0%, 78% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(4px); visibility: hidden; }
 }
 .pet-widget .pet-sprite {
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
@@ -1385,7 +1444,24 @@ hr.div {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
+.rest-timer-minimize { width: 21px; height: 21px; }
+.rest-timer-widget.minimized { min-width: 0; padding: 0; }
+.rest-timer-minimized-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 11px var(--font-mono);
+}
+.rest-timer-minimized-btn strong { color: var(--accent); font-size: 15px; }
 .rest-timer-time {
   font-family: var(--font-mono);
   font-size: 26px;
