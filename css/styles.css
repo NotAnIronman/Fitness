@@ -988,6 +988,13 @@ hr.div {
   z-index: 50;
   text-transform: none;
   letter-spacing: normal;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.exercise-row .tip-box,
+.exercise-block-header .tip-box {
+  width: min(390px, calc(100vw - 24px));
+  max-width: min(390px, calc(100vw - 24px));
 }
 .tip:hover .tip-box, .tip:focus .tip-box, .tip.tip-open .tip-box {
   display: block;
@@ -998,6 +1005,33 @@ hr.div {
   display: block;
   margin-bottom: 3px;
 }
+
+.goal-focus-options {
+  margin-bottom: 4px;
+}
+.goal-guidance-summary {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.6);
+  padding: 12px 14px;
+  line-height: 1.55;
+}
+.goal-guidance-summary p {
+  margin: 5px 0 0;
+  color: var(--text-dim);
+}
+.evidence-details {
+  margin-top: 12px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.evidence-details summary {
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+}
+.evidence-details li { margin-bottom: 6px; }
+.health-import-btn { flex-shrink: 0; }
 
 /* ============================================================
    19. EXERCISE BLOCKS (ramping sets)
