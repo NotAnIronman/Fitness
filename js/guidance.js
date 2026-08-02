@@ -26,6 +26,16 @@ const TRAINING_EXPERIENCE_OPTIONS = [
 
 const GUIDANCE_EVIDENCE = [
   {
+    label: 'Physical Activity Guidelines for Americans',
+    url: 'https://odphp.health.gov/our-work/nutrition-physical-activity/physical-activity-guidelines/current-guidelines/top-10-things-know',
+    note: 'Adults should build toward 150-300 minutes of moderate aerobic activity weekly, or the vigorous equivalent, plus muscle strengthening on at least two days.',
+  },
+  {
+    label: 'National Academies macronutrient reference ranges',
+    url: 'https://nap.nationalacademies.org/skim.php?chap=70-81&record_id=11537',
+    note: 'The adult acceptable range for fat is 20-35% of energy; carbohydrate and fat allocations should remain flexible within the full diet and training context.',
+  },
+  {
     label: 'Protein and resistance training meta-analysis',
     url: 'https://pubmed.ncbi.nlm.nih.gov/28698222/',
     note: 'Benefits for lean-mass gain plateaued around 1.6 g/kg/day on average, with individual uncertainty above that point.',

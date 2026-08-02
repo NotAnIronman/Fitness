@@ -8,6 +8,7 @@
 
 function renderThemes() {
   const t = STATE.theme;
+  const accessibilityIssues = getThemeAccessibilityIssues(t);
   const fontOptions = [
     { key: 'condensed', label: 'Oswald / Inter' },
     { key: 'serif', label: 'Fraunces / Inter' },
@@ -67,6 +68,7 @@ function renderThemes() {
         ${colorField('Border', 'border', t.border)}
         ${colorField('Surface 2', 'surface2', t.surface2)}
       </div>
+      ${accessibilityIssues.length ? `<div class="section-note" role="status"><strong>Contrast check:</strong> ${accessibilityIssues.map(escapeAttr).join('; ')}. Aim for at least 4.5:1 for normal text, or choose an accessible preset before fine-tuning.</div>` : `<div class="hint" role="status">Contrast check passed for main, muted, and accent text (at least 4.5:1).</div>`}
     </div>
 
     <div class="grid grid-2">
@@ -122,7 +124,7 @@ function renderThemes() {
         </div>
       ` : ''}
 
-      <p class="hint" style="margin-bottom:6px;"><strong style="color:var(--text);">Camera-to-camera QR:</strong> show this device's backup to the other device. Large histories are split into numbered codes; nothing is uploaded.</p>
+      <p class="hint" style="margin-bottom:6px;"><strong style="color:var(--text);">Camera-to-camera QR:</strong> best for setup or recent changes. Forge removes rebuildable search caches and never asks you to scan more than six codes; use Share or Export for a large full history. Nothing is uploaded.</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
         <button class="btn" onclick="startQrTransferSend()">Show transfer QR</button>
         <button class="btn" onclick="openQrTransferReceiver()">Scan transfer QR</button>
@@ -319,7 +321,7 @@ function mergeWeightLogs(existing, incoming) {
 const SHARE_SIZE_WARNING_BYTES = 900000;
 async function shareBackup() {
   try {
-    const { data, compressed } = await compressToBase64(JSON.stringify(STATE));
+    const { data, compressed } = await compressToBase64(JSON.stringify(buildPortableTransferState()));
     const approxBytes = data.length;
     if (approxBytes > SHARE_SIZE_WARNING_BYTES) {
       toast("Your backup has grown too large for Android's share sheet to reliably handle, use Export or Copy sync code instead.");
@@ -345,7 +347,7 @@ async function shareBackup() {
 // on the other one.
 async function copySyncCode() {
   try {
-    const { data } = await compressToBase64(JSON.stringify(STATE));
+    const { data } = await compressToBase64(JSON.stringify(buildPortableTransferState()));
     await navigator.clipboard.writeText(data);
     toast("Copied! Paste it into Forge on your other device (Themes -> Paste sync code).");
   } catch (e) {
@@ -377,22 +379,71 @@ async function importFromPasteSync() {
 }
 
 /* ---------- Direct QR transfer ----------
-   The compressed backup is split into independently scannable QR frames.
-   This keeps the exchange local without pretending a growing history will
-   fit in a single QR symbol. */
+   QR is intentionally a short-range snapshot option, not an unbounded backup
+   transport. Rebuildable food-search caches are excluded, and a transfer is
+   capped at six frames. Larger histories route users to native file sharing,
+   export, or a smaller recent/setup snapshot instead of demanding hundreds
+   of scans. */
 const QR_TRANSFER_PREFIX = 'FORGEQR1';
 const QR_TRANSFER_CHUNK_SIZE = 1200;
+const QR_TRANSFER_MAX_PARTS = 6;
 let _qrReceiveParts = null;
 let _qrReceiveReader = null;
 let _qrReceiveControls = null;
 let _qrLastText = '';
 
-async function startQrTransferSend() {
+function filterTransferDates(record, cutoff) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return {};
+  return Object.fromEntries(Object.entries(record).filter(([date]) => /^\d{4}-\d{2}-\d{2}$/.test(date) && (!cutoff || date >= cutoff)));
+}
+
+function buildPortableTransferState(historyDays = null) {
+  const portable = JSON.parse(JSON.stringify(STATE));
+  // USDA results can always be fetched again and commonly outweigh the actual
+  // user-entered history after only a few days.
+  portable.usdaCache = {};
+  portable.foodIndexPool = [];
+  if (historyDays == null) return portable;
+
+  let cutoff = null;
+  if (historyDays > 0) {
+    const date = new Date(todayISO() + 'T00:00:00');
+    date.setDate(date.getDate() - (historyDays - 1));
+    cutoff = dateToLocalISO(date);
+  }
+  const scopedDates = record => historyDays === 0 ? {} : filterTransferDates(record, cutoff);
+  portable.workoutLog = scopedDates(portable.workoutLog);
+  portable.foodLog = scopedDates(portable.foodLog);
+  portable.dailyCheckins = scopedDates(portable.dailyCheckins);
+  portable.dailyWater = scopedDates(portable.dailyWater);
+  portable.weightLog = historyDays > 0
+    ? portable.weightLog.filter(entry => entry && entry.date >= cutoff)
+    : [];
+  portable.pet.rewardedDates = scopedDates(portable.pet.rewardedDates);
+  portable.pet.rewardedWeeks = scopedDates(portable.pet.rewardedWeeks);
+  portable.pet.foodRewardedDates = scopedDates(portable.pet.foodRewardedDates);
+  portable.pet.waterRewardedDates = scopedDates(portable.pet.waterRewardedDates);
+  portable.pet.travel.processedSteps = scopedDates(portable.pet.travel.processedSteps);
+  return portable;
+}
+
+async function startQrTransferSend(historyDays = null) {
   try {
-    const { data } = await compressToBase64(JSON.stringify(STATE));
+    const portable = buildPortableTransferState(historyDays);
+    const { data } = await compressToBase64(JSON.stringify(portable));
     const transferId = Math.random().toString(36).slice(2, 10);
     const chunks = [];
     for (let i = 0; i < data.length; i += QR_TRANSFER_CHUNK_SIZE) chunks.push(data.slice(i, i + QR_TRANSFER_CHUNK_SIZE));
+    UI.qrFullPartCount = chunks.length;
+    UI.qrScopeLabel = historyDays == null ? 'Portable full history' : historyDays > 0 ? `Last ${historyDays} days` : 'Setup and current status';
+    UI.qrExpanded = false;
+    if (chunks.length > QR_TRANSFER_MAX_PARTS) {
+      UI.qrPayloadParts = [];
+      UI.qrPartIndex = 0;
+      UI.qrTransferMode = 'too-large';
+      render();
+      return;
+    }
     UI.qrPayloadParts = chunks.map((chunk, index) => `${QR_TRANSFER_PREFIX}|${transferId}|${index + 1}|${chunks.length}|${chunk}`);
     UI.qrPartIndex = 0;
     UI.qrTransferMode = 'send';
@@ -408,25 +459,42 @@ async function startQrTransferSend() {
 function renderQrTransferPanel() {
   if (UI.qrTransferMode === 'send') {
     const total = UI.qrPayloadParts.length;
-    return `<div class="qr-transfer-panel">
-      <div class="card-title">Show this to the receiving device</div>
+    return `<div class="qr-transfer-panel ${UI.qrExpanded ? 'qr-display-expanded' : ''}">
+      <div class="card-title">${escapeAttr(UI.qrScopeLabel || 'Forge transfer')} · show the receiving device</div>
       <div id="forge-qr-code" class="qr-code-box" aria-label="Transfer QR code part ${UI.qrPartIndex + 1} of ${total}"></div>
       <div class="qr-part-controls">
         <button class="btn btn-sm" onclick="changeQrTransferPart(-1)" ${UI.qrPartIndex <= 0 ? 'disabled' : ''}>← Previous</button>
         <strong>Part ${UI.qrPartIndex + 1} of ${total}</strong>
         <button class="btn btn-sm" onclick="changeQrTransferPart(1)" ${UI.qrPartIndex >= total - 1 ? 'disabled' : ''}>Next →</button>
       </div>
-      <p class="hint">The receiving device can scan parts in any order and ignores duplicates. This code contains your Forge data, so only show it to a device you trust.</p>
-      <button class="btn btn-ghost btn-sm" onclick="closeQrTransfer()">Done</button>
+      <p class="hint">Parts scan in any order and duplicates are ignored. For glare, use Large view, clean the camera lens, and angle one screen slightly instead of pointing both screens straight at each other. Only show these personal-data codes to a device you trust.</p>
+      <div class="qr-panel-actions"><button class="btn btn-sm" onclick="toggleQrDisplaySize()">${UI.qrExpanded ? 'Exit large view' : 'Large high-contrast view'}</button><button class="btn btn-ghost btn-sm" onclick="closeQrTransfer()">Done</button></div>
+    </div>`;
+  }
+  if (UI.qrTransferMode === 'too-large') {
+    return `<div class="qr-transfer-panel" role="status">
+      <div class="card-title">${escapeAttr(UI.qrScopeLabel)} is too large for a reasonable QR transfer</div>
+      <p class="hint">It would require ${UI.qrFullPartCount} codes. Forge caps QR at ${QR_TRANSFER_MAX_PARTS}; use <strong>Share to another device</strong> or <strong>Export backup</strong> above for the complete history.</p>
+      <div class="qr-panel-actions">
+        <button class="btn btn-primary btn-sm" onclick="startQrTransferSend(30)">Try last 30 days</button>
+        <button class="btn btn-sm" onclick="startQrTransferSend(0)">Send setup/current status</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeQrTransfer()">Cancel</button>
+      </div>
     </div>`;
   }
   return `<div class="qr-transfer-panel">
     <div class="card-title">Scan the sending device</div>
-    <p id="qr-receive-status" class="hint">${escapeAttr(UI.qrStatus || 'Point your camera at a numbered part. Keep scanning until every part is received.')}</p>
+    <p id="qr-receive-status" class="hint">${escapeAttr(UI.qrStatus || 'Point your camera at a numbered part. If glare blocks it, tilt the sending screen slightly and keep the QR large.')}</p>
     <video id="qr-transfer-video" class="qr-transfer-video" muted playsinline></video>
     <div class="qr-receive-progress"><div id="qr-receive-progress-fill"></div></div>
     <button class="btn btn-ghost btn-sm" onclick="closeQrTransfer()">Cancel</button>
   </div>`;
+}
+
+function toggleQrDisplaySize() {
+  UI.qrExpanded = !UI.qrExpanded;
+  render();
+  requestAnimationFrame(renderCurrentQrPart);
 }
 
 function renderCurrentQrPart() {
@@ -539,12 +607,15 @@ function closeQrTransfer() {
   UI.qrTransferMode = null;
   UI.qrPayloadParts = [];
   UI.qrPartIndex = 0;
+  UI.qrScopeLabel = '';
+  UI.qrFullPartCount = 0;
+  UI.qrExpanded = false;
   _qrReceiveParts = null;
   render();
 }
 
 function exportData() {
-  const blob = new Blob([JSON.stringify(STATE, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(buildPortableTransferState(), null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

@@ -53,6 +53,9 @@ let UI = {
   qrTransferMode: null,
   qrPayloadParts: [],
   qrPartIndex: 0,
+  qrScopeLabel: '',
+  qrFullPartCount: 0,
+  qrExpanded: false,
   qrStatus: '',
 };
 
@@ -60,7 +63,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v18';
+const APP_VERSION = 'forge-v19';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -498,6 +501,7 @@ function doRender() {
 
   const app = document.getElementById('app');
   app.innerHTML = `
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <div class="shell ${STATE.onboarding.active ? 'onboarding-active' : ''}">
       <div class="sidebar">
         <div class="brand tip" title="Version" style="border-bottom:none;">
@@ -513,7 +517,7 @@ function doRender() {
           Local-first. No Forge account. Transfer tools are in Themes.
         </div>
       </div>
-      <div class="main" id="main-content"></div>
+      <main class="main" id="main-content" tabindex="-1"></main>
       ${typeof renderOnboardingGuide === 'function' ? renderOnboardingGuide() : ''}
       ${STATE.onboarding.active ? '' : renderPetWidget(UI.route)}
       ${typeof renderRestTimerWidget === 'function' ? renderRestTimerWidget() : ''}
@@ -826,7 +830,7 @@ function renderStepCheckinCard(date) {
 }
 
 function toggleRememberedPanel(key) {
-  if (!['stepCheckinCollapsed', 'restTimerPanelCollapsed', 'restTimerWidgetCollapsed', 'workoutComplianceCollapsed'].includes(key)) return;
+  if (!['stepCheckinCollapsed', 'restTimerPanelCollapsed', 'restTimerWidgetCollapsed', 'workoutComplianceCollapsed', 'foodGoalTimelineCollapsed', 'weeklyMovementCollapsed'].includes(key)) return;
   STATE.uiPrefs[key] = !STATE.uiPrefs[key];
   persist(); render();
 }

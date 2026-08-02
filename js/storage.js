@@ -64,6 +64,8 @@ function defaultState() {
       restTimerWidgetCollapsed: false,
       workoutComplianceCollapsed: false,
       onboardingGuideCollapsed: false,
+      foodGoalTimelineCollapsed: false,
+      weeklyMovementCollapsed: false,
     },
     onboarding: {
       active: true,          // fresh installs get a guided, pet-led setup
@@ -102,8 +104,8 @@ function defaultState() {
     dailyCheckins: {
       // 'YYYY-MM-DD': { steps: 8000 }
     },
-    // Water intake, logged per day in ml. Target is computed from bodyweight/sex
-    // (see getWaterTargetMl in js/food.js), this just stores what's actually
+    // Water intake, logged per day in ml. The logging estimate is computed from
+    // bodyweight (see getWaterTargetMl in js/calc.js); this stores what was
     // been logged.
     dailyWater: {
       // 'YYYY-MM-DD': { ml: 1500 }
@@ -292,6 +294,8 @@ function normalizeStateShape(state) {
   state.uiPrefs.restTimerWidgetCollapsed = !!state.uiPrefs.restTimerWidgetCollapsed;
   state.uiPrefs.workoutComplianceCollapsed = !!state.uiPrefs.workoutComplianceCollapsed;
   state.uiPrefs.onboardingGuideCollapsed = !!state.uiPrefs.onboardingGuideCollapsed;
+  state.uiPrefs.foodGoalTimelineCollapsed = !!state.uiPrefs.foodGoalTimelineCollapsed;
+  state.uiPrefs.weeklyMovementCollapsed = !!state.uiPrefs.weeklyMovementCollapsed;
   if (!Array.isArray(state.onboarding.skippedSteps)) state.onboarding.skippedSteps = [];
   state.onboarding.step = Math.max(0, Math.min(7, Math.round(Number(state.onboarding.step) || 0)));
   state.onboarding.active = !!state.onboarding.active;

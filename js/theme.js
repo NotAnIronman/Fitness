@@ -12,7 +12,7 @@ const THEME_PRESETS = {
   daylight: {
     label: 'Daylight',
     bg: '#F7F5F0', surface: '#FFFFFF', surface2: '#F0EDE5', border: '#DEDAD0',
-    text: '#1E1B16', textDim: '#7A7468', accent: '#C1502E', accent2: '#2F6E5E',
+    text: '#1E1B16', textDim: '#70695E', accent: '#A94224', accent2: '#2F6E5E',
     radius: 8, font: 'serif',
   },
   neon: {
@@ -24,7 +24,7 @@ const THEME_PRESETS = {
   clay: {
     label: 'Clay Court',
     bg: '#FBF3EC', surface: '#FFFFFF', surface2: '#F2E3D5', border: '#E4CDB6',
-    text: '#3A2A1E', textDim: '#8A7461', accent: '#B5622C', accent2: '#3E7A5B',
+    text: '#3A2A1E', textDim: '#79614E', accent: '#91451D', accent2: '#356B4F',
     radius: 14, font: 'rounded',
   },
   mono: {
@@ -42,25 +42,25 @@ const THEME_PRESETS = {
   rosewater: {
     label: 'Rosewater',
     bg: '#FDF4F2', surface: '#FFFFFF', surface2: '#FBE8E4', border: '#F2D2CB',
-    text: '#4A2E2A', textDim: '#9C7A73', accent: '#E0796B', accent2: '#C9A15C',
+    text: '#4A2E2A', textDim: '#765A55', accent: '#A33D4A', accent2: '#8A651D',
     radius: 16, font: 'serif',
   },
   orchid: {
     label: 'Orchid',
     bg: '#F8F5FB', surface: '#FFFFFF', surface2: '#EDE3F5', border: '#DCC8EA',
-    text: '#3A2B47', textDim: '#8B7A9B', accent: '#9B5DE0', accent2: '#E0A6D8',
+    text: '#3A2B47', textDim: '#715F80', accent: '#7040A5', accent2: '#9B4E8E',
     radius: 16, font: 'serif',
   },
   peony: {
     label: 'Peony Garden',
     bg: '#FFF6F8', surface: '#FFFFFF', surface2: '#FBE3EA', border: '#F3C9D6',
-    text: '#4A2438', textDim: '#9C6E85', accent: '#EC5C88', accent2: '#7FA894',
+    text: '#4A2438', textDim: '#795469', accent: '#AC2E60', accent2: '#4E7765',
     radius: 20, font: 'rounded',
   },
   blushgold: {
     label: 'Blush & Gold',
     bg: '#FBF8F3', surface: '#FFFFFF', surface2: '#F3E7D8', border: '#E8D5B8',
-    text: '#3D3226', textDim: '#93826B', accent: '#D4A24C', accent2: '#E8A2A8',
+    text: '#3D3226', textDim: '#705F49', accent: '#7D570B', accent2: '#9D4F5A',
     radius: 12, font: 'serif',
   },
 };
@@ -98,6 +98,7 @@ function applyTheme(theme) {
   root.setProperty('--text-dim', theme.textDim);
   root.setProperty('--accent', theme.accent);
   root.setProperty('--accent-2', theme.accent2);
+  root.setProperty('--accent-ink', themeContrastRatio('#05100E', theme.accent) >= themeContrastRatio('#FFFFFF', theme.accent) ? '#05100E' : '#FFFFFF');
   root.setProperty('--radius', (theme.radius ?? 10) + 'px');
   const fonts = FONT_STACKS[theme.font] || FONT_STACKS.condensed;
   root.setProperty('--font-display', fonts.display);
@@ -114,15 +115,34 @@ function applyTheme(theme) {
   root.setProperty('color-scheme', themeLuminance(theme.bg) < 0.5 ? 'dark' : 'light');
 }
 
-// Standard relative luminance approximation from an RGB hex color, used only
-// to decide "is this background dark or light" for color-scheme above.
+// WCAG relative luminance from an RGB hex color. It supports both native
+// light/dark control selection and the theme contrast checks below.
 function themeLuminance(hex) {
   const clean = (hex || '#000000').replace('#', '');
   const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
-  const r = parseInt(full.substring(0, 2), 16) / 255;
-  const g = parseInt(full.substring(2, 4), 16) / 255;
-  const b = parseInt(full.substring(4, 6), 16) / 255;
+  const linear = value => {
+    const channel = value / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  };
+  const r = linear(parseInt(full.substring(0, 2), 16));
+  const g = linear(parseInt(full.substring(2, 4), 16));
+  const b = linear(parseInt(full.substring(4, 6), 16));
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function themeContrastRatio(colorA, colorB) {
+  const a = themeLuminance(colorA), b = themeLuminance(colorB);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+function getThemeAccessibilityIssues(theme) {
+  const checks = [
+    ['Main text on cards', theme.text, theme.surface],
+    ['Muted text on cards', theme.textDim, theme.surface],
+    ['Accent links on the page', theme.accent, theme.bg],
+  ];
+  return checks.filter(([, foreground, background]) => themeContrastRatio(foreground, background) < 4.5)
+    .map(([label, foreground, background]) => `${label}: ${themeContrastRatio(foreground, background).toFixed(1)}:1`);
 }
 
 // Build a full theme object (for state.theme) from a preset key

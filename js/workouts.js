@@ -25,6 +25,7 @@ function renderWorkouts() {
   const lvl = getActivityLevel();
   const stepBonus = getStepBonus();
   const weeklyAssessment = bw ? assessWeeklyBurnForGoal(summary.totalWeeklyExerciseKcal) : null;
+  const movementCollapsed = STATE.uiPrefs.weeklyMovementCollapsed;
 
   return `
     <div class="page-head">
@@ -56,11 +57,9 @@ function renderWorkouts() {
     </div>
 
     ${summary.workoutDaysPerWeek > 0 ? `
-      <div class="card">
-        <div class="card-title">
-          Weekly movement check
-        </div>
-        <p class="hint">Plan snapshot: ${summary.strengthDaysPerWeek} strength day(s) and about ${Math.round(summary.aerobicMinutes)} aerobic/sport minute(s). For general adult health, work gradually toward 150-300 minutes of moderate aerobic activity (or the vigorous equivalent) and muscle strengthening on at least 2 days each week. Your starting point and recovery capacity matter; doing some activity consistently is already valuable.</p>
+      <div class="card${movementCollapsed ? ' panel-card-collapsed' : ''}">
+        <div class="card-title"><span>Weekly movement check</span>${movementCollapsed ? `<span class="panel-inline-summary">${summary.strengthDaysPerWeek} strength · ${Math.round(summary.aerobicMinutes)} aerobic min</span>` : ''}<button class="panel-collapse-btn" onclick="toggleRememberedPanel('weeklyMovementCollapsed')" aria-expanded="${!movementCollapsed}" aria-label="${movementCollapsed ? 'Expand' : 'Minimize'} weekly movement check">${movementCollapsed ? '+' : '−'}</button></div>
+        ${movementCollapsed ? '' : `<p class="hint">Plan snapshot: ${summary.strengthDaysPerWeek} strength day(s) and about ${Math.round(summary.aerobicMinutes)} aerobic/sport minute(s). For general adult health, <a href="https://odphp.health.gov/our-work/nutrition-physical-activity/physical-activity-guidelines/current-guidelines/top-10-things-know" target="_blank" rel="noopener noreferrer">current U.S. guidance</a> recommends working gradually toward 150-300 minutes of moderate aerobic activity (or the vigorous equivalent) and muscle strengthening on at least 2 days each week. Your starting point and recovery capacity matter; doing some activity consistently is already valuable.</p>`}
       </div>
     ` : ''}
 

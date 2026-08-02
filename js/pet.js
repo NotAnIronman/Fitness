@@ -487,7 +487,24 @@ function renderTravelMap(travel) {
     const tierKey = travel.medals[state.key], tier = tierKey ? travelTier(tierKey) : null;
     const status = state.key === travel.currentState ? 'Here' : tier ? tier.label : 'Not completed';
     return `<button class="pet-map-state ${tier ? `completed tier-${tierKey}` : ''} ${state.key === travel.currentState ? 'current' : ''} ${state.key === travel.targetState ? 'target' : ''}" style="left:${pos[0]}%;top:${pos[1]}%;" onclick="selectPetTravelTarget('${state.key}')" title="${escapeAttr(state.name)}: ${status}" aria-label="${escapeAttr(state.name)}, ${status}"><span>${state.key}</span><small>${state.key === travel.currentState ? '●' : tier ? tier.medal : '○'}</small></button>`;
-  }).join('')}</div></div></div><p class="map-credit">Map outline: <a href="https://commons.wikimedia.org/wiki/File:Blank_US_Map_(states_only).svg" target="_blank" rel="noopener noreferrer">Heitordp / Wikimedia Commons, CC0</a></p>`;
+  }).join('')}</div></div></div>
+  <div class="pet-map-destination-control">
+    <label for="pet-travel-state-select">Accessible destination selector</label>
+    <div class="field-row">
+      <select id="pet-travel-state-select" aria-label="Destination state">${US_STATES.filter(state => state.key !== travel.currentState).map(state => {
+        const tierKey = travel.medals[state.key];
+        const status = tierKey ? travelTier(tierKey).label : 'not completed';
+        return `<option value="${state.key}" ${state.key === travel.targetState ? 'selected' : ''}>${escapeAttr(state.name)} — ${status}</option>`;
+      }).join('')}</select>
+      <button class="btn btn-sm" onclick="selectPetTravelTargetFromControl()">Set destination</button>
+    </div>
+  </div>
+  <p class="map-credit">Map outline: <a href="https://commons.wikimedia.org/wiki/File:Blank_US_Map_(states_only).svg" target="_blank" rel="noopener noreferrer">Heitordp / Wikimedia Commons, CC0</a></p>`;
+}
+
+function selectPetTravelTargetFromControl() {
+  const select = document.getElementById('pet-travel-state-select');
+  if (select && select.value) selectPetTravelTarget(select.value);
 }
 
 function renderTravelCard() {

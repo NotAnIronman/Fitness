@@ -33,12 +33,22 @@ function renderFood() {
   }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
 
   const safety = checkIntakeSafety(totals.kcal, STATE.profile.sex);
+  const goalTimelineCollapsed = STATE.uiPrefs.foodGoalTimelineCollapsed;
 
   return `
     <div class="page-head">
       <p class="page-eyebrow">Nutrition</p>
       <h1 class="page-title">Food log</h1>
       <p class="page-sub">Search for and log things you've eaten.</p>
+    </div>
+
+    <div class="date-nav-row" style="max-width:400px;">
+      ${renderDatePrevButton('shiftFoodDate')}
+      <div class="field date-nav-bar" style="margin-bottom:0;">
+        <label>Date</label>
+        <input type="date" data-focus-id="food-date" value="${date}" onchange="setFoodDate(this.value)">
+      </div>
+      ${renderDateNextButton('shiftFoodDate')}
     </div>
 
     ${notice('food-hidden-cals', `The most common reason a diet stops adding up isn't the meals, it's the extras: sauces, dressings, cooking oil, coffee add-ins, drinks, and snacks eaten standing up. If your numbers aren't matching your results, that's usually the first place to look.`, { maxLevel: 2, defaultOpenThrough: 1, brief: `If intake and results do not match, first check easy-to-miss extras such as oils, sauces, drinks, and snacks.` })}
@@ -54,16 +64,7 @@ function renderFood() {
       </div>
     ` : ''}
 
-    ${targetContext.warning ? `<div class="card"><div class="card-title">Goal timeline needs adjustment <span class="badge badge-warn">Maintenance shown</span></div><p class="hint">${escapeAttr(targetContext.warning)}</p></div>` : ''}
-
-    <div class="date-nav-row" style="max-width:400px;">
-      ${renderDatePrevButton('shiftFoodDate')}
-      <div class="field date-nav-bar" style="margin-bottom:0;">
-        <label>Date</label>
-        <input type="date" data-focus-id="food-date" value="${date}" onchange="setFoodDate(this.value)">
-      </div>
-      ${renderDateNextButton('shiftFoodDate')}
-    </div>
+    ${targetContext.warning ? `<div class="card${goalTimelineCollapsed ? ' panel-card-collapsed' : ''}"><div class="card-title"><span>Goal timeline needs adjustment</span><span class="badge badge-warn">Maintenance shown</span><button class="panel-collapse-btn" onclick="toggleRememberedPanel('foodGoalTimelineCollapsed')" aria-expanded="${!goalTimelineCollapsed}" aria-label="${goalTimelineCollapsed ? 'Expand' : 'Minimize'} goal timeline warning">${goalTimelineCollapsed ? '+' : '−'}</button></div>${goalTimelineCollapsed ? '' : `<p class="hint">${escapeAttr(targetContext.warning)}</p>`}</div>` : ''}
 
     ${renderWaterCard(date)}
 
@@ -347,7 +348,7 @@ function renderWaterCard(date) {
           <div class="stat"><div class="stat-label">Logging estimate</div><div class="stat-value accent" style="font-size:20px;">${toDisplay(target)}</div></div>
         </div>
         <div class="macro-bar-track" style="margin-bottom:12px;"><div class="macro-bar-fill" style="width:${pct}%; background:#38BDF8;"></div></div>
-        <p class="hint" style="margin-bottom:10px;">${expert ? `Fluid-log estimate: ${hydrationRate}; adjust for conditions and sweat.` : `A practical fluid-logging estimate of ~${hydrationRate}, not an official requirement. National Academies reference values cover total water from food and every beverage; individual needs vary with heat, altitude, illness, pregnancy or breastfeeding, and sweat losses. Thirst is a useful day-to-day guide. Reach this logged-fluid target and your pet earns one water item.`}</p>
+        <p class="hint" style="margin-bottom:10px;">${expert ? `Fluid-log estimate: ${hydrationRate}; adjust for conditions and sweat.` : `A practical fluid-logging estimate of ~${hydrationRate}, not an official requirement. <a href="https://www.nationalacademies.org/read/10925/chapter/2" target="_blank" rel="noopener noreferrer">National Academies reference values</a> cover total water from food and every beverage; individual needs vary with heat, altitude, illness, pregnancy or breastfeeding, and sweat losses. Thirst is a useful day-to-day guide. Reach this logged-fluid target and your pet earns one water item.`}</p>
         <div class="chip-row">
           ${[250, 350, 500, 750].map(ml => `<button class="chip" onclick="logWater(${ml}, '${date}')">+${toDisplay(ml)}</button>`).join('')}
           <button class="chip" onclick="undoLastWater('${date}')">Undo last</button>
