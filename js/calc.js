@@ -8,6 +8,38 @@ const lbToKg = lb => lb / 2.20462262185;
 const cmToIn = cm => cm / 2.54;
 const inToCm = inch => inch * 2.54;
 
+// User-facing measurement helpers. Internal calculations stay metric so there
+// is one source of truth; every rendered value goes through these helpers.
+function usesImperialUnits() { return STATE.profile.unitSystem === 'imperial'; }
+function displayWeightUnit() { return usesImperialUnits() ? 'lb' : 'kg'; }
+function displayWeightValue(weightKg, decimals = 1) {
+  if (!Number.isFinite(Number(weightKg))) return null;
+  const value = usesImperialUnits() ? kgToLb(Number(weightKg)) : Number(weightKg);
+  return Number(value.toFixed(decimals));
+}
+function formatWeightKg(weightKg, decimals = 1) {
+  const value = displayWeightValue(weightKg, decimals);
+  return value == null ? '—' : `${value.toLocaleString()} ${displayWeightUnit()}`;
+}
+function formatProteinRateRange(minPerKg, maxPerKg) {
+  if (usesImperialUnits()) {
+    return `${(minPerKg / 2.20462262185).toFixed(2)}-${(maxPerKg / 2.20462262185).toFixed(2)} g/lb`;
+  }
+  return `${Number(minPerKg).toFixed(1)}-${Number(maxPerKg).toFixed(1)} g/kg`;
+}
+function formatHydrationRate(mlPerKg = 33) {
+  return usesImperialUnits()
+    ? `${(mlPerKg / 29.5735 / 2.20462262185).toFixed(2)} fl oz/lb`
+    : `${Math.round(mlPerKg)} mL/kg`;
+}
+function formatFoodNameForUnits(name) {
+  if (!usesImperialUnits()) return String(name || '');
+  return String(name || '').replace(/\((\d+(?:\.\d+)?)\s*g\)/gi, (_, grams) => {
+    const ounces = Number(grams) / 28.349523125;
+    return `(${ounces.toFixed(ounces >= 1 ? 1 : 2)} oz)`;
+  });
+}
+
 // --- BMR: Mifflin-St Jeor equation ---
 function calcBMR({ sex, age, heightCm, weightKg }) {
   if (!age || age < 18 || age > 100 || !heightCm || !weightKg) return null;
@@ -315,14 +347,12 @@ function getEnergyBreakdown({ bmr, tdee, dailyExerciseKcal }) {
 // personalized medical advice, intended to catch clearly-too-low days (e.g. a few
 // hundred calories) rather than fine-tune anyone's specific target.
 // --- Daily water target ---
-// Baseline of ~30-35 ml per kg of bodyweight/day is a commonly cited general
-// guideline (e.g. often summarized from sports medicine and dietetics sources).
-// The male/female adjustment loosely reconciles with the US National Academy of
-// Medicine's Adequate Intake figures for total water (~3.7L/day men, ~2.7L/day
-// women for a reference-sized adult), scaled here by actual bodyweight instead
-// of population averages. This is a general baseline, not personalized medical
-// advice, actual needs go up with heat, altitude, and exercise/sweat.
-function getWaterTargetMl(weightKg, sex) {
+// A 33 mL/kg estimate gives users a practical fluid-logging starting point. It
+// is deliberately not presented as an official requirement: National Academies
+// Adequate Intakes are absolute total-water values (food plus all beverages),
+// not weight-based drinking-water prescriptions. Needs vary with environment,
+// illness, pregnancy/lactation, and exercise/sweat losses.
+function getWaterTargetMl(weightKg) {
   if (!weightKg) return null;
   const mlPerKg = 33;
   let target = weightKg * mlPerKg;
@@ -347,13 +377,15 @@ function explainExerciseCalc(entry, ex, bodyWeightKg) {
   if (!ex || !bodyWeightKg) return 'Add your weight on Home to see this breakdown.';
   const bwRound = Math.round(bodyWeightKg);
   const bwLb = Math.round(kgToLb(bodyWeightKg));
+  const bodyWeightText = formatWeightKg(bodyWeightKg, 0);
+  const formulaWeightText = usesImperialUnits() ? `${bwLb} lb ÷ 2.2046` : `${bwRound} kg`;
   if (ex.inputMode === 'duration' || ex.inputMode === 'distance') {
     const rawMin = Number(entry.durationMin) || 0;
     const adj = (ex.category === 'Strength' && typeof ex.restAdjust === 'number') ? ex.restAdjust : 1;
     const minutes = rawMin * adj;
     const kcal = metCalories(ex.met, bodyWeightKg, minutes);
     const perMinute = rawMin > 0 ? kcal / rawMin : 0;
-    let text = `<strong>${perMinute.toFixed(2)} kcal/min × ${rawMin} min = ${Math.round(kcal)} kcal</strong><br>Uses ${bwLb} lb (${bwRound} kg) bodyweight and MET ${ex.met}: ${ex.met} × 3.5 × ${bwRound} kg ÷ 200 × ${minutes.toFixed(1)} active min.`;
+    let text = `<strong>${perMinute.toFixed(2)} kcal/min × ${rawMin} min = ${Math.round(kcal)} kcal</strong><br>Uses ${bodyWeightText} bodyweight and MET ${ex.met}: ${ex.met} × 3.5 × (${formulaWeightText}) ÷ 200 × ${minutes.toFixed(1)} active min.`;
     if (adj < 1) text += ` (${rawMin} min logged, only ${Math.round(adj * 100)}% counted as active time since most of a gym session is rest between sets, not continuous effort.)`;
     return text;
   }
@@ -367,8 +399,8 @@ function explainExerciseCalc(entry, ex, bodyWeightKg) {
     : (Number(entry.sets) || 0) * (Number(entry.reps) || 0);
   const perRep = totalReps > 0 ? kcal / totalReps : 0;
   const load = effectiveLoadKg(entry);
-  const metric = load > 0 ? `; top load ${Math.round(kgToLb(load))} lb (${Math.round(load)} kg)` : '';
-  return `<strong>${perRep.toFixed(2)} kcal/rep × ${totalReps} reps = ${Math.round(kcal)} kcal</strong><br>Uses ${bwLb} lb (${bwRound} kg) bodyweight${metric}, MET ${ex.met}, about 3.5 seconds per rep, and a small low-intensity allowance between sets. Estimated active time: ${minutes.toFixed(1)} min${heavyAdjustment > 1 ? ' (load-above-bodyweight adjustment included)' : ''}.`;
+  const loadText = load > 0 ? `; top load ${formatWeightKg(load, 0)}` : '';
+  return `<strong>${perRep.toFixed(2)} kcal/rep × ${totalReps} reps = ${Math.round(kcal)} kcal</strong><br>Uses ${bodyWeightText} bodyweight${loadText}, MET ${ex.met}, about 3.5 seconds per rep, and a small low-intensity allowance between sets. Estimated active time: ${minutes.toFixed(1)} min${heavyAdjustment > 1 ? ' (load-above-bodyweight adjustment included)' : ''}.`;
 }
 
 // --- Strength standard ranking ---

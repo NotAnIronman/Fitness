@@ -168,7 +168,7 @@ function unequipPetSlot(slot) {
 function feedPetItem() {
   if (!STATE.pet.foodInventory) { toast('No food saved up yet, log a meal on the Food page first.'); return; }
   STATE.pet.foodInventory -= 1;
-  STATE.pet.hunger = Math.min(100, STATE.pet.hunger + 35);
+  STATE.pet.hunger = 100;
   STATE.pet.lastFedAt = Date.now();
   persist(); render();
   toast(`${STATE.pet.name || 'Your pet'} is happily eating!`);
@@ -176,7 +176,7 @@ function feedPetItem() {
 function waterPetItem() {
   if (!STATE.pet.waterInventory) { toast('No water saved up yet, log some on the Food page first.'); return; }
   STATE.pet.waterInventory -= 1;
-  STATE.pet.thirst = Math.min(100, STATE.pet.thirst + 35);
+  STATE.pet.thirst = 100;
   STATE.pet.lastWateredAt = Date.now();
   persist(); render();
   toast(`${STATE.pet.name || 'Your pet'} is drinking up!`);

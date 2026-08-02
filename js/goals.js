@@ -102,6 +102,7 @@ function renderGoals() {
 function renderGoalFocusCard() {
   const guidance = getGoalGuidance();
   const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
+  const proteinRate = formatProteinRateRange(guidance.proteinMin, guidance.proteinMax);
   return `
     <div class="card goal-focus-card">
       <div class="card-title">What result matters most?</div>
@@ -117,13 +118,14 @@ function renderGoalFocusCard() {
       <div class="goal-guidance-summary">
         <strong>${escapeAttr(guidance.focus.label)}</strong>
         <p>${escapeAttr(guidance.focus.short)}</p>
-        ${guidance.proteinLowGrams ? `<p><strong>Protein planning range:</strong> ${guidance.proteinLowGrams}-${guidance.proteinHighGrams} g/day (${guidance.proteinMin}-${guidance.proteinMax} g/kg using a ${Math.round(guidance.proteinReferenceKg)} kg reference).</p>` : '<p>Add your current weight to calculate a protein planning range.</p>'}
+        ${guidance.proteinLowGrams ? `<p><strong>Protein planning range:</strong> ${guidance.proteinLowGrams}-${guidance.proteinHighGrams} g/day (${proteinRate} using a ${formatWeightKg(guidance.proteinReferenceKg, 0)} reference).</p>` : '<p>Add your current weight to calculate a protein planning range.</p>'}
+        <p><strong>Carbohydrate and fat:</strong> Forge turns your calorie target into a balanced starting allocation on Food Tracking; neither macro is being ignored.</p>
         ${expert ? '' : `<p><strong>Energy:</strong> ${escapeAttr(guidance.energy)}</p><p><strong>Training:</strong> ${escapeAttr(guidance.training)}</p><p>${escapeAttr(guidance.nuance)}</p>`}
       </div>
       <details class="evidence-details">
         <summary>Evidence and limitations</summary>
         <p>These are adult planning ranges, not diagnoses or individualized medical nutrition therapy. Forge does not infer a goal from body size and does not silently change calorie targets; your selected weight/date still controls the calorie math.</p>
-        <ul>${GUIDANCE_EVIDENCE.map(source => `<li><a href="${source.url}" target="_blank" rel="noopener noreferrer">${escapeAttr(source.label)}</a> — ${escapeAttr(source.note)}</li>`).join('')}</ul>
+        <ul>${GUIDANCE_EVIDENCE.map(source => `<li><a href="${source.url}" target="_blank" rel="noopener noreferrer">${escapeAttr(source.label)}</a> — ${escapeAttr(formatGuidanceEvidenceNote(source))}</li>`).join('')}</ul>
       </details>
     </div>
   `;
@@ -220,7 +222,7 @@ function renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) {
       <p class="hint" style="font-size:13px; line-height:1.6;">${messages[feasibility]}
         ${unsafeTarget ? ' This timeline would require an intake or deficit that Forge should not prescribe. Extend the target date; the Food page will keep showing estimated maintenance rather than turning an unsafe calculation into a target.' : ''}
         ${effTdee ? ` Your current maintenance is ~${Math.round(effTdee)} kcal/day (TDEE of ${Math.round(tdee)}${stepBonus.dailyKcal > 0 ? ` plus a ${Math.round(stepBonus.dailyKcal)} kcal step bonus` : ''}).` : ' Fill in your profile on Home to see a suggested intake target.'}
-        This first-pass projection uses the familiar ~3,500 kcal-per-pound approximation. Human weight change is dynamic: energy needs and water weight change over time, so use the trend to adjust rather than treating the projection as a promise.
+        This first-pass projection uses the familiar ${isImperial ? '~3,500 kcal-per-pound' : '~7,700 kcal-per-kilogram'} approximation. Human weight change is dynamic: energy needs and water weight change over time, so use the trend to adjust rather than treating the projection as a promise.
       </p>
     </div>
   `;
@@ -319,7 +321,7 @@ function drawGoalChart() {
 function updateGoalTargetWeight(val) {
   const n = numOrNull(val);
   const kg = n != null ? (STATE.profile.unitSystem === 'imperial' ? lbToKg(n) : n) : null;
-  if (kg != null && (kg < 20 || kg > 400)) { toast('Enter a target weight between 20 and 400 kg (44-882 lb).'); render(); return; }
+  if (kg != null && (kg < 20 || kg > 400)) { toast(usesImperialUnits() ? 'Enter a target weight between 44 and 882 lb.' : 'Enter a target weight between 20 and 400 kg.'); render(); return; }
   ensureGoalStart();
   STATE.goal.targetWeightKg = kg;
   persist(); render();
@@ -369,7 +371,7 @@ function openLogWeightPrompt() {
   const n = numOrNull(val);
   if (n == null) return;
   const kg = isImperial ? lbToKg(n) : n;
-  if (kg < 20 || kg > 400) { toast('Enter a weight between 20 and 400 kg (44-882 lb).'); return; }
+  if (kg < 20 || kg > 400) { toast(usesImperialUnits() ? 'Enter a weight between 44 and 882 lb.' : 'Enter a weight between 20 and 400 kg.'); return; }
   logWeightEntry(kg);
   STATE.profile.weightKg = kg;
   persist(); render();

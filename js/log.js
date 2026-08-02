@@ -53,9 +53,9 @@ function renderLog() {
 
     ${renderStepCheckinCard(date)}
 
-    <div class="card">
-      <div class="card-title">Rest timer <button class="panel-collapse-btn" onclick="toggleRememberedPanel('restTimerPanelCollapsed')" aria-expanded="${!restCollapsed}" aria-label="${restCollapsed ? 'Expand' : 'Minimize'} rest timer settings">${restCollapsed ? '+' : '−'}</button></div>
-      ${restCollapsed ? `<p class="panel-collapsed-summary">Default: ${STATE.workoutPlan.restTimerSeconds} seconds</p>` : `
+    <div class="card${restCollapsed ? ' panel-card-collapsed' : ''}">
+      <div class="card-title"><span>Rest timer</span>${restCollapsed ? `<span class="panel-inline-summary">${STATE.workoutPlan.restTimerSeconds} sec</span>` : ''}<button class="panel-collapse-btn" onclick="toggleRememberedPanel('restTimerPanelCollapsed')" aria-expanded="${!restCollapsed}" aria-label="${restCollapsed ? 'Expand' : 'Minimize'} rest timer settings">${restCollapsed ? '+' : '−'}</button></div>
+      ${restCollapsed ? '' : `
       <div class="field-row" style="align-items:end;">
         <div class="field" style="margin-bottom:0;">
           <label>Default duration (seconds)</label>
@@ -104,10 +104,11 @@ function renderLog() {
 function renderComplianceCard(c) {
   const badgeClass = c.status === 'good' ? 'badge-ok' : c.status === 'behind' ? 'badge-warn' : 'badge-danger';
   const badgeText = c.status === 'good' ? 'On pace' : c.status === 'behind' ? 'Behind pace' : 'Way behind';
+  const collapsed = STATE.uiPrefs.workoutComplianceCollapsed;
   return `
-    <div class="card">
-      <div class="card-title">This week vs. your plan <span class="badge ${badgeClass}">${badgeText}</span></div>
-      <p class="hint" style="font-size:13px;">${c.message} Only completed exercises or sets count.</p>
+    <div class="card${collapsed ? ' panel-card-collapsed' : ''}">
+      <div class="card-title"><span>This week vs. your plan</span>${collapsed ? `<span class="panel-inline-summary">${c.loggedCount} of ${c.plannedDays}</span>` : `<span class="badge ${badgeClass}">${badgeText}</span>`}<button class="panel-collapse-btn" onclick="toggleRememberedPanel('workoutComplianceCollapsed')" aria-expanded="${!collapsed}" aria-label="${collapsed ? 'Expand' : 'Minimize'} weekly plan comparison">${collapsed ? '+' : '−'}</button></div>
+      ${collapsed ? '' : `<p class="hint" style="font-size:13px;">${c.message} Only completed exercises or sets count.</p>`}
     </div>
   `;
 }

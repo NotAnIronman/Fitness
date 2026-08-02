@@ -50,13 +50,17 @@ let UI = {
   petChangePanelOpen: false,
   petCustomizeOpen: false,
   pasteSyncOpen: false,
+  qrTransferMode: null,
+  qrPayloadParts: [],
+  qrPartIndex: 0,
+  qrStatus: '',
 };
 
 // Bump this alongside CACHE_VERSION in sw.js on every deploy. Shown as a hover/
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v17';
+const APP_VERSION = 'forge-v18';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -494,7 +498,7 @@ function doRender() {
 
   const app = document.getElementById('app');
   app.innerHTML = `
-    <div class="shell">
+    <div class="shell ${STATE.onboarding.active ? 'onboarding-active' : ''}">
       <div class="sidebar">
         <div class="brand tip" title="Version" style="border-bottom:none;">
           <span class="mark">FORGE</span><small>TRAINING LOG</small>
@@ -548,6 +552,7 @@ function navigate(route) {
     stopBarcodeScan();
     UI.barcodeScannerOpen = false;
   }
+  if (UI.qrTransferMode === 'receive' && typeof stopQrReceiveScanner === 'function') stopQrReceiveScanner();
   UI.route = route;
   saveLastRoute(route);
   render();
@@ -566,7 +571,7 @@ function afterRenderHooks() {
   });
   if (UI.route === 'goals') drawGoalChart();
   if (UI.route === 'progress') { drawProgressChart(); drawStepsChart(); }
-  if (UI.route === 'food' && typeof loadZXing === 'function') {
+  if ((UI.route === 'food' || UI.route === 'themes') && typeof loadZXing === 'function') {
     // Fire-and-forget: get the scanner library loaded in the background before
     // it's needed. iOS Safari requires getUserMedia to fire very close to the
     // user's tap, if there's a network/script-load delay in between (like
@@ -574,6 +579,12 @@ function afterRenderHooks() {
     // the permission prompt. Preloading here means by the time someone actually
     // taps "Scan barcode," the library is already cached and ready.
     loadZXing().catch(() => { /* will retry properly when Scan is tapped */ });
+  }
+  if (STATE.onboarding.active) {
+    requestAnimationFrame(() => {
+      const focus = document.querySelector('.onboarding-focus');
+      if (focus) focus.scrollIntoView({ behavior: 'smooth', block: window.matchMedia('(max-width: 600px)').matches ? 'start' : 'center' });
+    });
   }
   if (UI.route === 'workouts' || UI.route === 'log') {
     const sel = document.getElementById('ex-select');
@@ -764,12 +775,9 @@ function renderStepCheckinSummary() {
   const todayEntry = STATE.dailyCheckins[today];
   const ctx = buildGameContext();
   return `
-    <div class="card">
-      <div class="card-title">
-        Steps
-        ${ctx.checkinStreak > 1 ? `<span class="badge badge-ok">${ctx.checkinStreak} day streak</span>` : ''}
-      </div>
-      <div class="grid grid-2">
+    <div class="card compact-home-steps">
+      <div class="card-title">Steps</div>
+      <div class="compact-home-step-stats">
         <div class="stat">
           <div class="stat-label">Today</div>
           <div class="stat-value" style="font-size:20px;">${todayEntry ? todayEntry.steps.toLocaleString() : '\u2014'}</div>
@@ -779,7 +787,7 @@ function renderStepCheckinSummary() {
           <div class="stat-value accent" style="font-size:20px;">${getStepsAverage().toLocaleString()}</div>
         </div>
       </div>
-      <p class="hint" style="margin-top:8px;">${todayEntry ? "Update today's number" : "Check in today's steps"} on the <a href="#" onclick="navigate('log'); return false;">Workout Log</a> page. Your rolling average is what drives your activity level here, not a one-time guess.</p>
+      <a class="compact-step-link" href="#" onclick="navigate('log'); return false;" aria-label="Open Workout Log">Log →</a>
     </div>
   `;
 }
@@ -793,15 +801,16 @@ function renderStepCheckinCard(date) {
   const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
   const stepSource = typeof formatStepSource === 'function' ? formatStepSource(entry) : '';
   return `
-    <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 4 ? 'onboarding-focus' : ''}">
+    <div class="card${collapsed ? ' panel-card-collapsed' : ''} ${STATE.onboarding.active && STATE.onboarding.step === 4 ? 'onboarding-focus' : ''}">
       <div class="card-title">
-        ${isToday ? "Today's step check-in" : 'Step check-in'}
+        <span>${isToday ? "Today's step check-in" : 'Step check-in'}</span>
+        ${collapsed ? `<span class="panel-inline-summary">${entry ? `${Number(entry.steps).toLocaleString()} steps` : 'No steps logged'}</span>` : ''}
         <span class="panel-heading-actions">
           ${isToday && ctx.checkinStreak > 1 ? `<span class="badge badge-ok">${ctx.checkinStreak} day streak</span>` : ''}
           <button class="panel-collapse-btn" onclick="toggleRememberedPanel('stepCheckinCollapsed')" aria-expanded="${!collapsed}" aria-label="${collapsed ? 'Expand' : 'Minimize'} step check-in">${collapsed ? '+' : '−'}</button>
         </span>
       </div>
-      ${collapsed ? `<p class="panel-collapsed-summary">${entry ? `${Number(entry.steps).toLocaleString()} steps logged` : 'No steps logged'}</p>` : `
+      ${collapsed ? '' : `
       <div class="field-row" style="align-items:end;">
         <div class="field" style="margin-bottom:0;">
           <label>${isToday ? 'Steps so far today' : 'Steps that day'}</label>
@@ -817,7 +826,7 @@ function renderStepCheckinCard(date) {
 }
 
 function toggleRememberedPanel(key) {
-  if (!['stepCheckinCollapsed', 'restTimerPanelCollapsed', 'restTimerWidgetCollapsed'].includes(key)) return;
+  if (!['stepCheckinCollapsed', 'restTimerPanelCollapsed', 'restTimerWidgetCollapsed', 'workoutComplianceCollapsed'].includes(key)) return;
   STATE.uiPrefs[key] = !STATE.uiPrefs[key];
   persist(); render();
 }
@@ -932,7 +941,7 @@ function updateWeight(value) {
   const n = numOrNull(value);
   const kg = STATE.profile.unitSystem === 'imperial' ? (n != null ? lbToKg(n) : null) : n;
   if (kg != null && (kg < 20 || kg > 400)) {
-    toast('Enter a weight between 20 and 400 kg (44-882 lb).');
+    toast(usesImperialUnits() ? 'Enter a weight between 44 and 882 lb.' : 'Enter a weight between 20 and 400 kg.');
     render();
     return;
   }

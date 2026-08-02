@@ -60,6 +60,13 @@ function getTrainingExperienceOption(key) {
   return TRAINING_EXPERIENCE_OPTIONS.find(option => option.key === key) || TRAINING_EXPERIENCE_OPTIONS[0];
 }
 
+function formatGuidanceEvidenceNote(source) {
+  const note = String(source?.note || '');
+  return usesImperialUnits()
+    ? note.replace('1.6 g/kg/day', `${(1.6 / 2.20462262185).toFixed(2)} g/lb/day`)
+    : note;
+}
+
 function getWeightGoalDirection() {
   const current = currentWeightKg();
   const target = Number(STATE.goal.targetWeightKg);
@@ -134,6 +141,33 @@ function getGoalGuidance() {
   };
 }
 
+// This is a transparent starting allocation, not a rigid prescription.
+// Protein is goal/body-weight based; fat stays inside the adult AMDR; carbs
+// receive the remaining energy because their useful amount changes most with
+// training volume and sport demands.
+function getGoalMacroPlan(calorieTarget) {
+  const guidance = getGoalGuidance();
+  const kcal = Number(calorieTarget);
+  if (!Number.isFinite(kcal) || kcal <= 0 || !guidance.proteinLowGrams) return null;
+  const fatMinPct = 0.20;
+  const fatMaxPct = guidance.focus.key === 'performance' ? 0.30 : 0.35;
+  const fatMidPct = (fatMinPct + fatMaxPct) / 2;
+  const proteinMid = (guidance.proteinLowGrams + guidance.proteinHighGrams) / 2;
+  const carbEstimateGrams = Math.max(0, Math.round((kcal - proteinMid * 4 - kcal * fatMidPct) / 4));
+  return {
+    ...guidance,
+    calorieTarget: kcal,
+    fatLowGrams: Math.round(kcal * fatMinPct / 9),
+    fatHighGrams: Math.round(kcal * fatMaxPct / 9),
+    fatMinPct: Math.round(fatMinPct * 100),
+    fatMaxPct: Math.round(fatMaxPct * 100),
+    carbEstimateGrams,
+    carbNote: guidance.focus.key === 'performance'
+      ? 'Carbohydrate is the main adjustable fuel for training. Increase it around longer or harder sessions and judge the result from performance and recovery.'
+      : 'Carbohydrate receives the flexible calories left after protein and fat. Move it up or down with activity, preference, hunger, and training performance.',
+  };
+}
+
 function setGoalFocus(key) {
   STATE.goal.focus = getGoalFocusOption(key).key;
   persist(); render();
@@ -143,4 +177,3 @@ function setTrainingExperience(key) {
   STATE.goal.trainingExperience = getTrainingExperienceOption(key).key;
   persist(); render();
 }
-

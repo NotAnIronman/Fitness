@@ -113,6 +113,7 @@ function restartOnboarding() {
   STATE.onboarding.step = 0;
   STATE.onboarding.skippedSteps = [];
   STATE.onboarding.completedAt = null;
+  STATE.uiPrefs.onboardingGuideCollapsed = false;
   persist(); navigate('home');
 }
 
@@ -123,8 +124,15 @@ function renderOnboardingGuide() {
   const step = ONBOARDING_STEPS[index] || ONBOARDING_STEPS[0];
   const setupSteps = 6;
   const progress = index === 0 ? 0 : Math.min(setupSteps, index - 1);
+  if (STATE.uiPrefs.onboardingGuideCollapsed) {
+    return `<aside class="onboarding-guide onboarding-guide-collapsed" aria-live="polite" aria-label="Forge setup guide, minimized">
+      <button class="onboarding-expand" onclick="toggleOnboardingGuideCollapsed()" aria-label="Expand setup guide">Coach · ${escapeAttr(step.title)} <span>+</span></button>
+      <button class="onboarding-close" onclick="dismissOnboarding()" aria-label="Close setup guide" title="Close setup guide">×</button>
+    </aside>`;
+  }
   return `<aside class="onboarding-guide" aria-live="polite" aria-label="Forge setup guide">
     <button class="onboarding-close" onclick="dismissOnboarding()" aria-label="Close setup guide" title="Close setup guide">×</button>
+    <button class="onboarding-minimize" onclick="toggleOnboardingGuideCollapsed()" aria-label="Minimize setup guide" title="Minimize setup guide">−</button>
     <div class="onboarding-pet">${renderPetSprite(52)}</div>
     <div class="onboarding-copy">
       <div class="onboarding-kicker">${index === 0 ? 'Your setup guide' : index === 7 ? 'Setup complete' : `Setup ${progress + 1} of ${setupSteps}`}</div>
@@ -136,4 +144,9 @@ function renderOnboardingGuide() {
       </div>
     </div>
   </aside>`;
+}
+
+function toggleOnboardingGuideCollapsed() {
+  STATE.uiPrefs.onboardingGuideCollapsed = !STATE.uiPrefs.onboardingGuideCollapsed;
+  persist(); render();
 }

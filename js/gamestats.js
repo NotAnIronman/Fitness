@@ -52,10 +52,17 @@ function buildGameContext() {
   const totalExercisesLogged = Object.values(STATE.workoutLog).reduce((s, arr) => s + arr.filter(hasCompletedWork).length, 0);
   const workoutStreak = computeCalendarStreak(logDatesWithExercises);
   const bodyPartsSet = new Set();
+  const sportMinutesById = {};
+  let totalSportMinutes = 0;
   let usedPerSetWeights = false;
   Object.values(STATE.workoutLog).forEach(arr => arr.filter(hasCompletedWork).forEach(e => {
     const ex = EXERCISE_LIBRARY.find(x => x.id === e.exerciseId) || e.custom;
     if (ex && ex.bodyPart) bodyPartsSet.add(ex.bodyPart);
+    if (ex && ex.category === 'Sports') {
+      const minutes = Math.max(0, Number(e.durationMin) || 0);
+      sportMinutesById[ex.id] = (sportMinutesById[ex.id] || 0) + minutes;
+      totalSportMinutes += minutes;
+    }
     if (e.perSetWeights && e.perSetWeights.length) usedPerSetWeights = true;
   }));
   let hasPersonalRecord = false;
@@ -103,13 +110,17 @@ function buildGameContext() {
   const ownedItemsCount = STATE.pet.ownedItems.length;
   const slotsEquipped = Object.values(STATE.pet.equipped).filter(Boolean).length;
   const totalPointsEarned = STATE.pet.totalPointsEarned;
+  const medalRanks = { bronze: 1, silver: 2, gold: 3, platinum: 4 };
+  const silverOrHigherStates = Object.values(STATE.pet.travel?.medals || {})
+    .filter(tier => (medalRanks[tier] || 0) >= medalRanks.silver).length;
 
   return {
     checkinCount, maxStepsDay, checkinStreak, last7DayAvgSteps, last7CalendarDaysLogged,
     totalExercisesLogged, workoutStreak, bodyPartsTouched: bodyPartsSet.size, usedPerSetWeights, hasPersonalRecord, activeplanDays,
+    sportMinutesById, totalSportMinutes,
     totalFoodDaysLogged, onTargetDays, onTargetStreak, savedMealsCount, maxItemsInADay,
     weightLogCount, weightStreak, hasGoal, goalReached,
     profileComplete, bodyFatCalculated,
-    hasPet, ownedItemsCount, slotsEquipped, totalPointsEarned,
+    hasPet, ownedItemsCount, slotsEquipped, totalPointsEarned, silverOrHigherStates,
   };
 }

@@ -122,6 +122,13 @@ function renderThemes() {
         </div>
       ` : ''}
 
+      <p class="hint" style="margin-bottom:6px;"><strong style="color:var(--text);">Camera-to-camera QR:</strong> show this device's backup to the other device. Large histories are split into numbered codes; nothing is uploaded.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+        <button class="btn" onclick="startQrTransferSend()">Show transfer QR</button>
+        <button class="btn" onclick="openQrTransferReceiver()">Scan transfer QR</button>
+      </div>
+      ${UI.qrTransferMode ? renderQrTransferPanel() : ''}
+
       <p class="hint" style="margin-bottom:6px;"><strong style="color:var(--text);">Traditional file backup:</strong> a .json file you keep somewhere (or attach to an email to yourself, upload to your own cloud storage, etc).</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" onclick="exportData()">Export backup (.json)</button>
@@ -367,6 +374,173 @@ async function importFromPasteSync() {
     console.error(e);
     alert(e.message && e.message.includes('sync code') ? e.message : "That doesn't look like a valid Forge sync code. Make sure you copied the whole thing.");
   }
+}
+
+/* ---------- Direct QR transfer ----------
+   The compressed backup is split into independently scannable QR frames.
+   This keeps the exchange local without pretending a growing history will
+   fit in a single QR symbol. */
+const QR_TRANSFER_PREFIX = 'FORGEQR1';
+const QR_TRANSFER_CHUNK_SIZE = 1200;
+let _qrReceiveParts = null;
+let _qrReceiveReader = null;
+let _qrReceiveControls = null;
+let _qrLastText = '';
+
+async function startQrTransferSend() {
+  try {
+    const { data } = await compressToBase64(JSON.stringify(STATE));
+    const transferId = Math.random().toString(36).slice(2, 10);
+    const chunks = [];
+    for (let i = 0; i < data.length; i += QR_TRANSFER_CHUNK_SIZE) chunks.push(data.slice(i, i + QR_TRANSFER_CHUNK_SIZE));
+    UI.qrPayloadParts = chunks.map((chunk, index) => `${QR_TRANSFER_PREFIX}|${transferId}|${index + 1}|${chunks.length}|${chunk}`);
+    UI.qrPartIndex = 0;
+    UI.qrTransferMode = 'send';
+    UI.qrStatus = '';
+    render();
+    requestAnimationFrame(renderCurrentQrPart);
+  } catch (error) {
+    console.error(error);
+    toast('Could not prepare the QR transfer. Try Copy sync code instead.');
+  }
+}
+
+function renderQrTransferPanel() {
+  if (UI.qrTransferMode === 'send') {
+    const total = UI.qrPayloadParts.length;
+    return `<div class="qr-transfer-panel">
+      <div class="card-title">Show this to the receiving device</div>
+      <div id="forge-qr-code" class="qr-code-box" aria-label="Transfer QR code part ${UI.qrPartIndex + 1} of ${total}"></div>
+      <div class="qr-part-controls">
+        <button class="btn btn-sm" onclick="changeQrTransferPart(-1)" ${UI.qrPartIndex <= 0 ? 'disabled' : ''}>← Previous</button>
+        <strong>Part ${UI.qrPartIndex + 1} of ${total}</strong>
+        <button class="btn btn-sm" onclick="changeQrTransferPart(1)" ${UI.qrPartIndex >= total - 1 ? 'disabled' : ''}>Next →</button>
+      </div>
+      <p class="hint">The receiving device can scan parts in any order and ignores duplicates. This code contains your Forge data, so only show it to a device you trust.</p>
+      <button class="btn btn-ghost btn-sm" onclick="closeQrTransfer()">Done</button>
+    </div>`;
+  }
+  return `<div class="qr-transfer-panel">
+    <div class="card-title">Scan the sending device</div>
+    <p id="qr-receive-status" class="hint">${escapeAttr(UI.qrStatus || 'Point your camera at a numbered part. Keep scanning until every part is received.')}</p>
+    <video id="qr-transfer-video" class="qr-transfer-video" muted playsinline></video>
+    <div class="qr-receive-progress"><div id="qr-receive-progress-fill"></div></div>
+    <button class="btn btn-ghost btn-sm" onclick="closeQrTransfer()">Cancel</button>
+  </div>`;
+}
+
+function renderCurrentQrPart() {
+  const holder = document.getElementById('forge-qr-code');
+  const text = UI.qrPayloadParts[UI.qrPartIndex];
+  if (!holder || !text || typeof qrcode !== 'function') return;
+  try {
+    const code = qrcode(0, 'M');
+    code.addData(text);
+    code.make();
+    holder.innerHTML = code.createSvgTag(4, 4);
+  } catch (error) {
+    console.error(error);
+    holder.textContent = 'This transfer part could not be rendered. Use Copy sync code instead.';
+  }
+}
+
+function changeQrTransferPart(delta) {
+  UI.qrPartIndex = Math.max(0, Math.min(UI.qrPayloadParts.length - 1, UI.qrPartIndex + delta));
+  render();
+  requestAnimationFrame(renderCurrentQrPart);
+}
+
+function openQrTransferReceiver() {
+  UI.qrTransferMode = 'receive';
+  UI.qrStatus = 'Starting camera…';
+  _qrReceiveParts = { transferId: null, total: 0, chunks: new Map() };
+  _qrLastText = '';
+  render();
+  startQrReceiveScanner();
+}
+
+async function startQrReceiveScanner() {
+  try {
+    await loadZXing();
+    const video = document.getElementById('qr-transfer-video');
+    if (!video || UI.qrTransferMode !== 'receive') return;
+    const Reader = ZXingBrowser.BrowserQRCodeReader || ZXingBrowser.BrowserMultiFormatReader;
+    _qrReceiveReader = new Reader(undefined, { delayBetweenScanAttempts: 150 });
+    _qrReceiveControls = await _qrReceiveReader.decodeFromConstraints(
+      { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } },
+      video,
+      result => { if (result) handleQrTransferText(result.getText()); }
+    );
+    updateQrReceiveStatus('Camera ready. Scan each numbered part.');
+  } catch (error) {
+    console.error(error);
+    const message = error?.name === 'NotAllowedError'
+      ? 'Camera access was denied. Allow it and try again, or use Copy sync code.'
+      : `Could not start the QR scanner (${error?.message || 'unknown error'}).`;
+    updateQrReceiveStatus(message);
+  }
+}
+
+async function handleQrTransferText(text) {
+  if (!text || text === _qrLastText || !_qrReceiveParts) return;
+  _qrLastText = text;
+  setTimeout(() => { if (_qrLastText === text) _qrLastText = ''; }, 800);
+  const match = /^FORGEQR1\|([a-z0-9]{4,16})\|(\d+)\|(\d+)\|([\s\S]+)$/.exec(text);
+  if (!match) { updateQrReceiveStatus('That is not a Forge transfer QR code.'); return; }
+  const [, transferId, partText, totalText, chunk] = match;
+  const part = Number(partText), total = Number(totalText);
+  if (total < 1 || total > 500 || part < 1 || part > total) { updateQrReceiveStatus('That transfer code has invalid part numbers.'); return; }
+  if (_qrReceiveParts.transferId && _qrReceiveParts.transferId !== transferId) {
+    updateQrReceiveStatus('This code belongs to a different transfer. Continue with the original sending device.');
+    return;
+  }
+  _qrReceiveParts.transferId = transferId;
+  _qrReceiveParts.total = total;
+  _qrReceiveParts.chunks.set(part, chunk);
+  const received = _qrReceiveParts.chunks.size;
+  updateQrReceiveStatus(`Received ${received} of ${total}. ${received < total ? 'Show another part.' : 'Preparing import…'}`, received / total);
+  if (received !== total) return;
+
+  stopQrReceiveScanner();
+  try {
+    const joined = Array.from({ length: total }, (_, index) => _qrReceiveParts.chunks.get(index + 1)).join('');
+    const parsed = await decompressFromText(joined);
+    if (!window.confirm(`All ${total} QR part${total === 1 ? '' : 's'} received. Merge this backup into the data on this device?`)) {
+      updateQrReceiveStatus('Import cancelled.');
+      return;
+    }
+    STATE = mergeImportedState(parsed);
+    persist();
+    UI.qrTransferMode = null;
+    render();
+    toast('QR transfer imported and merged.');
+  } catch (error) {
+    console.error(error);
+    updateQrReceiveStatus('All parts were read, but the backup could not be decoded. Start a new transfer and try again.');
+  }
+}
+
+function updateQrReceiveStatus(message, progress) {
+  UI.qrStatus = message;
+  const status = document.getElementById('qr-receive-status');
+  if (status) status.textContent = message;
+  const fill = document.getElementById('qr-receive-progress-fill');
+  if (fill && Number.isFinite(progress)) fill.style.width = `${Math.round(progress * 100)}%`;
+}
+
+function stopQrReceiveScanner() {
+  if (_qrReceiveControls) { try { _qrReceiveControls.stop(); } catch (error) { /* already stopped */ } }
+  _qrReceiveControls = null;
+  _qrReceiveReader = null;
+}
+
+function closeQrTransfer() {
+  stopQrReceiveScanner();
+  UI.qrTransferMode = null;
+  UI.qrPayloadParts = [];
+  UI.qrPartIndex = 0;
+  _qrReceiveParts = null;
+  render();
 }
 
 function exportData() {

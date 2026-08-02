@@ -86,7 +86,7 @@ function renderFood() {
               ${STATE.recentFoods.length ? `
                 <p class="hint" style="margin: 10px 0 6px;">Recent:</p>
                 <div class="chip-row" style="margin-bottom:12px;">
-                  ${STATE.recentFoods.map((f, i) => `<button class="chip" onclick="openFoodAdjustFromRecent(${i})">${escapeAttr(f.name)}</button>`).join('')}
+                  ${STATE.recentFoods.map((f, i) => `<button class="chip" onclick="openFoodAdjustFromRecent(${i})">${escapeAttr(formatFoodNameForUnits(f.name))}</button>`).join('')}
                 </div>
               ` : ''}
               ${STATE.savedMeals.length ? `
@@ -106,7 +106,7 @@ function renderFood() {
                 <div class="food-search-results">
                   ${UI.foodResults.map((f, i) => `
                     <div class="food-search-item" style="cursor:pointer; display:flex; justify-content:space-between;" onclick="openFoodAdjust(${i})">
-                      <span>${escapeAttr(f.name)}</span>
+                      <span>${escapeAttr(formatFoodNameForUnits(f.name))}</span>
                       <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">${Math.round(f.kcal)} kcal</span>
                     </div>
                   `).join('')}
@@ -149,7 +149,7 @@ function renderFood() {
           ${entries.map((e, i) => `
             <div class="exercise-row">
               <div>
-                <div class="name">${formatQty(e.qty)} x ${escapeAttr(e.name)}</div>
+                <div class="name">${formatQty(e.qty)} x ${escapeAttr(formatFoodNameForUnits(e.name))}</div>
                 <div class="meta">P ${Math.round(e.protein * e.qty)}g . C ${Math.round(e.carbs * e.qty)}g . F ${Math.round(e.fat * e.qty)}g</div>
                 <div class="chip-row" style="margin-top:6px;">
                   ${[0.5, 1, 1.5, 2].map(q => `<button class="chip ${e.qty === q ? 'active' : ''}" onclick="setFoodQty(${i}, ${q})">${formatQty(q)}x</button>`).join('')}
@@ -178,21 +178,19 @@ function renderFood() {
 
 function renderGoalNutritionGuidance(totals) {
   const guidance = getGoalGuidance();
-  if (!guidance.proteinLowGrams) return '';
+  const macroPlan = getGoalMacroPlan(getFoodTargetCalories());
+  if (!guidance.proteinLowGrams || !macroPlan) return '';
   const protein = Math.round(totals.protein);
-  const status = protein >= guidance.proteinLowGrams && protein <= guidance.proteinHighGrams
-    ? '<span class="badge badge-ok">In range</span>'
-    : protein > guidance.proteinHighGrams
-      ? '<span class="badge badge-warn">Above range</span>'
-      : '<span class="badge">Building</span>';
+  const carbs = Math.round(totals.carbs);
+  const fat = Math.round(totals.fat);
   return `<div class="card goal-nutrition-card">
-    <div class="card-title">${escapeAttr(guidance.focus.label)} nutrition lens ${status}</div>
+    <div class="card-title">${escapeAttr(guidance.focus.label)} macro plan</div>
     <div class="grid grid-3">
-      <div class="stat"><div class="stat-label">Protein logged</div><div class="stat-value" style="font-size:20px;">${protein}<span class="unit">g</span></div></div>
-      <div class="stat"><div class="stat-label">Planning range</div><div class="stat-value accent" style="font-size:20px;">${guidance.proteinLowGrams}-${guidance.proteinHighGrams}<span class="unit">g</span></div></div>
-      <div class="stat"><div class="stat-label">Reference</div><div class="stat-value" style="font-size:20px;">${Math.round(guidance.proteinReferenceKg)}<span class="unit">kg</span></div></div>
+      <div class="stat"><div class="stat-label">Protein</div><div class="stat-value" style="font-size:20px;">${protein}<span class="unit">g logged</span></div><div class="hint">Plan ${guidance.proteinLowGrams}-${guidance.proteinHighGrams} g · ${formatProteinRateRange(guidance.proteinMin, guidance.proteinMax)}</div></div>
+      <div class="stat"><div class="stat-label">Carbohydrate</div><div class="stat-value accent" style="font-size:20px;">${carbs}<span class="unit">g logged</span></div><div class="hint">Flexible start ~${macroPlan.carbEstimateGrams} g</div></div>
+      <div class="stat"><div class="stat-label">Fat</div><div class="stat-value" style="font-size:20px;">${fat}<span class="unit">g logged</span></div><div class="hint">Plan ${macroPlan.fatLowGrams}-${macroPlan.fatHighGrams} g (${macroPlan.fatMinPct}-${macroPlan.fatMaxPct}% kcal)</div></div>
     </div>
-    ${(STATE.uiPrefs.knowledgeLevel || 0) >= 4 ? '' : `<p class="hint" style="margin-top:10px;">${escapeAttr(guidance.energy)} Protein is a range, not a score; exceeding it does not guarantee better results.</p>`}
+    ${(STATE.uiPrefs.knowledgeLevel || 0) >= 4 ? '' : `<p class="hint" style="margin-top:10px;">${escapeAttr(macroPlan.carbNote)} These are starting allocations, not pass/fail scores.</p>`}
   </div>`;
 }
 
@@ -232,7 +230,7 @@ function renderFoodAdjustForm() {
   const isEdit = UI.editingFoodIndex != null;
   return `
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px; margin-top:10px;">
-      <p class="hint" style="margin-bottom:10px;"><strong style="color:var(--text)">${escapeAttr(d.name)}</strong>${isEdit ? ' (editing)' : ''}. Pick a serving size, the numbers below update to match automatically, then correct anything that doesn't match your package.</p>
+      <p class="hint" style="margin-bottom:10px;"><strong style="color:var(--text)">${escapeAttr(formatFoodNameForUnits(d.name))}</strong>${isEdit ? ' (editing)' : ''}. Pick a serving size, the numbers below update to match automatically, then correct anything that doesn't match your package.</p>
       <div class="field">
         <label>Servings</label>
         <input type="number" id="fa-qty" data-focus-id="fa-qty" step="0.25" min="0.25" value="${d.qty}" onchange="onAdjustQtyInput(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
@@ -334,10 +332,11 @@ function renderWaterCard(date) {
   const isImperial = p.unitSystem === 'imperial';
   const entry = STATE.dailyWater[date];
   const loggedMl = entry ? entry.ml : 0;
-  const target = getWaterTargetMl(p.weightKg, p.sex);
+  const target = getWaterTargetMl(p.weightKg);
   const toDisplay = ml => isImperial ? `${(ml / 29.5735).toFixed(0)} fl oz` : `${(ml / 1000).toFixed(2)} L`;
   const pct = target ? Math.min(100, (loggedMl / target) * 100) : 0;
   const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
+  const hydrationRate = formatHydrationRate(33);
 
   return `
     <div class="card">
@@ -345,15 +344,15 @@ function renderWaterCard(date) {
       ${target ? `
         <div class="grid grid-2" style="margin-bottom:10px;">
           <div class="stat"><div class="stat-label">Logged today</div><div class="stat-value" style="font-size:20px;">${toDisplay(loggedMl)}</div></div>
-          <div class="stat"><div class="stat-label">Target</div><div class="stat-value accent" style="font-size:20px;">${toDisplay(target)}</div></div>
+          <div class="stat"><div class="stat-label">Logging estimate</div><div class="stat-value accent" style="font-size:20px;">${toDisplay(target)}</div></div>
         </div>
         <div class="macro-bar-track" style="margin-bottom:12px;"><div class="macro-bar-fill" style="width:${pct}%; background:#38BDF8;"></div></div>
-        <p class="hint" style="margin-bottom:10px;">${expert ? 'Starting estimate: 33 ml/kg. Adjust for thirst, heat, and sweat.' : 'A practical starting estimate of ~33 ml/kg. This is not a precise requirement: water in food and other drinks contributes, while heat, altitude, illness, and sweat losses can raise needs. Thirst and urine color are useful day-to-day checks. Reach this logged-fluid target for the day and your pet earns one water item.'}</p>
+        <p class="hint" style="margin-bottom:10px;">${expert ? `Fluid-log estimate: ${hydrationRate}; adjust for conditions and sweat.` : `A practical fluid-logging estimate of ~${hydrationRate}, not an official requirement. National Academies reference values cover total water from food and every beverage; individual needs vary with heat, altitude, illness, pregnancy or breastfeeding, and sweat losses. Thirst is a useful day-to-day guide. Reach this logged-fluid target and your pet earns one water item.`}</p>
         <div class="chip-row">
           ${[250, 350, 500, 750].map(ml => `<button class="chip" onclick="logWater(${ml}, '${date}')">+${toDisplay(ml)}</button>`).join('')}
           <button class="chip" onclick="undoLastWater('${date}')">Undo last</button>
         </div>
-      ` : `<div class="hint">Set your weight on Home to see a personalized water target.</div>`}
+      ` : `<div class="hint">Set your weight on Home to see a body-size-based fluid-logging estimate.</div>`}
     </div>
   `;
 }
@@ -743,7 +742,7 @@ function renderMealBuilder() {
           <div class="food-search-results">
             ${UI.foodResults.map((f, i) => `
               <div class="food-search-item" style="cursor:pointer; display:flex; justify-content:space-between;" onclick="addItemToMeal(${i})">
-                <span>${escapeAttr(f.name)}</span>
+                <span>${escapeAttr(formatFoodNameForUnits(f.name))}</span>
                 <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">${Math.round(f.kcal)} kcal</span>
               </div>
             `).join('')}
@@ -757,7 +756,7 @@ function renderMealBuilder() {
           ${items.map((it, i) => `
             <div class="exercise-row">
               <div>
-                <div class="name">${escapeAttr(it.name)}</div>
+                <div class="name">${escapeAttr(formatFoodNameForUnits(it.name))}</div>
                 <div class="meta">P ${Math.round(it.protein * it.qty)}g . C ${Math.round(it.carbs * it.qty)}g . F ${Math.round(it.fat * it.qty)}g</div>
               </div>
               <input type="number" step="0.25" min="0.25" value="${it.qty}" onchange="setMealItemQty(${i}, this.value)" onkeydown="if(event.key==='Enter') this.blur()" style="width:60px;">

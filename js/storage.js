@@ -62,6 +62,8 @@ function defaultState() {
       stepCheckinCollapsed: false,
       restTimerPanelCollapsed: false,
       restTimerWidgetCollapsed: false,
+      workoutComplianceCollapsed: false,
+      onboardingGuideCollapsed: false,
     },
     onboarding: {
       active: true,          // fresh installs get a guided, pet-led setup
@@ -288,6 +290,8 @@ function normalizeStateShape(state) {
   state.uiPrefs.stepCheckinCollapsed = !!state.uiPrefs.stepCheckinCollapsed;
   state.uiPrefs.restTimerPanelCollapsed = !!state.uiPrefs.restTimerPanelCollapsed;
   state.uiPrefs.restTimerWidgetCollapsed = !!state.uiPrefs.restTimerWidgetCollapsed;
+  state.uiPrefs.workoutComplianceCollapsed = !!state.uiPrefs.workoutComplianceCollapsed;
+  state.uiPrefs.onboardingGuideCollapsed = !!state.uiPrefs.onboardingGuideCollapsed;
   if (!Array.isArray(state.onboarding.skippedSteps)) state.onboarding.skippedSteps = [];
   state.onboarding.step = Math.max(0, Math.min(7, Math.round(Number(state.onboarding.step) || 0)));
   state.onboarding.active = !!state.onboarding.active;

@@ -3,8 +3,8 @@
    Uses @zxing/browser (MIT license, pure JS) rather than the native
    BarcodeDetector API, since Safari/iOS doesn't implement that API at
    all, native-API-only would silently fail on every iPhone. The
-   library is lazy-loaded from a CDN only when someone actually opens
-   the scanner, not on every page load.
+   library is bundled locally and lazy-loaded only when a scanning page is
+   opened, not on every page load.
 
    Barcode -> nutrition lookup uses Open Food Facts (openfoodfacts.org,
    free, no API key, Open Database License), which is specifically a
@@ -18,7 +18,7 @@
 // CommonJS build (require/module.exports), which is not valid as a plain
 // <script> tag, it "loads" (network-wise) but defines nothing, silently
 // leaving ZXingBrowser undefined. Pinning the exact umd/ path avoids that.
-const ZXING_BROWSER_CDN = 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/umd/zxing-browser.min.js';
+const ZXING_BROWSER_CDN = 'js/vendor/zxing-browser.min.js';
 const OPEN_FOOD_FACTS_URL = 'https://world.openfoodfacts.org/api/v2/product/';
 
 let _zxingLoadPromise = null;
@@ -48,6 +48,7 @@ let _zxingReader = null;
 let _zxingControls = null;
 
 function renderBarcodeScanner() {
+  const scanDistance = usesImperialUnits() ? 'about 4-6 inches' : 'about 10-15 cm';
   return `
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px; margin-bottom:14px;">
       <p class="hint" style="margin-bottom:10px;">${escapeAttr(UI.barcodeStatus || 'Point your camera at a product barcode.')}</p>
@@ -55,7 +56,7 @@ function renderBarcodeScanner() {
       <div style="display:flex; gap:8px; margin-top:10px;">
         <button class="btn btn-ghost btn-sm" onclick="closeBarcodeScanner()">Cancel</button>
       </div>
-      <p class="hint" style="margin-top:8px;">Struggling to get a read? A few things that matter more than the software: good even lighting (avoid glare on the barcode), hold it flat and steady about 10-15cm from the camera, and make sure the whole barcode is in frame. Laptop webcams especially can have slow or fixed-distance autofocus, if it won't lock on, try tilting slightly or moving a bit further back.</p>
+      <p class="hint" style="margin-top:8px;">Struggling to get a read? A few things that matter more than the software: good even lighting (avoid glare on the barcode), hold it flat and steady ${scanDistance} from the camera, and make sure the whole barcode is in frame. Laptop webcams especially can have slow or fixed-distance autofocus, if it won't lock on, try tilting slightly or moving a bit further back.</p>
       <p class="hint" style="margin-top:4px;">Still not working? Barcode scanning needs camera access and a secure (https) connection. You can always search by name instead.</p>
     </div>
   `;
