@@ -108,11 +108,16 @@ function buildGameContext() {
   // ---- Pet ----
   const hasPet = !!STATE.pet.species;
   const ownedItemsCount = STATE.pet.ownedItems.length;
+  const ownsCrown = STATE.pet.ownedItems.includes('crown');
   const slotsEquipped = Object.values(STATE.pet.equipped).filter(Boolean).length;
   const totalPointsEarned = STATE.pet.totalPointsEarned;
   const medalRanks = { bronze: 1, silver: 2, gold: 3, platinum: 4 };
   const silverOrHigherStates = Object.values(STATE.pet.travel?.medals || {})
     .filter(tier => (medalRanks[tier] || 0) >= medalRanks.silver).length;
+  const goldOrHigherStates = Object.values(STATE.pet.travel?.medals || {})
+    .filter(tier => (medalRanks[tier] || 0) >= medalRanks.gold).length;
+  const platinumStates = Object.values(STATE.pet.travel?.medals || {})
+    .filter(tier => tier === 'platinum').length;
 
   return {
     checkinCount, maxStepsDay, checkinStreak, last7DayAvgSteps, last7CalendarDaysLogged,
@@ -121,6 +126,7 @@ function buildGameContext() {
     totalFoodDaysLogged, onTargetDays, onTargetStreak, savedMealsCount, maxItemsInADay,
     weightLogCount, weightStreak, hasGoal, goalReached,
     profileComplete, bodyFatCalculated,
-    hasPet, ownedItemsCount, slotsEquipped, totalPointsEarned, silverOrHigherStates,
+    hasPet, ownedItemsCount, ownsCrown, slotsEquipped, totalPointsEarned,
+    silverOrHigherStates, goldOrHigherStates, platinumStates,
   };
 }

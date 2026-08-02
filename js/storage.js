@@ -66,6 +66,11 @@ function defaultState() {
       onboardingGuideCollapsed: false,
       foodGoalTimelineCollapsed: false,
       weeklyMovementCollapsed: false,
+      // Your Page stores preferences only. Empty order means the built-in
+      // order; hidden/sizing entries are the user's deviations from it.
+      yourPageTileOrder: [],
+      yourPageHiddenTiles: [],
+      yourPageTileSizes: {},
     },
     onboarding: {
       active: true,          // fresh installs get a guided, pet-led setup
@@ -278,12 +283,17 @@ function normalizeStateShape(state) {
     };
   });
   if (!Array.isArray(state.workoutPlan.days)) state.workoutPlan.days = [];
-  state.workoutPlan.days = state.workoutPlan.days.slice(0, 100).filter(isPlainObject).map(day => ({
-    id: safeStateId(day.id),
-    name: String(day.name || 'Training day').slice(0, 100),
-    exercises: Array.isArray(day.exercises) ? day.exercises.slice(0, 500).map(normalizeExerciseEntry).filter(Boolean) : [],
-  }));
+  state.workoutPlan.days = state.workoutPlan.days.slice(0, 100).filter(isPlainObject).map(day => {
+    const normalized = {
+      id: safeStateId(day.id),
+      name: String(day.name || 'Training day').slice(0, 100),
+      exercises: Array.isArray(day.exercises) ? day.exercises.slice(0, 500).map(normalizeExerciseEntry).filter(Boolean) : [],
+    };
+    if (typeof day.locationId === 'string' && day.locationId) normalized.locationId = day.locationId.slice(0, 100);
+    return normalized;
+  });
   state.workoutLog = normalizeDatedLog(state.workoutLog, normalizeLoggedExerciseEntry);
+  normalizeOptionalWorkoutLocations(state);
   state.foodLog = normalizeDatedLog(state.foodLog, normalizeFoodEntry);
   if (!Array.isArray(state.uiPrefs.collapsedNotices)) state.uiPrefs.collapsedNotices = [];
   if (!isPlainObject(state.uiPrefs.noticeOverrides)) state.uiPrefs.noticeOverrides = {};
@@ -296,6 +306,11 @@ function normalizeStateShape(state) {
   state.uiPrefs.onboardingGuideCollapsed = !!state.uiPrefs.onboardingGuideCollapsed;
   state.uiPrefs.foodGoalTimelineCollapsed = !!state.uiPrefs.foodGoalTimelineCollapsed;
   state.uiPrefs.weeklyMovementCollapsed = !!state.uiPrefs.weeklyMovementCollapsed;
+  if (!Array.isArray(state.uiPrefs.yourPageTileOrder)) state.uiPrefs.yourPageTileOrder = [];
+  if (!Array.isArray(state.uiPrefs.yourPageHiddenTiles)) state.uiPrefs.yourPageHiddenTiles = [];
+  if (!isPlainObject(state.uiPrefs.yourPageTileSizes)) state.uiPrefs.yourPageTileSizes = {};
+  state.uiPrefs.yourPageTileOrder = state.uiPrefs.yourPageTileOrder.slice(0, 30).map(String);
+  state.uiPrefs.yourPageHiddenTiles = state.uiPrefs.yourPageHiddenTiles.slice(0, 30).map(String);
   if (!Array.isArray(state.onboarding.skippedSteps)) state.onboarding.skippedSteps = [];
   state.onboarding.step = Math.max(0, Math.min(7, Math.round(Number(state.onboarding.step) || 0)));
   state.onboarding.active = !!state.onboarding.active;
@@ -328,6 +343,41 @@ function normalizeStateShape(state) {
   state.workoutPlan.restTimerSeconds = Math.max(10, Math.min(900, Number(state.workoutPlan.restTimerSeconds) || 90));
   state.workoutPlan.stepsPerDay = Math.max(0, Math.min(200000, Number(state.workoutPlan.stepsPerDay) || 0));
   return state;
+}
+
+// Location support is deliberately sparse. A single-location user has neither
+// of these top-level keys. Custom locations are stored once, and a logged date
+// stores only a short location id instead of duplicating its workout entries.
+function normalizeOptionalWorkoutLocations(state) {
+  if (!Array.isArray(state.workoutLocations)) {
+    delete state.workoutLocations;
+    delete state.workoutLogMeta;
+    state.workoutPlan.days.forEach(day => { delete day.locationId; });
+    return;
+  }
+  const seen = new Set();
+  state.workoutLocations = state.workoutLocations.slice(0, 25).filter(isPlainObject).map(location => ({
+    id: safeStateId(location.id),
+    name: String(location.name || 'Training location').trim().slice(0, 60),
+  })).filter(location => location.name && !seen.has(location.id) && seen.add(location.id));
+  if (!state.workoutLocations.length) {
+    delete state.workoutLocations;
+    delete state.workoutLogMeta;
+    state.workoutPlan.days.forEach(day => { delete day.locationId; });
+    return;
+  }
+  const validIds = new Set(state.workoutLocations.map(location => location.id));
+  state.workoutPlan.days.forEach(day => { if (!validIds.has(day.locationId)) delete day.locationId; });
+  const meta = {};
+  if (isPlainObject(state.workoutLogMeta)) {
+    Object.entries(state.workoutLogMeta).slice(0, 5000).forEach(([date, value]) => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && isPlainObject(value) && validIds.has(value.locationId)) {
+        meta[date] = { locationId: value.locationId };
+      }
+    });
+  }
+  if (Object.keys(meta).length) state.workoutLogMeta = meta;
+  else delete state.workoutLogMeta;
 }
 
 function normalizeDailyCheckins(checkins) {

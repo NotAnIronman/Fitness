@@ -37,6 +37,10 @@ let UI = {
   logCopyOpen: false,
   logCopyMode: 'add',
   progressExerciseId: null,
+  progressLocationId: 'all',
+  workoutLocationManagerOpen: false,
+  yourPageManagerOpen: false,
+  draggedTileId: null,
   editingExercise: null, // { scope: 'workout'|'log', dayId, entryId }
   mealBuilderOpen: false,
   mealBuilderName: '',
@@ -63,7 +67,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v19';
+const APP_VERSION = 'forge-v20';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -469,15 +473,16 @@ function cssEscape(s) {
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home & BMR', num: '01' },
-  { key: 'workouts', label: 'Workout Plan', num: '02' },
-  { key: 'log', label: 'Workout Log', num: '03' },
-  { key: 'progress', label: 'Progress', num: '04' },
-  { key: 'goals', label: 'Weight Goals', num: '05' },
-  { key: 'food', label: 'Food Tracking', num: '06' },
-  { key: 'bodyfat', label: 'Body Fat', num: '07' },
-  { key: 'achievements', label: 'Achievements', num: '08' },
-  { key: 'pet', label: 'Pet', num: '09' }, // hidden from the nav unless STATE.pet.enabled, see doRender()
-  { key: 'themes', label: 'Themes', num: '10' },
+  { key: 'yourpage', label: 'Your Page', num: '02' },
+  { key: 'workouts', label: 'Workout Plan', num: '03' },
+  { key: 'log', label: 'Workout Log', num: '04' },
+  { key: 'progress', label: 'Progress', num: '05' },
+  { key: 'goals', label: 'Weight Goals', num: '06' },
+  { key: 'food', label: 'Food Tracking', num: '07' },
+  { key: 'bodyfat', label: 'Body Fat', num: '08' },
+  { key: 'achievements', label: 'Achievements', num: '09' },
+  { key: 'pet', label: 'Pet', num: '10' }, // hidden from the nav unless STATE.pet.enabled, see doRender()
+  { key: 'themes', label: 'Themes', num: '11' },
 ];
 
 function doRender() {
@@ -525,6 +530,7 @@ function doRender() {
   `;
   const main = document.getElementById('main-content');
   if (UI.route === 'home') main.innerHTML = renderHome();
+  else if (UI.route === 'yourpage') main.innerHTML = renderYourPage();
   else if (UI.route === 'workouts') main.innerHTML = renderWorkouts();
   else if (UI.route === 'log') main.innerHTML = renderLog();
   else if (UI.route === 'progress') main.innerHTML = renderProgress();

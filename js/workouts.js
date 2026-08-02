@@ -38,6 +38,8 @@ function renderWorkouts() {
 
     ${renderGoalTrainingLens()}
 
+    ${renderWorkoutLocationManager()}
+
     <div class="grid grid-3" style="margin-bottom:16px;">
       <div class="card"><div class="stat"><div class="stat-label">Training days / week</div><div class="stat-value">${summary.workoutDaysPerWeek}</div></div></div>
       <div class="card">
@@ -131,6 +133,8 @@ function renderDayCard(day, bw) {
       </div>
 
       ${UI.copyDayOpenFor === day.id ? renderCopyDayMenu(day) : ''}
+
+      ${renderWorkoutLocationSelect(day.locationId || '', `setWorkoutPlanDayLocation('${day.id}', this.value)`, 'Planned location')}
 
       ${day.exercises.length ? `<div class="row-list">${rows}</div>` : `<div class="empty-state">No exercises yet.</div>`}
 
@@ -239,7 +243,7 @@ function renderCopyDayMenu(day) {
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:12px; margin-bottom:14px;">
       <p class="hint" style="margin-bottom:8px;">Copy all exercises from:</p>
       <div class="chip-row">
-        ${otherDays.map(d => `<button class="chip" onclick="copyDayInto('${d.id}', '${day.id}')">${escapeAttr(d.name)}</button>`).join('')}
+        ${otherDays.map(d => `<button class="chip" onclick="copyDayInto('${d.id}', '${day.id}')">${escapeAttr(d.name)}${d.locationId ? ` · ${escapeAttr(workoutLocationName(d.locationId))}` : ''}</button>`).join('')}
         <button class="chip" onclick="closeCopyDayMenu()">Cancel</button>
       </div>
     </div>

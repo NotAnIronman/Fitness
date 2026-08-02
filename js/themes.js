@@ -413,6 +413,7 @@ function buildPortableTransferState(historyDays = null) {
   }
   const scopedDates = record => historyDays === 0 ? {} : filterTransferDates(record, cutoff);
   portable.workoutLog = scopedDates(portable.workoutLog);
+  if (portable.workoutLogMeta) portable.workoutLogMeta = scopedDates(portable.workoutLogMeta);
   portable.foodLog = scopedDates(portable.foodLog);
   portable.dailyCheckins = scopedDates(portable.dailyCheckins);
   portable.dailyWater = scopedDates(portable.dailyWater);

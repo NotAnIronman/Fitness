@@ -541,7 +541,12 @@ const ACHIEVEMENTS = [
   { id: 'checkin_streak_30',  name: 'Month of Steps',       desc: 'Check in your steps 30 days in a row.',                       category: 'Steps', points: 75,check: ctx => ctx.checkinStreak >= 30, progress: ctx => ({ current: Math.min(ctx.checkinStreak, 30), target: 30 }) },
   { id: 'checkin_streak_100', name: 'Century Streak',       desc: 'Check in your steps 100 days in a row.',                      category: 'Steps', points: 200,check: ctx => ctx.checkinStreak >= 100, progress: ctx => ({ current: Math.min(ctx.checkinStreak, 100), target: 100 }) },
   { id: 'checkin_total_30',   name: 'Data Point Collector', desc: 'Log 30 daily step check-ins total.',                          category: 'Steps', points: 30,check: ctx => ctx.checkinCount >= 30, progress: ctx => ({ current: Math.min(ctx.checkinCount, 30), target: 30 }) },
+  { id: 'checkin_total_100',  name: 'Hundred Check-ins',    desc: 'Log 100 daily step check-ins total.',                         category: 'Steps', points: 75,check: ctx => ctx.checkinCount >= 100, progress: ctx => ({ current: Math.min(ctx.checkinCount, 100), target: 100 }) },
+  { id: 'checkin_streak_365', name: 'Year in Motion',       desc: 'Check in your steps 365 days in a row.',                      category: 'Steps', points: 500,check: ctx => ctx.checkinStreak >= 365, progress: ctx => ({ current: Math.min(ctx.checkinStreak, 365), target: 365 }) },
+  { id: 'avg_week_4500',      name: 'Active Week',          desc: 'Average 4,500+ steps across at least 5 / 7 calendar days.',   category: 'Steps', points: 15,check: ctx => ctx.last7CalendarDaysLogged >= 5 && ctx.last7DayAvgSteps >= 4500 },
   { id: 'avg_week_7k',        name: 'On the Move',          desc: 'Average 7,000+ steps across at least 5 / 7 calendar days.',   category: 'Steps', points: 20,check: ctx => ctx.last7CalendarDaysLogged >= 5 && ctx.last7DayAvgSteps >= 7000 },
+  { id: 'avg_week_10k',       name: 'Five-Figure Week',     desc: 'Average 10,000+ steps across at least 5 / 7 calendar days.',  category: 'Steps', points: 35,check: ctx => ctx.last7CalendarDaysLogged >= 5 && ctx.last7DayAvgSteps >= 10000 },
+  { id: 'avg_week_12500',     name: 'High-Step Week',       desc: 'Average 12,500+ steps across at least 5 / 7 calendar days.',  category: 'Steps', points: 50,check: ctx => ctx.last7CalendarDaysLogged >= 5 && ctx.last7DayAvgSteps >= 12500 },
   // Every duration-based sport earns its own hour milestone. Building these
   // from the exercise library prevents the achievement list drifting out of
   // sync when another sport is added later.
@@ -589,12 +594,29 @@ const ACHIEVEMENTS = [
   // ---- Pet & misc ----
   { id: 'adopt_pet',      name: 'New Friend',                 desc: 'Choose your pet companion.',                            category: 'Pet', points: 10,check: ctx => ctx.hasPet },
   { id: 'first_purchase', name: 'Shopper',                    desc: 'Buy your first item from the pet shop.',                category: 'Pet', points: 10,check: ctx => ctx.ownedItemsCount >= 1 },
+  { id: 'buy_crown',      name: 'Royal Treatment',            desc: 'Buy the Crown from the pet shop.',                     category: 'Pet', points: 50,check: ctx => ctx.ownsCrown },
   { id: 'fully_dressed',  name: 'Fully Dressed',              desc: 'Equip an item in every slot at once.',                  category: 'Pet', points: 40,check: ctx => ctx.slotsEquipped >= 5, progress: ctx => ({ current: ctx.slotsEquipped, target: 5 }) },
   { id: 'travel_silver_1',  name: 'State Traveler',            desc: 'Earn Silver or higher in your first state.',           category: 'Pet Travel', points: 15, check: ctx => ctx.silverOrHigherStates >= 1 },
   { id: 'travel_silver_5',  name: 'Regional Explorer',         desc: 'Earn Silver or higher in 5 states.',                   category: 'Pet Travel', points: 30, check: ctx => ctx.silverOrHigherStates >= 5, progress: ctx => ({ current: Math.min(ctx.silverOrHigherStates, 5), target: 5 }) },
   { id: 'travel_silver_10', name: 'Road Trip',                 desc: 'Earn Silver or higher in 10 states.',                  category: 'Pet Travel', points: 60, check: ctx => ctx.silverOrHigherStates >= 10, progress: ctx => ({ current: Math.min(ctx.silverOrHigherStates, 10), target: 10 }) },
   { id: 'travel_silver_25', name: 'Half the Map',              desc: 'Earn Silver or higher in 25 states.',                  category: 'Pet Travel', points: 125, check: ctx => ctx.silverOrHigherStates >= 25, progress: ctx => ({ current: Math.min(ctx.silverOrHigherStates, 25), target: 25 }) },
   { id: 'travel_silver_50', name: 'Coast to Coast',            desc: 'Earn Silver or higher in all 50 states.',              category: 'Pet Travel', points: 300, check: ctx => ctx.silverOrHigherStates >= 50, progress: ctx => ({ current: Math.min(ctx.silverOrHigherStates, 50), target: 50 }) },
+  ...[1, 5, 10, 25, 50].map(target => ({
+    id: `travel_gold_${target}`,
+    name: target === 1 ? 'Golden Arrival' : target === 50 ? 'Golden Nation' : `${target}-State Gold Tour`,
+    desc: `Earn Gold or Platinum in ${target === 1 ? '1 state' : `${target} states`}.`,
+    category: 'Pet Travel', points: target === 1 ? 20 : target * 6,
+    check: ctx => ctx.goldOrHigherStates >= target,
+    progress: ctx => ({ current: Math.min(ctx.goldOrHigherStates, target), target }),
+  })),
+  ...[1, 5, 10, 25, 50].map(target => ({
+    id: `travel_platinum_${target}`,
+    name: target === 1 ? 'Platinum Arrival' : target === 50 ? 'Platinum Nation' : `${target}-State Platinum Tour`,
+    desc: `Earn Platinum in ${target === 1 ? '1 state' : `${target} states`}.`,
+    category: 'Pet Travel', points: target === 1 ? 30 : target * 10,
+    check: ctx => ctx.platinumStates >= target,
+    progress: ctx => ({ current: Math.min(ctx.platinumStates, target), target }),
+  })),
   { id: 'points_100',     name: 'Saver',                      desc: 'Earn 100 total pet points.',                            category: 'Pet', points: 10,check: ctx => ctx.totalPointsEarned >= 100, progress: ctx => ({ current: Math.min(ctx.totalPointsEarned, 100), target: 100 }) },
   { id: 'points_500',     name: 'Big Saver',                  desc: 'Earn 500 total pet points.',                            category: 'Pet', points: 30,check: ctx => ctx.totalPointsEarned >= 500, progress: ctx => ({ current: Math.min(ctx.totalPointsEarned, 500), target: 500 }) },
   { id: 'points_1000',    name: 'Point Millionaire (almost)', desc: 'Earn 1,000 total pet points.',                          category: 'Pet', points: 75,check: ctx => ctx.totalPointsEarned >= 1000, progress: ctx => ({ current: Math.min(ctx.totalPointsEarned, 1000), target: 1000 }) },

@@ -78,9 +78,17 @@ function drawStepsChart() {
 
 // Collects every distinct exercise that appears anywhere in the log, with a
 // human label, so the picker only shows things the person has actually logged.
-function getLoggedExerciseOptions() {
+function progressLocationMatches(date, locationId) {
+  if (!locationId || locationId === 'all') return true;
+  if (locationId === 'default') return !getWorkoutLogLocationId(date);
+  return getWorkoutLogLocationId(date) === locationId;
+}
+
+function getLoggedExerciseOptions(locationId) {
+  locationId = locationId || 'all';
   const seen = new Map(); // key -> label
-  Object.values(STATE.workoutLog).forEach(entries => {
+  Object.entries(STATE.workoutLog).forEach(([date, entries]) => {
+    if (!progressLocationMatches(date, locationId)) return;
     entries.forEach(e => {
       if (!hasCompletedWork(e)) return;
       if (e.exerciseId) {
@@ -95,10 +103,12 @@ function getLoggedExerciseOptions() {
 }
 
 // Builds a date-ordered series of {date, value, unit} for one exercise key.
-function getExerciseHistory(key) {
+function getExerciseHistory(key, locationId) {
+  locationId = locationId || 'all';
   const dates = Object.keys(STATE.workoutLog).sort();
   const points = [];
   dates.forEach(date => {
+    if (!progressLocationMatches(date, locationId)) return;
     const entries = STATE.workoutLog[date].filter(e =>
       (key.startsWith('id:') ? e.exerciseId === key.slice(3) : (e.custom && e.custom.name === key.slice(7))) && hasCompletedWork(e)
     ).map(completedExerciseEntry).filter(Boolean);
@@ -123,9 +133,11 @@ function getExerciseHistory(key) {
 
 // Finds the most recent full entry (not just its chart value) logged for an
 // exercise key, used for the strength-standard comparison below.
-function getMostRecentEntryForExercise(key) {
+function getMostRecentEntryForExercise(key, locationId) {
+  locationId = locationId || 'all';
   const dates = Object.keys(STATE.workoutLog).sort().reverse();
   for (const date of dates) {
+    if (!progressLocationMatches(date, locationId)) continue;
     const match = (STATE.workoutLog[date] || []).find(e =>
       (key.startsWith('id:') ? e.exerciseId === key.slice(3) : (e.custom && e.custom.name === key.slice(7))) && hasCompletedWork(e)
     );
@@ -157,9 +169,11 @@ function renderStandingCard(standing, exerciseId) {
 }
 
 function renderProgress() {
-  const options = getLoggedExerciseOptions();
+  if (UI.progressLocationId !== 'all' && UI.progressLocationId !== 'default' && !getWorkoutLocation(UI.progressLocationId)) UI.progressLocationId = 'all';
+  const options = getLoggedExerciseOptions(UI.progressLocationId);
+  if (UI.progressExerciseId && !options.some(option => option.key === UI.progressExerciseId)) UI.progressExerciseId = null;
   if (!UI.progressExerciseId && options.length) UI.progressExerciseId = options[0].key;
-  const history = UI.progressExerciseId ? getExerciseHistory(UI.progressExerciseId) : [];
+  const history = UI.progressExerciseId ? getExerciseHistory(UI.progressExerciseId, UI.progressLocationId) : [];
   const selectedLabel = options.find(o => o.key === UI.progressExerciseId)?.label;
 
   const first = history[0];
@@ -172,7 +186,7 @@ function renderProgress() {
     const hasStandard = STRENGTH_STANDARDS[exerciseId] || STRENGTH_STANDARDS_REPS[exerciseId];
     const bw = currentWeightKg();
     if (hasStandard && bw) {
-      const recent = getMostRecentEntryForExercise(UI.progressExerciseId);
+      const recent = getMostRecentEntryForExercise(UI.progressExerciseId, UI.progressLocationId);
       if (recent) {
         let standing = null;
         if (STRENGTH_STANDARDS[exerciseId]) {
@@ -193,6 +207,8 @@ function renderProgress() {
     </div>
 
     ${renderStepsCard()}
+
+    ${getWorkoutLocations().length ? `<div class="card progress-location-filter"><div class="field" style="max-width:340px;margin-bottom:0"><label>Workout location</label><select onchange="setProgressLocation(this.value)"><option value="all" ${UI.progressLocationId === 'all' ? 'selected' : ''}>All locations</option><option value="default" ${UI.progressLocationId === 'default' ? 'selected' : ''}>Default location</option>${getWorkoutLocations().map(location => `<option value="${escapeAttr(location.id)}" ${UI.progressLocationId === location.id ? 'selected' : ''}>${escapeAttr(location.name)}</option>`).join('')}</select></div><p class="hint">Filter prevents home and gym loads from being plotted as one progression line.</p></div>` : ''}
 
     ${!options.length ? `
       <div class="card"><div class="empty-state"><div class="big">-</div>Nothing logged yet. Head to the Workout Log page and log a few sessions, then come back here to see the trend.</div></div>
@@ -228,10 +244,16 @@ function setProgressExercise(key) {
   render();
 }
 
+function setProgressLocation(locationId) {
+  UI.progressLocationId = locationId;
+  UI.progressExerciseId = null;
+  render();
+}
+
 function drawProgressChart() {
   const canvas = document.getElementById('progress-chart');
   if (!canvas || typeof Chart === 'undefined' || !UI.progressExerciseId) return;
-  const history = getExerciseHistory(UI.progressExerciseId);
+  const history = getExerciseHistory(UI.progressExerciseId, UI.progressLocationId);
   if (!history.length) return;
 
   if (_progressChart) { _progressChart.destroy(); }

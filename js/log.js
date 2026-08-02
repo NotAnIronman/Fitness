@@ -14,6 +14,7 @@ function renderLog() {
   const isToday = date === todayISO();
   const dateObj = new Date(date + 'T00:00:00');
   const dateLabel = dateObj.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  const locationId = getWorkoutLogLocationId(date);
 
   const performedEntries = entries.map(completedExerciseEntry).filter(Boolean);
   let dayKcal = 0;
@@ -37,7 +38,7 @@ function renderLog() {
         <button class="date-nav-btn" onclick="shiftLogDate(-1)" title="Previous day">‹</button>
         <div class="date-nav-bar date-nav-label">
           ${dateLabel}${isToday ? ' (today)' : ''}
-          <span class="sub">${entries.length} exercise(s)${entries.length ? `, ${completedCount}/${entries.length} fully completed` : ''}, ${Math.round(dayKcal)} completed-work kcal</span>
+          <span class="sub">${entries.length} exercise(s)${entries.length ? `, ${completedCount}/${entries.length} fully completed` : ''}, ${Math.round(dayKcal)} completed-work kcal${getWorkoutLocations().length ? ` · ${escapeAttr(workoutLocationName(locationId))}` : ''}</span>
         </div>
         <button class="date-nav-btn" onclick="shiftLogDate(1)" title="Next day">›</button>
       </div>
@@ -47,6 +48,7 @@ function renderLog() {
         </div>
         ${!isToday ? `<button class="btn btn-sm" onclick="setLogDate('${todayISO()}')" style="flex: 0 0 auto; white-space: nowrap;">Jump to today</button>` : ''}
       </div>
+      ${renderWorkoutLocationSelect(locationId, `setWorkoutLogLocation('${date}', this.value)`, 'Training location for this workout')}
     </div>
 
     ${compliance ? renderComplianceCard(compliance) : ''}
@@ -130,8 +132,8 @@ function renderCopyIntoLogMenu() {
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:12px; margin-bottom:14px;">
       <p class="hint" style="margin-bottom:8px;">${isReplace ? 'Replace everything logged today with:' : 'Copy exercises from:'}${isReplace ? ' <strong style="color:var(--danger);">This clears what\'s currently logged for this day.</strong>' : ''}</p>
       <div class="chip-row">
-        ${planDays.map(d => `<button class="chip" onclick="${planFn}('${d.id}')">Plan: ${escapeAttr(d.name)}</button>`).join('')}
-        ${hasYesterday ? `<button class="chip" onclick="${logFn}('${yIso}')">Previous day's log</button>` : ''}
+        ${planDays.map(d => `<button class="chip" onclick="${planFn}('${d.id}')">Plan: ${escapeAttr(d.name)}${d.locationId ? ` · ${escapeAttr(workoutLocationName(d.locationId))}` : ''}</button>`).join('')}
+        ${hasYesterday ? `<button class="chip" onclick="${logFn}('${yIso}')">Previous day's log${getWorkoutLogLocationId(yIso) ? ` · ${escapeAttr(workoutLocationName(getWorkoutLogLocationId(yIso)))}` : ''}</button>` : ''}
         <button class="chip" onclick="closeCopyIntoLog()">Cancel</button>
       </div>
     </div>
@@ -230,16 +232,20 @@ function closeCopyIntoLog() {
 function copyPlanDayIntoLog(planDayId) {
   const planDay = STATE.workoutPlan.days.find(d => d.id === planDayId);
   if (!planDay) return;
+  if (!canApplyWorkoutLocationToLog(UI.logDate, planDay.locationId)) return;
   const copied = planDay.exercises.map(copyExerciseForLog);
   ensureLogDate(UI.logDate).push(...copied);
+  copyWorkoutLocationToLog(planDay.locationId, UI.logDate);
   UI.logCopyOpen = false;
   persist(); render();
   toast(`Copied ${copied.length} exercise(s) from ${planDay.name}. Check them off as you complete them, or edit if actual weights differ.`);
 }
 function copyLogDateIntoLog(sourceDate) {
   const source = STATE.workoutLog[sourceDate] || [];
+  if (!canApplyWorkoutLocationToLog(UI.logDate, getWorkoutLogLocationId(sourceDate))) return;
   const copied = source.map(copyExerciseForLog);
   ensureLogDate(UI.logDate).push(...copied);
+  copyWorkoutLocationToLog(getWorkoutLogLocationId(sourceDate), UI.logDate);
   UI.logCopyOpen = false;
   persist(); render();
   toast(`Copied ${copied.length} exercise(s)`);
@@ -251,6 +257,7 @@ function replacePlanDayIntoLog(planDayId) {
   if (!planDay) return;
   const copied = planDay.exercises.map(copyExerciseForLog);
   STATE.workoutLog[UI.logDate] = copied;
+  copyWorkoutLocationToLog(planDay.locationId, UI.logDate);
   UI.logCopyOpen = false;
   persist(); render();
   toast(`Replaced today's log with ${planDay.name}`);
@@ -261,6 +268,7 @@ function replaceLogDateIntoLog(sourceDate) {
   const source = STATE.workoutLog[sourceDate] || [];
   const copied = source.map(copyExerciseForLog);
   STATE.workoutLog[UI.logDate] = copied;
+  copyWorkoutLocationToLog(getWorkoutLogLocationId(sourceDate), UI.logDate);
   UI.logCopyOpen = false;
   persist(); render();
   toast(`Replaced today's log`);
