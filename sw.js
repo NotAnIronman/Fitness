@@ -1,8 +1,9 @@
 /* ============================================================
    SERVICE WORKER
    Caches this app's own files so it still works offline. Cross-origin
-   requests (Google Fonts, Chart.js CDN, USDA/Open Food Facts/ZXing)
-   are left alone and go straight to the network, this only takes
+   requests (Google Fonts, USDA, and Open Food Facts) are left alone
+   and go straight to the network; bundled chart/QR/scanner scripts and
+   other files in this repo are handled here. This only takes
    ownership of files that live in this repo.
 
    Strategy: network-first for this app's own files. Whenever there's
@@ -23,7 +24,7 @@
    in sync with this).
    ============================================================ */
 
-const CACHE_VERSION = 'forge-v18';
+const CACHE_VERSION = 'forge-v19';
 
 const PRECACHE_URLS = [
   './',
