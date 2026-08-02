@@ -24,7 +24,7 @@
    in sync with this).
    ============================================================ */
 
-const CACHE_VERSION = 'forge-v19';
+const CACHE_VERSION = 'forge-v20';
 
 const PRECACHE_URLS = [
   './',
@@ -39,6 +39,8 @@ const PRECACHE_URLS = [
   './js/theme.js',
   './js/gamestats.js',
   './js/app.js',
+  './js/locations.js',
+  './js/dashboard.js',
   './js/health.js',
   './js/workouts.js',
   './js/resttimer.js',
