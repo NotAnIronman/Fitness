@@ -1656,3 +1656,58 @@ hr.div {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================
+   V20: OPTIONAL LOCATIONS + MODULAR "YOUR PAGE"
+   ============================================================ */
+.workout-location-manager { margin-bottom: 16px; }
+.workout-location-manager.panel-card-collapsed .hint { margin-left: auto; }
+.workout-location-add { align-items: end; }
+.workout-location-add .field { margin-bottom: 0; }
+.workout-location-add .btn { flex: 0 0 auto; }
+.workout-location-field { max-width: 360px; margin: 0 0 14px; }
+.location-list { display: grid; gap: 8px; margin-top: 12px; }
+.location-list-row, .tile-store-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * .55);
+  background: var(--bg);
+}
+.progress-location-filter .hint { margin: 10px 0 0; }
+
+.your-page-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  align-items: stretch;
+}
+.your-page-tile { min-width: 0; position: relative; }
+.your-page-tile.wide { grid-column: 1 / -1; }
+.your-page-tile > .card { height: 100%; margin: 0; padding-top: 48px; }
+.your-page-tile-tools {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.your-page-tile-tools .icon-btn { width: 27px; height: 27px; }
+.your-page-tile-tools .btn { padding: 5px 8px; }
+.your-page-tile[draggable="true"] { cursor: grab; }
+.your-page-tile[draggable="true"]:active { cursor: grabbing; }
+.tile-store { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.tile-link { margin-top: 14px; }
+.your-page-pet { display: flex; align-items: center; gap: 16px; }
+
+@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+  .your-page-grid, .tile-store { grid-template-columns: 1fr; }
+  .your-page-tile.wide { grid-column: auto; }
+  .your-page-tile[draggable="true"] { cursor: default; }
+}
