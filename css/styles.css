@@ -80,6 +80,7 @@
   --text-dim: #8FA1AC;
   --accent: #5EEAD4;
   --accent-2: #F97316;
+  --accent-ink: #05100E;
   --danger: #F0654D;
   --ok: #7FD87A;
   --warn: #F5C64C;
@@ -112,9 +113,22 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background 0.25s ease, color 0.25s ease;
 }
+.skip-link {
+  position: fixed;
+  left: 12px;
+  top: 8px;
+  z-index: 1000;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  transform: translateY(-150%);
+}
+.skip-link:focus { transform: translateY(0); }
 ::selection {
   background: var(--accent);
-  color: #05100E;
+  color: var(--accent-ink);
 }
 a {
   color: var(--accent);
@@ -599,7 +613,7 @@ input[type="date"] {
 }
 .btn-primary {
   background: var(--accent);
-  color: #05100E;
+  color: var(--accent-ink);
   border-color: var(--accent);
   font-weight: 600;
 }
@@ -674,7 +688,7 @@ input[type="date"] {
 }
 .day-tab.active {
   background: var(--accent);
-  color: #05100E;
+  color: var(--accent-ink);
   border-color: var(--accent);
   font-weight: 600;
 }
@@ -884,7 +898,7 @@ input[type="date"] {
 }
 .pill-toggle button.active {
   background: var(--accent);
-  color: #05100E;
+  color: var(--accent-ink);
   font-weight: 600;
 }
 hr.div {
@@ -1109,6 +1123,21 @@ hr.div {
 }
 .qr-code-box svg { display: block; width: 100%; height: auto; }
 .qr-part-controls { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.qr-panel-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.qr-transfer-panel.qr-display-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
+  margin: 0;
+  padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  border: 0;
+  border-radius: 0;
+  background: #090909;
+  color: #fff;
+}
+.qr-transfer-panel.qr-display-expanded .qr-code-box { width: min(88vw, 68vh, 760px); padding: 18px; }
+.qr-transfer-panel.qr-display-expanded .hint { max-width: 70ch; margin-inline: auto; color: #e8e8e8; }
 .qr-transfer-video { width: 100%; max-height: 340px; background: #000; border-radius: 10px; object-fit: cover; margin: 8px 0; }
 .qr-receive-progress { height: 6px; overflow: hidden; margin: 4px 0 12px; background: var(--surface-2); border-radius: 999px; }
 .qr-receive-progress > div { width: 0; height: 100%; background: var(--accent); transition: width .2s; }
@@ -1247,7 +1276,7 @@ hr.div {
 }
 .chip.active {
   background: var(--accent);
-  color: #05100E;
+  color: var(--accent-ink);
   border-color: var(--accent);
   font-weight: 600;
 }
@@ -1411,7 +1440,7 @@ hr.div {
   gap: 6px;
   margin: 12px 0 6px;
 }
-.pet-us-map-scroll { width: 100%; min-width: 0; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.pet-us-map-scroll { width: 100%; min-width: 0; max-width: 100%; overflow: hidden; }
 .pet-us-map {
   position: relative;
   width: 100%;
@@ -1451,8 +1480,14 @@ hr.div {
 .pet-map-state.tier-silver { border-color: #B8C2CC; }
 .pet-map-state.tier-bronze { border-color: #CD7F32; }
 .map-credit { margin: -6px 0 12px; text-align: right; font-size: 10px; color: var(--text-dim); }
+.pet-map-destination-control { margin: 10px 0 12px; }
+.pet-map-destination-control .field-row { align-items: end; }
+.pet-map-destination-control select { min-width: 0; }
+.pet-map-destination-control .btn { flex: 0 0 auto; white-space: nowrap; }
 @media (max-width: 650px) {
-  .pet-us-map { min-width: 620px; }
+  .pet-us-map { min-width: 0; }
+  .pet-map-state { width: clamp(14px, 4.2vw, 18px); height: clamp(14px, 4.2vw, 18px); font-size: clamp(5px, 1.55vw, 7px); border-radius: 4px; }
+  .pet-map-state small { right: -3px; bottom: -4px; font-size: 6px; }
 }
 .travel-route-summary {
   padding: 12px;
