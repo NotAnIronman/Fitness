@@ -47,11 +47,15 @@ let UI = {
   mealBuilderOpen: false,
   mealBuilderName: '',
   mealBuilderItems: [], // [{name,kcal,protein,carbs,fat,qty}]
+  foodCombineOpen: false,
+  foodCombineSelected: [],
+  foodCombineName: '',
   editingFoodIndex: null,
   secretPanelOpen: false,
   foodQuickPicksOpen: false,
   barcodeScannerOpen: false,
   barcodeStatus: '',
+  barcodeDeviceId: '',
   petShopGroupOpen: {},
   petChangePanelOpen: false,
   petCustomizeOpen: false,
@@ -69,7 +73,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v22';
+const APP_VERSION = 'forge-v22.1';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -202,10 +206,6 @@ const KNOWLEDGE_LEVELS = [
 function setKnowledgeLevel(value) {
   STATE.uiPrefs.knowledgeLevel = Math.max(0, Math.min(4, Math.round(Number(value) || 0)));
   STATE.uiPrefs.knowledgeLevelTouched = true;
-  if (STATE.uiPrefs.knowledgeLevel === 4 && STATE.onboarding.active) {
-    STATE.onboarding.active = false;
-    STATE.onboarding.dismissed = true;
-  }
   persist(); render();
 }
 
@@ -222,7 +222,7 @@ function confirmDefaultKnowledgeLevel() { setKnowledgeLevel(STATE.uiPrefs.knowle
 function renderKnowledgeLevelCard() {
   const level = STATE.uiPrefs.knowledgeLevel || 0;
   const info = KNOWLEDGE_LEVELS[level];
-  return `<div class="card knowledge-card ${STATE.onboarding.active && STATE.onboarding.step === 2 ? 'onboarding-focus' : ''}">
+  return `<div class="card knowledge-card ${onboardingStepIs('guidance') ? 'onboarding-focus' : ''}">
     <div class="card-title">How much guidance would you like?</div>
     <div class="knowledge-heading"><strong id="knowledge-level-label">${info.label}</strong><span>${level + 1} / 5</span></div>
     <input type="range" min="0" max="4" step="1" value="${level}" aria-label="Health and fitness familiarity" oninput="previewKnowledgeLevel(this.value)" onchange="setKnowledgeLevel(this.value)">
@@ -566,6 +566,7 @@ function navigate(route) {
   }
   if (UI.qrTransferMode === 'receive' && typeof stopQrReceiveScanner === 'function') stopQrReceiveScanner();
   UI.route = route;
+  if (route === 'yourpage') markOnboarding('visitedYourPage');
   saveLastRoute(route);
   render();
 }
@@ -640,7 +641,7 @@ function renderHome() {
     ${renderStepCheckinSummary()}
 
     <div class="grid grid-2">
-      <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 1 ? 'onboarding-focus' : ''}">
+      <div class="card ${onboardingStepIs('profile') ? 'onboarding-focus' : ''}">
         <div class="card-title">
           Basic info
           <div class="pill-toggle">
@@ -815,7 +816,7 @@ function renderStepCheckinCard(date) {
   const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
   const stepSource = typeof formatStepSource === 'function' ? formatStepSource(entry) : '';
   return `
-    <div class="card${collapsed ? ' panel-card-collapsed' : ''} ${STATE.onboarding.active && STATE.onboarding.step === 4 ? 'onboarding-focus' : ''}">
+    <div class="card${collapsed ? ' panel-card-collapsed' : ''} ${onboardingStepIs('log_steps') ? 'onboarding-focus' : ''}">
       <div class="card-title">
         <span>${isToday ? "Today's step check-in" : 'Step check-in'}</span>
         ${collapsed ? `<span class="panel-inline-summary">${entry ? `${Number(entry.steps).toLocaleString()} steps` : 'No steps logged'}</span>` : ''}

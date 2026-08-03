@@ -132,18 +132,32 @@ function choosePetSpecies(key) {
   STATE.pet.species = key;
   const animal = PET_ANIMALS.find(a => a.key === key);
   if (!STATE.pet.name) STATE.pet.name = animal.name;
+  markOnboarding('petSpeciesChosen');
   persist(); render();
 }
 function renamePet(name) {
   STATE.pet.name = name.trim().slice(0, 24) || 'Pet';
+  markOnboarding('petRenamed');
   persist(); render();
 }
 function togglePetChangePanel() {
   UI.petChangePanelOpen = !UI.petChangePanelOpen;
+  if (UI.petChangePanelOpen) markOnboarding('openedPetEditor');
   render();
 }
 function togglePetCustomizePanel() {
   UI.petCustomizeOpen = !UI.petCustomizeOpen;
+  if (UI.petCustomizeOpen) {
+    markOnboarding('openedCustomize');
+    if (STATE.onboarding.active && !STATE.pet.tutorialShopCreditGranted) {
+      if (STATE.pet.ownedItems.length === 0 && STATE.pet.points < 30) {
+        STATE.pet.points += 30;
+        toast('Coach added a one-time 30-point welcome credit for your first cosmetic.');
+      }
+      STATE.pet.tutorialShopCreditGranted = true;
+      persist();
+    }
+  } else if (STATE.pet.ownedItems.length) markOnboarding('closedCustomizeAfterPurchase');
   render();
 }
 function buyPetItem(key) {
@@ -424,6 +438,7 @@ function selectPetTravelTarget(key) {
     medalTier = lowerTravelTier(travel.leg.medalTier);
   }
   travel.targetState = key;
+  markOnboarding('travelTargetSelected');
   travel.leg = createTravelLeg(travel.currentState, key, medalTier);
   travel.leg.progressSteps = Math.min(retained, travel.leg.distanceSteps);
   persist(); render();
@@ -431,8 +446,9 @@ function selectPetTravelTarget(key) {
 
 function setPetTravelDifficulty(key) {
   if (!PET_TRAVEL_DIFFICULTIES[key]) return;
+  markOnboarding('travelDifficultySelected');
   const travel = ensurePetTravelState();
-  if (key === travel.difficulty) return;
+  if (key === travel.difficulty) { persist(); render(); return; }
   if (travel.leg && travel.leg.progressSteps > 0) {
     const lowest = travelTier(key).rank < travelTier(travel.leg.medalTier).rank ? key : travel.leg.medalTier;
     if (!window.confirm(`Change to ${travelTier(key).label}? This trip will earn the lower tier used (${travelTier(lowest).label}).`)) return;
@@ -512,7 +528,7 @@ function renderTravelCard() {
   const target = travel.leg ? getState(travel.leg.to) : null;
   const pct = travel.leg ? Math.min(100, travel.leg.progressSteps / travel.leg.distanceSteps * 100) : 0;
   const locked = STATE.pet.happiness < PET_TRAVEL_MIN_HAPPINESS;
-  return `<div class="card">
+  return `<div class="card ${['travel_info','travel_difficulty','travel_target'].some(onboardingStepIs) ? 'onboarding-focus' : ''}">
     <div class="card-title">Pet Travel <span class="travel-count">${Object.keys(travel.medals).length} / ${US_STATES.length} completed</span></div>
     <p class="hint">Choose any state on the map. Up to ${PET_TRAVEL_DAILY_STEP_CAP.toLocaleString()} logged steps per calendar day can move your pet; future entries wait until their date.</p>
     <div class="travel-difficulty">${Object.entries(PET_TRAVEL_DIFFICULTIES).map(([key,tier]) => `<button class="chip ${travel.difficulty === key ? 'active' : ''}" onclick="setPetTravelDifficulty('${key}')">${tier.medal} ${tier.label} 1:${tier.multiplier}</button>`).join('')}</div>
@@ -563,7 +579,7 @@ function renderPetTab() {
       <p class="page-sub">Earn points by checking in on steps, logging workouts, and staying on your calorie target, then spend them here.</p>
     </div>
 
-    <div class="card" style="text-align:center;">
+    <div class="card ${['pet_editor','pet_species','pet_name','customize_open','customize_close'].some(onboardingStepIs) ? 'onboarding-focus' : ''}" style="text-align:center;">
       ${renderPetSprite(90)}
       <p class="hint" style="margin-top:8px; font-style:italic;">"${cheer}"</p>
 
@@ -608,6 +624,8 @@ function renderPetTab() {
       ` : ''}
     </div>
 
+    ${UI.petCustomizeOpen ? renderPetShop() : ''}
+
     ${renderTravelCard()}
 
     <div class="card">
@@ -620,8 +638,6 @@ function renderPetTab() {
       </div>
       <p class="hint" style="margin-top:8px;">Hit all four, every day, for 7 days straight: <strong style="color:var(--accent)">+100 bonus</strong>.</p>
     </div>
-
-    ${UI.petCustomizeOpen ? renderPetShop() : ''}
 
     ${(PET_ANIMALS.some(a => a.img) || PET_ITEMS.some(i => i.img)) ? `
       <p class="hint" style="text-align:center; margin-top:8px;">Some art by <a href="https://openmoji.org" target="_blank" rel="noopener">OpenMoji</a>, licensed CC BY-SA 4.0.</p>

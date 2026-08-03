@@ -39,7 +39,7 @@ function renderThemes() {
       <p class="page-sub">Make it feel like yours. Pick a preset as a starting point, then override any color, corner radius, or font pairing.</p>
     </div>
 
-    <div class="card">
+    <div class="card ${onboardingStepIs('theme_preset') ? 'onboarding-focus' : ''}">
       <div class="card-title">Presets</div>
       <div class="grid grid-3">
         ${Object.entries(THEME_PRESETS).map(([key, p]) => `
@@ -72,14 +72,14 @@ function renderThemes() {
     </div>
 
     <div class="grid grid-2">
-      <div class="card">
+      <div class="card ${onboardingStepIs('theme_shape') ? 'onboarding-focus' : ''}">
         <div class="card-title">Shape</div>
         <div class="field">
           <label>Corner radius: <span id="radius-label">${t.radius}</span>px</label>
           <input type="range" id="radius-slider" min="0" max="24" value="${t.radius}" oninput="liveUpdateRadius(this.value)" onchange="commitRadius(this.value)">
         </div>
       </div>
-      <div class="card">
+      <div class="card ${onboardingStepIs('theme_font') ? 'onboarding-focus' : ''}">
         <div class="card-title">Typography</div>
         <div class="field">
           <label>Font pairing</label>
@@ -102,7 +102,7 @@ function renderThemes() {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card ${onboardingStepIs('transfer_info') ? 'onboarding-focus' : ''}">
       <div class="card-title">Your data</div>
       <p class="hint" style="margin-bottom:12px;">Everything lives in this browser's local storage, nothing is sent anywhere except food searches. There's no account and no server this data passes through, syncing between your own devices is entirely up to you, using whichever option below actually works on what you've got.</p>
 
@@ -138,6 +138,17 @@ function renderThemes() {
         <input type="file" id="import-file-input" accept="application/json,.json" style="display:none;" onchange="importData(event)">
         <button class="btn btn-danger" onclick="resetAllData()">Reset all data</button>
       </div>
+    </div>
+
+    <div class="card ${onboardingStepIs('contact_info') ? 'onboarding-focus' : ''}">
+      <div class="card-title">Contact & support</div>
+      <p class="hint">Found a bug, have an idea, or need help? Contact <a href="mailto:ForgeTrainingLog@gmail.com">ForgeTrainingLog@gmail.com</a>. Forge does not attach or transmit your local health data.</p>
+      <div class="field"><label>Optional message draft</label><textarea id="support-message" rows="4" maxlength="4000" placeholder="What happened, what did you expect, and which device/browser are you using?"></textarea></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="openSupportEmail()">Open email app</button>
+        <button class="btn" onclick="copySupportEmail()">Copy email address</button>
+      </div>
+      <p class="hint" style="margin-top:8px;">Opening the email app keeps sending under your control. A future in-page Send button would require a protected server endpoint and abuse controls; no email-service credentials belong in this static app.</p>
     </div>
 
     ${renderSecretSettings()}
@@ -181,6 +192,7 @@ function colorField(label, key, value) {
 
 function applyPreset(key) {
   STATE.theme = themeFromPreset(key);
+  markOnboarding('themePresetSelected');
   persist(); render();
 }
 
@@ -207,13 +219,28 @@ function liveUpdateRadius(value) {
 function commitRadius(value) {
   STATE.theme.radius = Number(value);
   STATE.theme.preset = 'custom';
+  markOnboarding('themeShapeChanged');
   persist();
 }
 
 function updateThemeField(key, value) {
   STATE.theme[key] = value;
   STATE.theme.preset = 'custom';
+  if (key === 'font') markOnboarding('themeFontChanged');
   persist(); render();
+}
+
+const SUPPORT_EMAIL = 'ForgeTrainingLog@gmail.com';
+function openSupportEmail() {
+  const message = String(document.getElementById('support-message')?.value || '').trim();
+  const subject = 'Forge Training Log support';
+  const body = `${message}${message ? '\n\n' : ''}App version: ${APP_VERSION}\nPage: ${UI.route}\n\nPlease attach screenshots only if you choose to.`;
+  window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+async function copySupportEmail() {
+  try { await navigator.clipboard.writeText(SUPPORT_EMAIL); toast('Support email copied.'); }
+  catch (e) { toast(`Copy this address: ${SUPPORT_EMAIL}`); }
 }
 
 function updateFoodApiKey(value) {

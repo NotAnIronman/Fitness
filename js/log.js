@@ -69,7 +69,7 @@ function renderLog() {
       `}
     </div>
 
-    <div class="card">
+    <div class="card ${onboardingStepIs('copy_workout') ? 'onboarding-focus' : ''}">
       <div class="card-title">
         Exercises this day
         <div style="display:flex; gap:6px;">
@@ -236,6 +236,7 @@ function copyPlanDayIntoLog(planDayId) {
   const copied = planDay.exercises.map(copyExerciseForLog);
   ensureLogDate(UI.logDate).push(...copied);
   copyWorkoutLocationToLog(planDay.locationId, UI.logDate);
+  markOnboarding('copiedPlanToLog');
   UI.logCopyOpen = false;
   persist(); render();
   toast(`Copied ${copied.length} exercise(s) from ${planDay.name}. Check them off as you complete them, or edit if actual weights differ.`);
@@ -258,6 +259,7 @@ function replacePlanDayIntoLog(planDayId) {
   const copied = planDay.exercises.map(copyExerciseForLog);
   STATE.workoutLog[UI.logDate] = copied;
   copyWorkoutLocationToLog(planDay.locationId, UI.logDate);
+  markOnboarding('copiedPlanToLog');
   UI.logCopyOpen = false;
   persist(); render();
   toast(`Replaced today's log with ${planDay.name}`);

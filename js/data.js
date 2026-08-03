@@ -590,6 +590,7 @@ const ACHIEVEMENTS = [
   // ---- Profile & body fat ----
   { id: 'profile_complete',    name: 'All Set Up',          desc: 'Fill in your full profile (age, height, weight).',       category: 'Profile', points: 10,check: ctx => ctx.profileComplete },
   { id: 'body_fat_calculated', name: 'Know Your Numbers',   desc: 'Calculate your body fat percentage.',                    category: 'Profile', points: 15,check: ctx => ctx.bodyFatCalculated },
+  { id: 'guided_tour_complete', name: 'Forged & Ready',     desc: 'Complete every step of the full guided tour.',           category: 'Profile', points: 50,check: ctx => ctx.guidedTourComplete },
 
   // ---- Pet & misc ----
   { id: 'adopt_pet',      name: 'New Friend',                 desc: 'Choose your pet companion.',                            category: 'Pet', points: 10,check: ctx => ctx.hasPet },

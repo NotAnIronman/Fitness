@@ -82,6 +82,7 @@ function defaultState() {
       step: 0,
       skippedSteps: [],
       completedAt: null,
+      markers: {},           // sparse tour-only interaction confirmations
     },
     // Most-recent-first quick-pick lists, since "recent items" was the most
     // requested feature: exercise ids (or 'custom:Name' for custom ones), and
@@ -135,6 +136,7 @@ function defaultState() {
       ownedItems: [],         // item keys purchased from the shop
       points: 0,
       totalPointsEarned: 0,
+      tutorialShopCreditGranted: false,
       happiness: 80,          // 0-100, derived from how recently you've interacted, see updatePetHappinessDecay
       lastInteractionAt: null, // ms timestamp of last caring action (checkin, workout/food log, click, feed, water)
       lastSeenDate: null,      // legacy field kept so old saves still deepMerge cleanly, unused by current logic
@@ -326,9 +328,10 @@ function normalizeStateShape(state) {
   state.uiPrefs.yourPageAddedTiles = state.uiPrefs.yourPageAddedTiles.slice(0, 30).map(String);
   state.uiPrefs.pageLayouts = normalizePageLayouts(state.uiPrefs.pageLayouts);
   if (!Array.isArray(state.onboarding.skippedSteps)) state.onboarding.skippedSteps = [];
-  state.onboarding.step = Math.max(0, Math.min(7, Math.round(Number(state.onboarding.step) || 0)));
+  state.onboarding.step = Math.max(0, Math.min(80, Math.round(Number(state.onboarding.step) || 0)));
   state.onboarding.active = !!state.onboarding.active;
   state.onboarding.dismissed = !!state.onboarding.dismissed;
+  if (!isPlainObject(state.onboarding.markers)) state.onboarding.markers = {};
   if (!Array.isArray(state.pet.ownedItems)) state.pet.ownedItems = [];
   if (!Array.isArray(state.pet.travelCelebrated)) state.pet.travelCelebrated = [];
   if (!isPlainObject(state.pet.travel)) state.pet.travel = def.pet.travel;
@@ -337,6 +340,7 @@ function normalizeStateShape(state) {
   if (!isPlainObject(state.pet.travel.processedSteps)) state.pet.travel.processedSteps = {};
   if (state.pet.travel.leg != null && !isPlainObject(state.pet.travel.leg)) state.pet.travel.leg = null;
   if (!isPlainObject(state.pet.equipped)) state.pet.equipped = {};
+  state.pet.tutorialShopCreditGranted = !!state.pet.tutorialShopCreditGranted;
   if (!isPlainObject(state.pet.rewardedDates)) state.pet.rewardedDates = {};
   if (!isPlainObject(state.pet.rewardedWeeks)) state.pet.rewardedWeeks = {};
   if (!isPlainObject(state.pet.foodRewardedDates)) state.pet.foodRewardedDates = {};

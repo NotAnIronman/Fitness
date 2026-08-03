@@ -60,7 +60,7 @@ function renderWorkoutLocationSelect(value, onChange, label) {
 
 function renderWorkoutLocationManager() {
   const locations = getWorkoutLocations();
-  return `<div class="card workout-location-manager">
+  return `<div class="card workout-location-manager ${onboardingStepIs('location') ? 'onboarding-focus' : ''}">
     <div class="card-title"><span>Training locations</span><button class="panel-collapse-btn" onclick="toggleWorkoutLocationManager()" aria-expanded="${UI.workoutLocationManagerOpen}" aria-label="${UI.workoutLocationManagerOpen ? 'Close' : 'Open'} training location manager">${UI.workoutLocationManagerOpen ? '−' : '+'}</button></div>
     ${UI.workoutLocationManagerOpen ? `
       <p class="hint">Optional. Add locations only when the same exercise uses meaningfully different equipment or loads. Forge stores each location once and one short reference per workout date.</p>

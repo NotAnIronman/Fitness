@@ -46,15 +46,25 @@ function loadZXing() {
 
 let _zxingReader = null;
 let _zxingControls = null;
+let _barcodeTrack = null;
 
 function renderBarcodeScanner() {
   const scanDistance = usesImperialUnits() ? 'about 4-6 inches' : 'about 10-15 cm';
   return `
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px; margin-bottom:14px;">
       <p class="hint" style="margin-bottom:10px;">${escapeAttr(UI.barcodeStatus || 'Point your camera at a product barcode.')}</p>
-      <video id="barcode-video" style="width:100%; max-height:280px; border-radius:calc(var(--radius)*0.5); background:#000; object-fit:cover;" muted playsinline></video>
-      <div style="display:flex; gap:8px; margin-top:10px;">
+      <video id="barcode-video" class="barcode-video" muted playsinline></video>
+      <div class="barcode-camera-tools">
+        <div class="field" id="barcode-camera-field" hidden><label>Camera</label><select id="barcode-camera-select" onchange="switchBarcodeCamera(this.value)"></select></div>
+        <div class="field" id="barcode-zoom-field" hidden><label>Camera zoom</label><input id="barcode-zoom" type="range" oninput="setBarcodeCameraZoom(this.value)"></div>
+        <button class="btn btn-sm" id="barcode-torch-button" hidden onclick="toggleBarcodeTorch()">Toggle light</button>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm" onclick="closeBarcodeScanner()">Cancel</button>
+      </div>
+      <div class="barcode-manual-entry">
+        <div class="field"><label>Type the barcode instead</label><input id="manual-barcode" inputmode="numeric" autocomplete="off" placeholder="Digits below the barcode" onkeydown="if(event.key==='Enter') lookupManualBarcode()"></div>
+        <button class="btn btn-sm" onclick="lookupManualBarcode()">Look up</button>
       </div>
       <p class="hint" style="margin-top:8px;">Struggling to get a read? A few things that matter more than the software: good even lighting (avoid glare on the barcode), hold it flat and steady ${scanDistance} from the camera, and make sure the whole barcode is in frame. Laptop webcams especially can have slow or fixed-distance autofocus, if it won't lock on, try tilting slightly or moving a bit further back.</p>
       <p class="hint" style="margin-top:4px;">Still not working? Barcode scanning needs camera access and a secure (https) connection. You can always search by name instead.</p>
@@ -95,17 +105,12 @@ async function startBarcodeScan() {
     // picked up quickly instead of needing to hold it steady for a while.
     _zxingReader = new ZXingBrowser.BrowserMultiFormatReader(undefined, { delayBetweenScanAttempts: 100 });
     UI.barcodeStatus = 'Point your camera at a product barcode.';
+    const videoConstraints = UI.barcodeDeviceId
+      ? { deviceId: { exact: UI.barcodeDeviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } };
     _zxingControls = await _zxingReader.decodeFromConstraints(
       {
-        video: {
-          facingMode: 'environment',
-          // Higher resolution gives a barcode more actual pixels to be read
-          // from, these are "ideal" hints, so a camera that can't do 1080p
-          // just falls back to its best available resolution instead of
-          // failing outright.
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
+        video: videoConstraints,
       },
       video,
       (result, err, controls) => {
@@ -117,7 +122,7 @@ async function startBarcodeScan() {
         // per-frame "not found" errors are normal while scanning, not fatal, ignore them
       }
     );
-    tryEnableContinuousFocus(video);
+    configureBarcodeCamera(video);
   } catch (e) {
     console.error(e);
     let msg;
@@ -139,17 +144,64 @@ async function startBarcodeScan() {
 // inconsistent, mainly Chrome on some devices), this asks for continuous
 // autofocus instead. Silently does nothing if unsupported, this is a
 // nice-to-have, not something to fail loudly over.
-function tryEnableContinuousFocus(video) {
+async function configureBarcodeCamera(video) {
   try {
     const stream = video.srcObject;
     if (!stream) return;
     const track = stream.getVideoTracks && stream.getVideoTracks()[0];
     if (!track || !track.getCapabilities) return;
+    _barcodeTrack = track;
     const caps = track.getCapabilities();
-    if (caps.focusMode && caps.focusMode.includes('continuous')) {
-      track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+    const advanced = {};
+    if (caps.focusMode?.includes('continuous')) advanced.focusMode = 'continuous';
+    if (caps.exposureMode?.includes('continuous')) advanced.exposureMode = 'continuous';
+    if (Object.keys(advanced).length) await track.applyConstraints({ advanced: [advanced] }).catch(() => {});
+    const zoomField = document.getElementById('barcode-zoom-field');
+    const zoom = document.getElementById('barcode-zoom');
+    if (caps.zoom && zoom && zoomField) {
+      const settings = track.getSettings ? track.getSettings() : {};
+      zoom.min = caps.zoom.min; zoom.max = caps.zoom.max; zoom.step = caps.zoom.step || 0.1;
+      zoom.value = settings.zoom || caps.zoom.min;
+      zoomField.hidden = false;
+    }
+    const torchButton = document.getElementById('barcode-torch-button');
+    if (caps.torch && torchButton) torchButton.hidden = false;
+    const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'videoinput');
+    const cameraField = document.getElementById('barcode-camera-field');
+    const cameraSelect = document.getElementById('barcode-camera-select');
+    if (devices.length > 1 && cameraField && cameraSelect) {
+      cameraSelect.innerHTML = devices.map((device, index) => `<option value="${escapeAttr(device.deviceId)}" ${device.deviceId === track.getSettings?.().deviceId ? 'selected' : ''}>${escapeAttr(device.label || `Camera ${index + 1}`)}</option>`).join('');
+      cameraField.hidden = false;
     }
   } catch (e) { /* focus control not supported here, that's fine */ }
+}
+
+function setBarcodeCameraZoom(value) {
+  if (!_barcodeTrack) return;
+  _barcodeTrack.applyConstraints({ advanced: [{ zoom: Number(value) }] }).catch(() => toast('This camera could not change zoom.'));
+}
+
+let _barcodeTorchOn = false;
+function toggleBarcodeTorch() {
+  if (!_barcodeTrack) return;
+  _barcodeTorchOn = !_barcodeTorchOn;
+  _barcodeTrack.applyConstraints({ advanced: [{ torch: _barcodeTorchOn }] }).catch(() => {
+    _barcodeTorchOn = false; toast('This camera could not control its light.');
+  });
+}
+
+function switchBarcodeCamera(deviceId) {
+  UI.barcodeDeviceId = deviceId;
+  stopBarcodeScan();
+  UI.barcodeStatus = 'Switching camera...';
+  startBarcodeScan();
+}
+
+function lookupManualBarcode() {
+  const barcode = String(document.getElementById('manual-barcode')?.value || '').replace(/\D/g, '');
+  if (barcode.length < 6 || barcode.length > 18) { toast('Enter the 6–18 digits printed below the barcode.'); return; }
+  stopBarcodeScan();
+  onBarcodeDetected(barcode);
 }
 
 function stopBarcodeScan() {
@@ -157,6 +209,8 @@ function stopBarcodeScan() {
     try { _zxingControls.stop(); } catch (e) { /* already stopped */ }
     _zxingControls = null;
   }
+  _barcodeTrack = null;
+  _barcodeTorchOn = false;
 }
 
 async function onBarcodeDetected(barcode) {

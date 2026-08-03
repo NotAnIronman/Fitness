@@ -180,6 +180,7 @@ function getGoalMacroPlan(calorieTarget) {
 
 function setGoalFocus(key) {
   STATE.goal.focus = getGoalFocusOption(key).key;
+  markOnboarding('goalFocusSelected');
   persist(); render();
 }
 

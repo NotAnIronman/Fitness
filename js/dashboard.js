@@ -77,7 +77,11 @@ function renderYourPageTileShell(tile, index, list) {
     </div>${tile.render()}</section>`;
 }
 
-function toggleYourPageManager() { UI.yourPageManagerOpen = !UI.yourPageManagerOpen; render(); }
+function toggleYourPageManager() {
+  UI.yourPageManagerOpen = !UI.yourPageManagerOpen;
+  if (UI.yourPageManagerOpen) markOnboarding('openedTileManager');
+  render();
+}
 
 function toggleYourPageTile(tileId) {
   const tile = availableYourPageTiles().find(item => item.id === tileId);
@@ -129,7 +133,7 @@ function toggleYourPageTileSize(tileId) {
 
 function renderYourStepsTile() {
   const today = STATE.dailyCheckins[todayISO()]?.steps;
-  return `<div class="card"><div class="card-title">Steps</div><div class="grid grid-2"><div class="stat"><div class="stat-label">Today</div><div class="stat-value accent">${today == null ? '—' : today.toLocaleString()}</div></div><div class="stat"><div class="stat-label">Rolling average</div><div class="stat-value">${getStepsAverage().toLocaleString()}</div></div></div><button class="btn btn-sm tile-link" onclick="navigate('log')">Open step check-in</button></div>`;
+  return `<div class="card your-page-steps"><div class="card-title">Steps</div><div class="grid grid-2"><div class="stat"><div class="stat-label">Today</div><div class="stat-value accent">${today == null ? '—' : today.toLocaleString()}</div></div><div class="stat"><div class="stat-label">Rolling average</div><div class="stat-value">${getStepsAverage().toLocaleString()}</div></div></div><button class="btn btn-sm tile-link" onclick="navigate('log')">Open step check-in</button></div>`;
 }
 
 function renderYourWorkoutTile() {

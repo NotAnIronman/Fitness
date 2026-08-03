@@ -38,7 +38,7 @@ function renderGoals() {
     ${renderGoalFocusCard()}
 
     <div class="grid grid-2">
-      <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 5 ? 'onboarding-focus' : ''}">
+      <div class="card ${onboardingStepIs('weight_goal') ? 'onboarding-focus' : ''}">
         <div class="card-title">Set your goal</div>
         <div class="field">
           <label>Target weight (${unit})</label>
@@ -88,7 +88,7 @@ function renderGoals() {
 
     ${hasGoal ? renderPaceFeedback(isImperial) : ''}
 
-    <div class="card">
+    <div class="card ${onboardingStepIs('weight_log') ? 'onboarding-focus' : ''}">
       <div class="card-title">
         Weight log
         <button class="btn btn-sm" onclick="openLogWeightPrompt()">+ Log today's weight</button>
@@ -104,7 +104,7 @@ function renderGoalFocusCard() {
   const expert = (STATE.uiPrefs.knowledgeLevel || 0) >= 4;
   const proteinRate = formatProteinRateRange(guidance.proteinMin, guidance.proteinMax);
   return `
-    <div class="card goal-focus-card">
+    <div class="card goal-focus-card ${onboardingStepIs('goal_focus') ? 'onboarding-focus' : ''}">
       <div class="card-title">What result matters most?</div>
       <div class="chip-row goal-focus-options">
         ${GOAL_FOCUS_OPTIONS.map(option => `<button class="chip ${guidance.focus.key === option.key ? 'active' : ''}" onclick="setGoalFocus('${option.key}')">${escapeAttr(option.label)}</button>`).join('')}
@@ -373,6 +373,7 @@ function openLogWeightPrompt() {
   const kg = isImperial ? lbToKg(n) : n;
   if (kg < 20 || kg > 400) { toast(usesImperialUnits() ? 'Enter a weight between 44 and 882 lb.' : 'Enter a weight between 20 and 400 kg.'); return; }
   logWeightEntry(kg);
+  markOnboarding('weightLoggedOnGoals');
   STATE.profile.weightKg = kg;
   persist(); render();
   toast('Weight logged');

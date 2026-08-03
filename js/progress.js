@@ -208,7 +208,7 @@ function renderProgress() {
 
     ${renderStepsCard()}
 
-    ${getWorkoutLocations().length ? `<div class="card progress-location-filter"><div class="field" style="max-width:340px;margin-bottom:0"><label>Workout location</label><select onchange="setProgressLocation(this.value)"><option value="all" ${UI.progressLocationId === 'all' ? 'selected' : ''}>All locations</option><option value="default" ${UI.progressLocationId === 'default' ? 'selected' : ''}>Default location</option>${getWorkoutLocations().map(location => `<option value="${escapeAttr(location.id)}" ${UI.progressLocationId === location.id ? 'selected' : ''}>${escapeAttr(location.name)}</option>`).join('')}</select></div><p class="hint">Filter prevents home and gym loads from being plotted as one progression line.</p></div>` : ''}
+    ${getWorkoutLocations().length ? `<div class="card progress-location-filter ${onboardingStepIs('progress_location') ? 'onboarding-focus' : ''}"><div class="field" style="max-width:340px;margin-bottom:0"><label>Workout location</label><select onchange="setProgressLocation(this.value)"><option value="all" ${UI.progressLocationId === 'all' ? 'selected' : ''}>All locations</option><option value="default" ${UI.progressLocationId === 'default' ? 'selected' : ''}>Default location</option>${getWorkoutLocations().map(location => `<option value="${escapeAttr(location.id)}" ${UI.progressLocationId === location.id ? 'selected' : ''}>${escapeAttr(location.name)}</option>`).join('')}</select></div><p class="hint">Filter prevents home and gym loads from being plotted as one progression line.</p></div>` : ''}
 
     ${!options.length ? `
       <div class="card"><div class="empty-state"><div class="big">-</div>Nothing logged yet. Head to the Workout Log page and log a few sessions, then come back here to see the trend.</div></div>
@@ -247,6 +247,7 @@ function setProgressExercise(key) {
 function setProgressLocation(locationId) {
   UI.progressLocationId = locationId;
   UI.progressExerciseId = null;
+  if (getWorkoutLocation(locationId)) markOnboarding('progressLocationChanged');
   render();
 }
 

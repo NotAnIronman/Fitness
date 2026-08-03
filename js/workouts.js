@@ -52,7 +52,7 @@ function renderWorkouts() {
           </div>
         </div>
       </div>
-      <div class="card">
+      <div class="card ${onboardingStepIs('starting_steps') ? 'onboarding-focus' : ''}">
         <div class="stat-label">Starting step estimate ${tip('ⓘ', 'This is just a starting point', 'Once you check in your steps a few times on the Workout Log page, your real rolling average takes over completely. This number only matters before that history builds up.')}</div>
         <input aria-label="Starting daily step estimate" type="number" data-focus-id="steps-per-day" min="0" max="200000" step="500" value="${STATE.workoutPlan.stepsPerDay}" onchange="updateSteps(this.value)" onkeydown="if(event.key==='Enter') this.blur()" style="margin-top:6px;">
       </div>
@@ -90,7 +90,7 @@ function renderWorkouts() {
       the hours and days after training, which is part of why rest and protein matter as much as the workout itself.
     `, { maxLevel: 0, defaultOpenThrough: 0 })}
 
-    <div class="day-tabs">
+    <div class="day-tabs ${onboardingStepIs('workout_day') ? 'onboarding-focus' : ''}">
       ${days.map(d => `
         <button class="day-tab ${d.id === UI.workoutDayId ? 'active' : ''}" onclick="selectDay('${d.id}')">${escapeAttr(d.name)}</button>
       `).join('')}
@@ -98,7 +98,7 @@ function renderWorkouts() {
     </div>
 
     ${activeDay ? renderDayCard(activeDay, bw) : `
-      <div class="card"><div class="empty-state"><div class="big">+</div>Add a training day to start building your plan.</div></div>
+      <div class="card ${onboardingStepIs('workout_day') ? 'onboarding-focus' : ''}"><div class="empty-state"><div class="big">+</div>Add a training day to start building your plan.</div></div>
     `}
   `;
 }
@@ -120,7 +120,7 @@ function renderDayCard(day, bw) {
   const sessionFeedback = dayKcal > 0 ? getSessionIntensityFeedback(dayKcal) : null;
 
   return `
-    <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 3 ? 'onboarding-focus' : ''}">
+    <div class="card ${['workout_exercise','workout_name'].some(onboardingStepIs) ? 'onboarding-focus' : ''}">
       <div class="card-title">
         <span>
           <input type="text" data-focus-id="day-name-${day.id}" value="${escapeAttr(day.name)}" onchange="renameDay('${day.id}', this.value)" onkeydown="if(event.key==='Enter') this.blur()"
@@ -431,6 +431,7 @@ function selectDay(id) {
 function renameDay(id, name) {
   const d = STATE.workoutPlan.days.find(x => x.id === id);
   if (d) d.name = name;
+  if (d && String(name || '').trim()) markOnboarding('workoutNamed');
   persist();
   render();
 }
@@ -441,6 +442,7 @@ function deleteDay(id) {
 }
 function updateSteps(val) {
   STATE.workoutPlan.stepsPerDay = Math.max(0, Math.min(200000, Number(val) || 0));
+  markOnboarding('startingStepsSet');
   persist(); render();
 }
 

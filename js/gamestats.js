@@ -104,6 +104,7 @@ function buildGameContext() {
     sex: STATE.profile.sex, waistCm: STATE.bodyFat.waistCm, neckCm: STATE.bodyFat.neckCm,
     hipCm: STATE.bodyFat.hipCm, heightCm: STATE.profile.heightCm,
   }) != null;
+  const guidedTourComplete = !!STATE.onboarding.completedAt && !(STATE.onboarding.skippedSteps || []).length;
 
   // ---- Pet ----
   const hasPet = !!STATE.pet.species;
@@ -125,7 +126,7 @@ function buildGameContext() {
     sportMinutesById, totalSportMinutes,
     totalFoodDaysLogged, onTargetDays, onTargetStreak, savedMealsCount, maxItemsInADay,
     weightLogCount, weightStreak, hasGoal, goalReached,
-    profileComplete, bodyFatCalculated,
+    profileComplete, bodyFatCalculated, guidedTourComplete,
     hasPet, ownedItemsCount, ownsCrown, slotsEquipped, totalPointsEarned,
     silverOrHigherStates, goldOrHigherStates, platinumStates,
   };

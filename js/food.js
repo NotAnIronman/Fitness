@@ -69,7 +69,7 @@ function renderFood() {
     ${renderWaterCard(date)}
 
     <div class="grid grid-2" style="margin-bottom:16px;">
-      <div class="card ${STATE.onboarding.active && STATE.onboarding.step === 6 ? 'onboarding-focus' : ''}">
+      <div class="card ${['food_log','meal'].some(onboardingStepIs) ? 'onboarding-focus' : ''}">
         <div class="card-title">
           Log food
           <div style="display:flex; gap:6px;">
@@ -143,12 +143,14 @@ function renderFood() {
 
     ${renderGoalNutritionGuidance(totals)}
 
-    <div class="card">
-      <div class="card-title">Logged today <span style="font-family:var(--font-mono); font-size:12px; color:var(--text-dim);">${entries.length} item(s)</span></div>
+    <div class="card ${onboardingStepIs('meal') ? 'onboarding-focus' : ''}">
+      <div class="card-title"><span>Logged today <span style="font-family:var(--font-mono); font-size:12px; color:var(--text-dim);">${entries.length} item(s)</span></span>${entries.length >= 2 ? `<button class="btn btn-sm ${UI.foodCombineOpen ? 'btn-primary' : ''}" onclick="toggleFoodCombine()">${UI.foodCombineOpen ? 'Cancel grouping' : 'Combine into meal'}</button>` : ''}</div>
+      ${UI.foodCombineOpen ? renderFoodCombinePanel(entries) : ''}
       ${entries.length ? `
         <div class="row-list">
           ${entries.map((e, i) => `
-            <div class="exercise-row">
+            <div class="exercise-row ${UI.foodCombineSelected.includes(i) ? 'food-row-selected' : ''}">
+              ${UI.foodCombineOpen ? `<label class="food-combine-check"><input type="checkbox" ${UI.foodCombineSelected.includes(i) ? 'checked' : ''} onchange="toggleFoodCombineSelection(${i})"><span class="sr-only">Select ${escapeAttr(formatFoodNameForUnits(e.name))}</span></label>` : ''}
               <div>
                 <div class="name">${formatQty(e.qty)} x ${escapeAttr(formatFoodNameForUnits(e.name))}</div>
                 <div class="meta">P ${Math.round(e.protein * e.qty)}g . C ${Math.round(e.carbs * e.qty)}g . F ${Math.round(e.fat * e.qty)}g</div>
@@ -356,7 +358,7 @@ function renderWaterCard(date) {
   const hydrationRate = formatHydrationRate(33);
 
   return `
-    <div class="card">
+    <div class="card ${onboardingStepIs('water') ? 'onboarding-focus' : ''}">
       <div class="card-title">Water</div>
       ${target ? `
         <div class="grid grid-2" style="margin-bottom:10px;">
@@ -412,6 +414,7 @@ function setFoodDate(date) {
   if (!isReasonableDateString(date)) { toast("That doesn't look like a valid date, try again"); render(); return; }
   UI.foodDate = date;
   UI.foodResults = [];
+  closeFoodCombine(false);
   render();
 }
 
@@ -835,6 +838,78 @@ function setFoodQty(index, value) {
 function removeFoodEntry(index) {
   STATE.foodLog[UI.foodDate].splice(index, 1);
   persist(); render();
+}
+
+// Select existing log lines, save their exact portions as a reusable meal,
+// and replace those lines with one consolidated row. Multiplying each entry by
+// its current quantity before saving keeps today's calories and macros exactly
+// unchanged and makes a later meal re-log equal to the portion built today.
+function renderFoodCombinePanel(entries) {
+  const count = UI.foodCombineSelected.length;
+  return `<div class="food-combine-panel">
+    <p class="hint">Select at least two logged lines. Forge saves them as a reusable meal and replaces only those lines with one meal row; today's totals stay the same.</p>
+    <div class="field-row food-combine-actions">
+      <div class="field"><label>Meal name</label><input maxlength="120" value="${escapeAttr(UI.foodCombineName)}" placeholder="e.g. Turkey sandwich" oninput="UI.foodCombineName=this.value"></div>
+      <button class="btn btn-primary" onclick="combineSelectedFoodIntoMeal()" ${count < 2 ? 'disabled' : ''}>Save & combine ${count || ''}</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="selectAllFoodForCombine()">Select all ${entries.length}</button>
+  </div>`;
+}
+
+function toggleFoodCombine() {
+  if (UI.foodCombineOpen) closeFoodCombine();
+  else { UI.foodCombineOpen = true; UI.foodCombineSelected = []; UI.foodCombineName = ''; render(); }
+}
+
+function closeFoodCombine(shouldRender) {
+  UI.foodCombineOpen = false;
+  UI.foodCombineSelected = [];
+  UI.foodCombineName = '';
+  if (shouldRender !== false) render();
+}
+
+function toggleFoodCombineSelection(index) {
+  const selected = new Set(UI.foodCombineSelected);
+  if (selected.has(index)) selected.delete(index); else selected.add(index);
+  UI.foodCombineSelected = Array.from(selected).sort((a, b) => a - b);
+  render();
+}
+
+function selectAllFoodForCombine() {
+  UI.foodCombineSelected = (STATE.foodLog[UI.foodDate] || []).map((_, index) => index);
+  render();
+}
+
+function combineSelectedFoodIntoMeal() {
+  const entries = STATE.foodLog[UI.foodDate] || [];
+  const indexes = [...new Set(UI.foodCombineSelected)].filter(index => entries[index]).sort((a, b) => a - b);
+  if (indexes.length < 2) { toast('Select at least two food lines.'); return; }
+  const name = String(UI.foodCombineName || '').trim().slice(0, 120);
+  if (!name) { toast('Name the meal first.'); return; }
+  const selected = indexes.map(index => entries[index]);
+  const items = selected.map(entry => ({
+    name: entry.name,
+    kcal: entry.kcal * entry.qty,
+    protein: entry.protein * entry.qty,
+    carbs: entry.carbs * entry.qty,
+    fat: entry.fat * entry.qty,
+    qty: 1,
+  }));
+  const totals = items.reduce((sum, item) => ({
+    kcal: sum.kcal + item.kcal,
+    protein: sum.protein + item.protein,
+    carbs: sum.carbs + item.carbs,
+    fat: sum.fat + item.fat,
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+  STATE.savedMeals.push({ id: uid(), name, items, ...totals });
+  const indexSet = new Set(indexes);
+  const insertAt = indexes[0];
+  const remaining = entries.filter((_, index) => !indexSet.has(index));
+  remaining.splice(insertAt, 0, { name, ...totals, qty: 1 });
+  STATE.foodLog[UI.foodDate] = remaining;
+  closeFoodCombine(false);
+  persist(); render();
+  toast(`Saved and combined “${name}” without changing today's totals.`);
 }
 
 // ============================================================
