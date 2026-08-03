@@ -95,6 +95,12 @@ function defaultState() {
     usdaCache: {
       // 'querylowercase': { results: [...], ts: 169... }
     },
+    // Cache of real household-portion lookups ("1 medium = 118g" etc), fetched
+    // lazily per food only when someone actually adjusts a per-100g result
+    // (not on every search result), keyed by fdcId so repeat lookups are free.
+    usdaPortionsCache: {
+      // 'fdcId': { portions: [{modifier, grams}], ts: 169... }
+    },
     // A growing pool of every food item ever returned by a USDA search, kept
     // separately from usdaCache (which is keyed per exact query string). New
     // searches check this pool first via substring match before hitting the
@@ -259,7 +265,7 @@ function sanitizeJsonValue(value, depth) {
 function normalizeStateShape(state) {
   const def = defaultState();
   if (!isPlainObject(state)) throw new Error('Backup root must be an object.');
-  const objectFields = ['profile', 'goal', 'workoutPlan', 'workoutLog', 'foodLog', 'bodyFat', 'uiPrefs', 'onboarding', 'usdaCache', 'dailyCheckins', 'dailyWater', 'pet', 'achievements', 'theme'];
+  const objectFields = ['profile', 'goal', 'workoutPlan', 'workoutLog', 'foodLog', 'bodyFat', 'uiPrefs', 'onboarding', 'usdaCache', 'usdaPortionsCache', 'dailyCheckins', 'dailyWater', 'pet', 'achievements', 'theme'];
   objectFields.forEach(key => { if (!isPlainObject(state[key])) state[key] = def[key]; });
   const arrayFields = ['weightLog', 'recentExercises', 'recentFoods', 'savedMeals', 'foodIndexPool'];
   arrayFields.forEach(key => { if (!Array.isArray(state[key])) state[key] = def[key]; });

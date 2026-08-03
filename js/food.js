@@ -229,18 +229,34 @@ function renderCustomFoodForm() {
 function renderFoodAdjustForm() {
   const d = UI.foodAdjustDraft;
   const isEdit = UI.editingFoodIndex != null;
+  const hasPortions = d.portions && d.portions.length > 0;
+  const portionUnitLabel = hasPortions && d.selectedPortionIdx != null ? d.portions[d.selectedPortionIdx].label : `${d.portionGrams}g`;
   return `
     <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:14px; margin-top:10px;">
       <p class="hint" style="margin-bottom:10px;"><strong style="color:var(--text)">${escapeAttr(formatFoodNameForUnits(d.name))}</strong>${isEdit ? ' (editing)' : ''}. Pick a serving size, the numbers below update to match automatically, then correct anything that doesn't match your package.</p>
+
+      ${d.portionsLoading ? `<p class="hint" style="margin-bottom:10px;">Looking up real portion sizes for this food...</p>` : ''}
+
+      ${hasPortions ? `
+        <div class="field">
+          <label>What's one serving?</label>
+          <div class="chip-row">
+            ${d.portions.map((p, i) => `<button class="chip ${d.selectedPortionIdx === i ? 'active' : ''}" onclick="selectFoodPortion(${i})">${escapeAttr(p.label)} (${p.grams}g)</button>`).join('')}
+            <button class="chip ${d.selectedPortionIdx === null ? 'active' : ''}" onclick="useRawGramsForDraft()">Exact grams</button>
+          </div>
+          <p class="hint" style="margin-top:4px;">From USDA's own household-measure data for this food, not a guess. Pick whichever is closest, then fine-tune with the numbers below.</p>
+        </div>
+      ` : ''}
+
       <div class="field">
-        <label>Servings</label>
+        <label>How many ${hasPortions ? escapeAttr(portionUnitLabel) : 'servings'}?</label>
         <input type="number" id="fa-qty" data-focus-id="fa-qty" step="0.25" min="0.25" value="${d.qty}" onchange="onAdjustQtyInput(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
         <div class="chip-row">
           ${[0.25, 0.5, 1, 1.5, 2, 3].map(q => `<button class="chip ${d.qty === q ? 'active' : ''}" onclick="setAdjustQty(${q})">${formatQty(q)}x</button>`).join('')}
         </div>
       </div>
       <div class="grid grid-4">
-        <div class="field"><label>kcal (total for servings above)</label><input type="number" id="fa-kcal" data-focus-id="fa-kcal" min="0" value="${round1(d.kcal)}"></div>
+        <div class="field"><label>kcal (total for the amount above)</label><input type="number" id="fa-kcal" data-focus-id="fa-kcal" min="0" value="${round1(d.kcal)}"></div>
         <div class="field"><label>Protein (g)</label><input type="number" id="fa-protein" data-focus-id="fa-protein" min="0" value="${round1(d.protein)}"></div>
         <div class="field"><label>Carbs (g)</label><input type="number" id="fa-carbs" data-focus-id="fa-carbs" min="0" value="${round1(d.carbs)}"></div>
         <div class="field"><label>Fat (g)</label><input type="number" id="fa-fat" data-focus-id="fa-fat" min="0" value="${round1(d.fat)}"></div>
@@ -531,6 +547,8 @@ function parseUsdaFood(food) {
       protein: ln.protein?.value || 0,
       carbs: ln.carbohydrates?.value || 0,
       fat: ln.fat?.value || 0,
+      fdcId: food.fdcId,
+      perServing: true, // already the real labeled serving, not per-100g
     };
   }
   const nutrients = food.foodNutrients || [];
@@ -544,6 +562,8 @@ function parseUsdaFood(food) {
     protein: find('203'),
     carbs: find('205'),
     fat: find('204'),
+    fdcId: food.fdcId,
+    perServing: false, // per-100g raw value, real portions fetched lazily when adjusting (see fetchUsdaPortions)
   };
 }
 
@@ -586,7 +606,97 @@ function openFoodEdit(index) {
     protein: entry.protein * entry.qty,
     carbs: entry.carbs * entry.qty,
     fat: entry.fat * entry.qty,
+    rawPer100g: null, // editing an already-logged entry, portion re-picking doesn't apply here
+    fdcId: null,
+    portions: null,
+    portionsLoading: false,
+    selectedPortionIdx: null,
+    portionGrams: 100,
   };
+  render();
+}
+
+const USDA_FOOD_DETAIL_URL = 'https://api.nal.usda.gov/fdc/v1/food';
+
+// Real household portions ("1 medium", "1 cup, sliced") with gram weights,
+// straight from USDA's food detail endpoint, fetched lazily only when someone
+// actually adjusts a per-100g result (not for every search result up front,
+// that would be a lot of extra network calls for portions most people never
+// look at). Cached per fdcId so repeat lookups are free.
+async function fetchUsdaPortions(fdcId) {
+  const cached = STATE.usdaPortionsCache[fdcId];
+  if (cached) return cached.portions;
+  try {
+    const apiKey = STATE.foodApiKey || 'DEMO_KEY';
+    const url = `${USDA_FOOD_DETAIL_URL}/${fdcId}?api_key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('USDA detail fetch failed: ' + res.status);
+    const data = await res.json();
+    const portions = (data.foodPortions || [])
+      .filter(p => p.gramWeight > 0)
+      .map(p => ({ label: describeUsdaPortion(p), grams: p.gramWeight }))
+      .slice(0, 6); // keep the picker to a manageable, scannable size
+    STATE.usdaPortionsCache[fdcId] = { portions, ts: Date.now() };
+    persist();
+    return portions;
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
+}
+
+function describeUsdaPortion(p) {
+  const modifier = p.modifier || 'serving';
+  if (!p.amount || p.amount === 1) return modifier;
+  return `${formatQty(p.amount)} ${modifier}`;
+}
+
+async function loadPortionsForDraft(fdcId) {
+  const d = UI.foodAdjustDraft;
+  if (!d) return;
+  d.portionsLoading = true;
+  render();
+  const portions = await fetchUsdaPortions(fdcId);
+  // The user may have cancelled or moved on to a different food while this
+  // was in flight, don't clobber whatever they're looking at now.
+  if (!UI.foodAdjustDraft || UI.foodAdjustDraft.fdcId !== fdcId) return;
+  UI.foodAdjustDraft.portions = portions;
+  UI.foodAdjustDraft.portionsLoading = false;
+  if (portions.length) {
+    selectFoodPortion(0); // default to the first real portion, not a bare gram count
+  } else {
+    render();
+  }
+}
+
+// Recomputes the draft's per-1x base from the chosen real portion (e.g. "1
+// medium" = 118g), scaled off the food's immutable per-100g values. The
+// existing 0.25/0.5/1/1.5/2/3x servings chips then apply on top of THIS, so
+// "2x" means "2 medium bananas," not "200g of something."
+function selectFoodPortion(idx) {
+  const d = UI.foodAdjustDraft;
+  const portion = d.portions[idx];
+  d.selectedPortionIdx = idx;
+  const scale = portion.grams / 100;
+  d.base = {
+    kcal: d.rawPer100g.kcal * scale,
+    protein: d.rawPer100g.protein * scale,
+    carbs: d.rawPer100g.carbs * scale,
+    fat: d.rawPer100g.fat * scale,
+  };
+  d.portionGrams = portion.grams;
+  rescaleAdjustDraft(1);
+  render();
+}
+
+// Escape hatch back to the plain per-100g unit, for anyone who'd rather enter
+// an exact weight (e.g. from a kitchen scale) than pick a household portion.
+function useRawGramsForDraft() {
+  const d = UI.foodAdjustDraft;
+  d.selectedPortionIdx = null;
+  d.base = { ...d.rawPer100g };
+  d.portionGrams = 100;
+  rescaleAdjustDraft(1);
   render();
 }
 
@@ -600,7 +710,19 @@ function startFoodAdjustDraft(f) {
     protein: f.protein,
     carbs: f.carbs,
     fat: f.fat,
+    // Portion-picking support for USDA per-100g foods (raw ingredients like
+    // "Banana, raw" don't carry a real serving size the way branded/labeled
+    // foods do), see fetchUsdaPortions/selectFoodPortion above.
+    rawPer100g: f.perServing === false ? { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat } : null,
+    fdcId: f.fdcId || null,
+    portions: null,            // null = not applicable or not loaded yet, [] = loaded with none available, [...] = real choices
+    portionsLoading: false,
+    selectedPortionIdx: null,  // null = using the raw 100g unit as-is
+    portionGrams: 100,
   };
+  if (f.perServing === false && f.fdcId) {
+    loadPortionsForDraft(f.fdcId);
+  }
 }
 
 // Rescales the shown macro fields from the immutable base whenever the serving

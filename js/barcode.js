@@ -163,7 +163,7 @@ async function onBarcodeDetected(barcode) {
   UI.barcodeStatus = `Found barcode ${barcode}, looking it up...`;
   render();
   try {
-    const res = await fetch(`${OPEN_FOOD_FACTS_URL}${encodeURIComponent(barcode)}.json?fields=product_name,brands,nutriments,serving_size`);
+    const res = await fetch(`${OPEN_FOOD_FACTS_URL}${encodeURIComponent(barcode)}.json?fields=product_name,brands,nutriments,serving_size,serving_quantity`);
     if (!res.ok) throw new Error('Open Food Facts request failed: ' + res.status);
     const data = await res.json();
     if (data.status !== 1 || !data.product) {
@@ -173,22 +173,38 @@ async function onBarcodeDetected(barcode) {
     }
     const p = data.product;
     const n = p.nutriments || {};
-    const kcal = n['energy-kcal_100g'] != null ? n['energy-kcal_100g']
-      : (n['energy_100g'] != null ? n['energy_100g'] / 4.184 : 0); // energy_100g is kJ when kcal isn't provided directly
-    const name = p.product_name
-      ? `${p.product_name}${p.brands ? ' (' + p.brands.split(',')[0].trim() + ')' : ''} (100g)`
-      : `Scanned item ${barcode} (100g)`;
-    const food = {
-      name,
-      kcal: kcal || 0,
-      protein: n['proteins_100g'] || 0,
-      carbs: n['carbohydrates_100g'] || 0,
-      fat: n['fat_100g'] || 0,
-    };
+    const brandSuffix = p.brands ? ` (${p.brands.split(',')[0].trim()})` : '';
+    const baseName = p.product_name || `Scanned item ${barcode}`;
+
+    // Prefer the product's own per-serving values (as printed on its actual
+    // Nutrition Facts panel) over per-100g, when Open Food Facts has them,
+    // that's the real gap this used to have: serving_size was being fetched
+    // but never actually used, everything defaulted to 100g regardless.
+    const hasServingData = n['energy-kcal_serving'] != null && p.serving_size;
+    let food;
+    if (hasServingData) {
+      food = {
+        name: `${baseName}${brandSuffix} (${p.serving_size})`,
+        kcal: n['energy-kcal_serving'] || 0,
+        protein: n['proteins_serving'] || 0,
+        carbs: n['carbohydrates_serving'] || 0,
+        fat: n['fat_serving'] || 0,
+      };
+    } else {
+      const kcal100 = n['energy-kcal_100g'] != null ? n['energy-kcal_100g']
+        : (n['energy_100g'] != null ? n['energy_100g'] / 4.184 : 0); // energy_100g is kJ when kcal isn't provided directly
+      food = {
+        name: `${baseName}${brandSuffix} (100g)`,
+        kcal: kcal100 || 0,
+        protein: n['proteins_100g'] || 0,
+        carbs: n['carbohydrates_100g'] || 0,
+        fat: n['fat_100g'] || 0,
+      };
+    }
     UI.barcodeScannerOpen = false;
     startFoodAdjustDraft(food);
     render();
-    toast('Found it! Check the numbers before adding.');
+    toast(hasServingData ? 'Found it! Set to one labeled serving, check the numbers before adding.' : 'Found it! No serving size on file for this one, defaulted to 100g, check the numbers before adding.');
   } catch (e) {
     console.error(e);
     UI.barcodeStatus = 'Lookup failed (check your connection). You can search by name instead.';

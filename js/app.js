@@ -67,7 +67,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v20';
+const APP_VERSION = 'forge-v21';
 
 function todayISO() {
   return dateToLocalISO(new Date());
