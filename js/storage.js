@@ -71,6 +71,10 @@ function defaultState() {
       yourPageTileOrder: [],
       yourPageHiddenTiles: [],
       yourPageTileSizes: {},
+      yourPageAddedTiles: [],
+      // Sparse route -> layout overrides. Tracking data never lives here.
+      // A route key is created only after the user customizes that page.
+      pageLayouts: {},
     },
     onboarding: {
       active: true,          // fresh installs get a guided, pet-led setup
@@ -315,8 +319,12 @@ function normalizeStateShape(state) {
   if (!Array.isArray(state.uiPrefs.yourPageTileOrder)) state.uiPrefs.yourPageTileOrder = [];
   if (!Array.isArray(state.uiPrefs.yourPageHiddenTiles)) state.uiPrefs.yourPageHiddenTiles = [];
   if (!isPlainObject(state.uiPrefs.yourPageTileSizes)) state.uiPrefs.yourPageTileSizes = {};
+  if (!Array.isArray(state.uiPrefs.yourPageAddedTiles)) state.uiPrefs.yourPageAddedTiles = [];
+  if (!isPlainObject(state.uiPrefs.pageLayouts)) state.uiPrefs.pageLayouts = {};
   state.uiPrefs.yourPageTileOrder = state.uiPrefs.yourPageTileOrder.slice(0, 30).map(String);
   state.uiPrefs.yourPageHiddenTiles = state.uiPrefs.yourPageHiddenTiles.slice(0, 30).map(String);
+  state.uiPrefs.yourPageAddedTiles = state.uiPrefs.yourPageAddedTiles.slice(0, 30).map(String);
+  state.uiPrefs.pageLayouts = normalizePageLayouts(state.uiPrefs.pageLayouts);
   if (!Array.isArray(state.onboarding.skippedSteps)) state.onboarding.skippedSteps = [];
   state.onboarding.step = Math.max(0, Math.min(7, Math.round(Number(state.onboarding.step) || 0)));
   state.onboarding.active = !!state.onboarding.active;
@@ -349,6 +357,25 @@ function normalizeStateShape(state) {
   state.workoutPlan.restTimerSeconds = Math.max(10, Math.min(900, Number(state.workoutPlan.restTimerSeconds) || 90));
   state.workoutPlan.stepsPerDay = Math.max(0, Math.min(200000, Number(state.workoutPlan.stepsPerDay) || 0));
   return state;
+}
+
+function normalizePageLayouts(layouts) {
+  const out = {};
+  Object.entries(layouts || {}).slice(0, 30).forEach(([route, layout]) => {
+    if (!/^[a-z][a-z0-9_-]{0,30}$/.test(route) || !isPlainObject(layout)) return;
+    const normalized = {
+      order: Array.isArray(layout.order) ? layout.order.slice(0, 100).map(String) : [],
+      hidden: Array.isArray(layout.hidden) ? layout.hidden.slice(0, 100).map(String) : [],
+      sizes: {},
+    };
+    if (isPlainObject(layout.sizes)) {
+      Object.entries(layout.sizes).slice(0, 100).forEach(([id, size]) => {
+        if (size === 'half' || size === 'full') normalized.sizes[String(id)] = size;
+      });
+    }
+    out[route] = normalized;
+  });
+  return out;
 }
 
 // Location support is deliberately sparse. A single-location user has neither

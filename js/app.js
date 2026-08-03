@@ -40,7 +40,9 @@ let UI = {
   progressLocationId: 'all',
   workoutLocationManagerOpen: false,
   yourPageManagerOpen: false,
+  pageLayoutManagerOpen: {},
   draggedTileId: null,
+  draggedPageModuleId: null,
   editingExercise: null, // { scope: 'workout'|'log', dayId, entryId }
   mealBuilderOpen: false,
   mealBuilderName: '',
@@ -67,7 +69,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v21';
+const APP_VERSION = 'forge-v22';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -569,6 +571,7 @@ function navigate(route) {
 }
 
 function afterRenderHooks() {
+  if (typeof applyPageModularity === 'function') applyPageModularity(UI.route);
   // Associate straightforward field labels with their first control. Existing
   // explicit ids/labels win; this covers the many generated forms without
   // requiring screen-reader users to infer unnamed number inputs.
@@ -581,6 +584,7 @@ function afterRenderHooks() {
   });
   if (UI.route === 'goals') drawGoalChart();
   if (UI.route === 'progress') { drawProgressChart(); drawStepsChart(); }
+  if (UI.route === 'yourpage' && document.getElementById('steps-chart')) drawStepsChart();
   if ((UI.route === 'food' || UI.route === 'themes') && typeof loadZXing === 'function') {
     // Fire-and-forget: get the scanner library loaded in the background before
     // it's needed. iOS Safari requires getUserMedia to fire very close to the

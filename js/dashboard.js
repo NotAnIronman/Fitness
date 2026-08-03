@@ -12,6 +12,20 @@ const YOUR_PAGE_TILES = [
   { id: 'water', name: 'Water', render: renderYourWaterTile },
   { id: 'weight', name: 'Weight goal', render: renderYourWeightTile },
   { id: 'pet', name: 'Pet', render: renderYourPetTile, available: () => STATE.pet.enabled },
+  // Additional page-native widgets are opt-in so V20/V21 dashboards do not
+  // suddenly become crowded after upgrading.
+  { id: 'step_checkin', name: 'Step check-in', render: () => renderStepCheckinCard(todayISO()), defaultVisible: false },
+  { id: 'step_history', name: 'Step history', render: () => renderStepsCard(), defaultVisible: false },
+  { id: 'guidance_level', name: 'Guidance level', render: () => renderKnowledgeLevelCard(), defaultVisible: false },
+  { id: 'training_lens', name: 'Training lens', render: () => renderGoalTrainingLens(), defaultVisible: false },
+  { id: 'goal_focus', name: 'Goal focus', render: () => renderGoalFocusCard(), defaultVisible: false },
+  { id: 'water_log', name: 'Water log', render: () => renderWaterCard(todayISO()), defaultVisible: false },
+  { id: 'workout_locations', name: 'Training locations', render: () => renderWorkoutLocationManager(), defaultVisible: false },
+  { id: 'weekly_plan', name: 'Weekly plan', render: renderYourWeeklyPlanTile, defaultVisible: false },
+  { id: 'body_fat', name: 'Body-fat estimate', render: renderYourBodyFatTile, defaultVisible: false },
+  { id: 'achievements_summary', name: 'Achievements', render: renderYourAchievementsTile, defaultVisible: false },
+  { id: 'pet_travel', name: 'Pet Travel', render: () => renderTravelCard(), defaultVisible: false, available: () => STATE.pet.enabled },
+  { id: 'rest_timer', name: 'Rest timer', render: renderYourRestTimerTile, defaultVisible: false },
 ];
 
 function availableYourPageTiles() {
@@ -25,9 +39,13 @@ function getYourPageTileOrder() {
 }
 
 function visibleYourPageTiles() {
-  const hidden = new Set(STATE.uiPrefs.yourPageHiddenTiles || []);
   const byId = new Map(availableYourPageTiles().map(tile => [tile.id, tile]));
-  return getYourPageTileOrder().filter(id => !hidden.has(id)).map(id => byId.get(id)).filter(Boolean);
+  return getYourPageTileOrder().map(id => byId.get(id)).filter(tile => tile && isYourPageTileVisible(tile));
+}
+
+function isYourPageTileVisible(tile) {
+  if ((STATE.uiPrefs.yourPageHiddenTiles || []).includes(tile.id)) return false;
+  return tile.defaultVisible !== false || (STATE.uiPrefs.yourPageAddedTiles || []).includes(tile.id);
 }
 
 function renderYourPage() {
@@ -44,9 +62,8 @@ function renderYourPage() {
 }
 
 function renderYourPageTileStore() {
-  const hidden = new Set(STATE.uiPrefs.yourPageHiddenTiles || []);
   return `<p class="hint">Use the arrow buttons on a tile to reorder it on any screen. Wide/standard controls its desktop width.</p>
-    <div class="tile-store">${availableYourPageTiles().map(tile => `<div class="tile-store-row"><span>${escapeAttr(tile.name)}</span><button class="btn btn-sm" onclick="toggleYourPageTile('${tile.id}')">${hidden.has(tile.id) ? 'Add' : 'Hide'}</button></div>`).join('')}</div>`;
+    <div class="tile-store">${availableYourPageTiles().map(tile => `<div class="tile-store-row"><span>${escapeAttr(tile.name)}</span><button class="btn btn-sm" onclick="toggleYourPageTile('${tile.id}')" aria-label="${isYourPageTileVisible(tile) ? 'Hide' : 'Add'} ${escapeAttr(tile.name)}">${isYourPageTileVisible(tile) ? 'Hide' : 'Add'}</button></div>`).join('')}</div>`;
 }
 
 function renderYourPageTileShell(tile, index, list) {
@@ -63,9 +80,19 @@ function renderYourPageTileShell(tile, index, list) {
 function toggleYourPageManager() { UI.yourPageManagerOpen = !UI.yourPageManagerOpen; render(); }
 
 function toggleYourPageTile(tileId) {
+  const tile = availableYourPageTiles().find(item => item.id === tileId);
+  if (!tile) return;
   const hidden = new Set(STATE.uiPrefs.yourPageHiddenTiles || []);
-  if (hidden.has(tileId)) hidden.delete(tileId); else hidden.add(tileId);
+  const added = new Set(STATE.uiPrefs.yourPageAddedTiles || []);
+  if (isYourPageTileVisible(tile)) {
+    if (tile.defaultVisible === false) added.delete(tileId);
+    else hidden.add(tileId);
+  } else {
+    hidden.delete(tileId);
+    if (tile.defaultVisible === false) added.add(tileId);
+  }
   STATE.uiPrefs.yourPageHiddenTiles = Array.from(hidden);
+  STATE.uiPrefs.yourPageAddedTiles = Array.from(added);
   persist(); render();
 }
 
@@ -134,4 +161,26 @@ function renderYourWeightTile() {
 
 function renderYourPetTile() {
   return `<div class="card"><div class="card-title">${escapeAttr(STATE.pet.name || 'Pet')}</div><div class="your-page-pet">${renderPetSprite(82)}<div><div class="stat-label">Happiness</div><div class="stat-value accent" style="font-size:22px">${Math.round(STATE.pet.happiness)}%</div><div class="hint">${STATE.pet.points} points</div></div></div><button class="btn btn-sm tile-link" onclick="navigate('pet')">Visit pet</button></div>`;
+}
+
+function renderYourWeeklyPlanTile() {
+  const summary = weeklyPlanSummary();
+  return `<div class="card"><div class="card-title">Weekly plan</div><div class="grid grid-3"><div class="stat"><div class="stat-label">Training days</div><div class="stat-value accent">${summary.workoutDaysPerWeek}</div></div><div class="stat"><div class="stat-label">Strength days</div><div class="stat-value">${summary.strengthDaysPerWeek}</div></div><div class="stat"><div class="stat-label">Aerobic / sport</div><div class="stat-value">${Math.round(summary.aerobicMinutes)}<span class="unit">min</span></div></div></div><button class="btn btn-sm tile-link" onclick="navigate('workouts')">Open workout plan</button></div>`;
+}
+
+function renderYourBodyFatTile() {
+  const p = STATE.profile, bf = STATE.bodyFat;
+  const result = calcNavyBodyFat({ sex: p.sex, waistCm: bf.waistCm, neckCm: bf.neckCm, hipCm: bf.hipCm, heightCm: p.heightCm });
+  const category = result != null ? getBodyFatCategory(result, p.sex) : null;
+  return `<div class="card"><div class="card-title">Body-fat estimate</div><div class="stat"><div class="stat-label">Current tape estimate</div><div class="stat-value accent">${result == null ? '—' : `${result.toFixed(1)}<span class="unit">%</span>`}</div></div><p class="hint">${category ? escapeAttr(category.label) : 'Add measurements on the Body Fat page.'}</p><button class="btn btn-sm tile-link" onclick="navigate('bodyfat')">Open body-fat estimate</button></div>`;
+}
+
+function renderYourAchievementsTile() {
+  const unlocked = Object.keys(STATE.achievements.unlocked || {}).length;
+  const pct = ACHIEVEMENTS.length ? Math.min(100, unlocked / ACHIEVEMENTS.length * 100) : 0;
+  return `<div class="card"><div class="card-title">Achievements</div><div class="stat"><div class="stat-label">Unlocked</div><div class="stat-value accent">${unlocked}<span class="unit"> / ${ACHIEVEMENTS.length}</span></div></div><div class="progress-track" style="margin-top:10px"><div class="progress-fill" style="width:${pct}%"></div></div><button class="btn btn-sm tile-link" onclick="navigate('achievements')">Open achievements</button></div>`;
+}
+
+function renderYourRestTimerTile() {
+  return `<div class="card"><div class="card-title">Rest timer</div><div class="stat"><div class="stat-label">Default duration</div><div class="stat-value accent">${STATE.workoutPlan.restTimerSeconds}<span class="unit">sec</span></div></div><button class="btn btn-primary btn-sm tile-link" onclick="quickStartRestTimer('Rest')">Start timer</button><button class="btn btn-sm tile-link" onclick="navigate('log')">Open timer settings</button></div>`;
 }
