@@ -1711,3 +1711,54 @@ hr.div {
   .your-page-tile.wide { grid-column: auto; }
   .your-page-tile[draggable="true"] { cursor: default; }
 }
+
+/* ============================================================
+   V22: PAGE-WIDE MODULAR LAYOUTS
+   ============================================================ */
+.page-layout-manager { margin-bottom: 16px; }
+.page-layout-manager > .card-title { margin-bottom: 0; }
+.page-layout-manager:not(.panel-card-collapsed) > .card-title { margin-bottom: 14px; }
+.page-layout-store { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.page-layout-store-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.page-layout-reset { margin-top: 12px; }
+.page-module-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+.page-module {
+  min-width: 0;
+  position: relative;
+}
+.page-module-editing { padding-top: 37px; }
+.page-module-full { grid-column: 1 / -1; }
+.page-module-half { grid-column: span 6; }
+.page-module-third { grid-column: span 4; }
+.page-module-quarter { grid-column: span 3; }
+.page-module[hidden] { display: none; }
+.page-module > .card,
+.page-module > .notice,
+.page-module > .section-note,
+.page-module > .empty-state { height: 100%; margin-top: 0; }
+.page-module-tools {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.page-module-tools .icon-btn { width: 27px; height: 27px; }
+.page-module-tools .btn { padding: 5px 8px; }
+.page-module[draggable="true"] { cursor: grab; }
+.page-module[draggable="true"]:active { cursor: grabbing; }
+.page-module > .notice-pill { width: max-content; }
+
+@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+  .page-layout-store, .page-module-grid { grid-template-columns: 1fr; }
+  .page-module-full, .page-module-half, .page-module-third, .page-module-quarter { grid-column: 1 / -1; }
+  .page-module[draggable="true"] { cursor: default; }
+  .page-layout-store-actions { justify-content: flex-start; }
+}
