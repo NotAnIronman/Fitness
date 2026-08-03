@@ -1730,6 +1730,64 @@ hr.div {
 .barcode-camera-tools .field { min-width: 150px; flex: 1; margin: 0; }
 .barcode-manual-entry { display: flex; gap: 8px; margin-top: 12px; margin-bottom: 0; }
 .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* ============================================================
+   V23: NOTES, GUIDES, MACRO ALIGNMENT, PET PLACEMENT, CELEBRATIONS
+   ============================================================ */
+.workout-note-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.workout-note-toggle.has-note { color: var(--accent); border-color: var(--accent); }
+.workout-note-editor { margin: 10px 0 0; }
+.exercise-guide-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  text-underline-offset: 3px;
+}
+.exercise-guide-link:hover, .exercise-guide-link:focus-visible { color: var(--accent); }
+.faq-guide-list { display: grid; gap: 12px; }
+.exercise-guide { margin-top: 0; }
+.exercise-guide > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+.exercise-guide-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.exercise-guide-body section { padding: 12px; border: 1px solid var(--border); border-radius: calc(var(--radius) * .6); background: var(--bg); }
+.exercise-guide-body h3 { margin: 0 0 6px; font-size: 13px; color: var(--accent); }
+.exercise-guide-body p { margin: 0; color: var(--text-dim); font-size: 12.5px; line-height: 1.55; }
+
+.pet-transform-preview { display: grid; place-items: center; min-height: 190px; margin: 12px 0; border: 1px dashed var(--border); border-radius: var(--radius); background: var(--bg); }
+.pet-transform-controls { margin-top: 8px; padding: 10px; border: 1px solid var(--border); border-radius: calc(var(--radius) * .6); }
+.pet-transform-controls summary { cursor: pointer; font-weight: 600; }
+.pet-transform-field { margin-top: 10px; }
+
+.macro-fit-good { color: var(--ok) !important; }
+.macro-fit-mixed { color: var(--warn) !important; }
+.macro-fit-low { color: var(--danger) !important; }
+.macro-fit-neutral { color: var(--text-dim) !important; }
+.food-macro-name { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.macro-fit-text { font: 9px var(--font-mono); text-transform: uppercase; letter-spacing: .05em; opacity: .9; }
+.goal-nutrition-card .stat .hint, .goal-nutrition-card .stat .unit { color: var(--text-dim); }
+.macro-fit-disclaimer { margin-top: 10px; }
+
+.weight-loss-celebration { display: flex; align-items: center; gap: 18px; border-color: var(--accent); }
+.weight-loss-object { flex: 0 0 auto; font-size: clamp(44px, 8vw, 72px); filter: drop-shadow(0 8px 12px rgba(0,0,0,.18)); }
+.weight-loss-celebration p { margin: 4px 0; }
+
+@media (max-width: 600px) {
+  .exercise-guide-body { grid-template-columns: 1fr; }
+  .weight-loss-celebration { align-items: flex-start; }
+}
 .your-page-pet { display: flex; align-items: center; gap: 16px; }
 
 @media (max-width: 900px), (max-aspect-ratio: 0.65) {
