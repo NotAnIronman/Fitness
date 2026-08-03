@@ -43,13 +43,14 @@ const ONBOARDING_STEPS = [
   { key: 'food_log', route: 'food', title: 'Log any food item', body: `Search, scan, or add a custom food. Serving data can be incomplete, so review the nutrition label when precision matters.`, action: 'Open Food Tracking', complete: () => (STATE.foodLog[todayISO()] || []).length > 0 },
   { key: 'meal', route: 'food', title: 'Build or group a meal', body: `Save a reusable meal in the builder, or select foods already logged today and combine them. Grouping preserves today's totals.`, action: 'Create a saved meal', complete: () => STATE.savedMeals.length > 0 },
   { key: 'water', route: 'food', title: 'Add water', body: `Log some water for today. The estimate is a starting point, not a requirement that overrides thirst, climate, training, or medical advice.`, action: 'Log water', complete: () => Number(STATE.dailyWater[todayISO()]?.ml) > 0 },
-  { key: 'body_fat_info', route: 'bodyfat', title: 'Body-fat estimates', body: `This optional tape-based estimate is useful for broad trends, but measurement technique and the equation can create error. No measurement is required for the tour.`, action: 'Got it', manual: true },
-  { key: 'achievements_info', route: 'achievements', title: 'Achievements', body: `Achievements reward consistency across steps, training, nutrition, goals, and pet travel. They are motivation tools—not health grades.`, action: 'Got it', manual: true },
+  { key: 'body_fat_info', route: 'bodyfat', title: 'Body-fat estimates', body: `This optional tape-based estimate is useful for broad trends, but measurement technique and the equation can create error. No measurement is required for the tour.`, action: 'Got it', manual: true, autoRoute: true },
+  { key: 'achievements_info', route: 'achievements', title: 'Achievements', body: `Achievements reward consistency across steps, training, nutrition, goals, and pet travel. They are motivation tools—not health grades.`, action: 'Got it', manual: true, autoRoute: true },
   { key: 'pet_editor', route: 'pet', title: 'Open Change Pet', body: `Open Change Pet to see the pet name and species controls.`, action: 'Open Pet editor', complete: () => !!onboardingMarkers().openedPetEditor },
   { key: 'pet_species', route: 'pet', title: 'Choose any pet', body: `Choose whichever companion you like—even reselecting the current species counts.`, action: 'Choose a pet', complete: () => !!onboardingMarkers().petSpeciesChosen },
   { key: 'pet_name', route: 'pet', title: 'Rename your pet', body: `Give your companion any name you like.`, action: 'Rename pet', complete: () => !!onboardingMarkers().petRenamed },
+  { key: 'pet_editor_close', route: 'pet', title: 'Close Change Pet', body: `Close the Change Pet panel so the Customize shop has room to open cleanly.`, action: 'Close Pet editor', complete: () => !!onboardingMarkers().closedPetEditor },
   { key: 'customize_open', route: 'pet', title: 'Open Customize', body: `Customize contains the shop and the equipment you already own. New purchases equip automatically.`, action: 'Open Customize', complete: () => !!onboardingMarkers().openedCustomize },
-  { key: 'buy_cosmetic', route: 'pet', title: 'Buy a cosmetic', body: `Buy any cosmetic. Coach adds a one-time 30-point welcome credit when Customize first opens, enough for a starter item.`, action: 'Buy an item', complete: () => STATE.pet.ownedItems.length > 0 },
+  { key: 'buy_cosmetic', route: 'pet', title: 'Buy a cosmetic', body: `Buy a cosmetic. Here's 30 points as a welcome credit to spend in the shop!`, action: 'Buy an item', complete: () => STATE.pet.ownedItems.length > 0 },
   { key: 'customize_close', route: 'pet', title: 'Close Customize', body: `Close Customize to return to the main pet page.`, action: 'Close Customize', complete: () => !!onboardingMarkers().closedCustomizeAfterPurchase },
   { key: 'travel_info', route: 'pet', title: 'How Pet Travel works', body: `Your checked-in steps move the pet toward a selected state, up to 40,000 credited steps per date. Low happiness pauses movement. Silver, Gold, and Platinum arrivals earn souvenirs.`, action: 'Got it', manual: true },
   { key: 'travel_difficulty', route: 'pet', title: 'Choose travel difficulty', body: `Choose Bronze, Silver, Gold, or Platinum. Difficulty changes the user-steps-to-travel-steps ratio and sets the best medal for a clean leg.`, action: 'Choose difficulty', complete: () => !!onboardingMarkers().travelDifficultySelected },
@@ -66,6 +67,10 @@ function onboardingStepComplete(index) {
   const step = ONBOARDING_STEPS[index];
   if (!step || !step.complete) return false;
   try { return !!step.complete(); } catch (e) { return false; }
+}
+
+function getActiveOnboardingStep() {
+  return STATE.onboarding.active ? ONBOARDING_STEPS[STATE.onboarding.step] || null : null;
 }
 
 function syncOnboardingStep() {

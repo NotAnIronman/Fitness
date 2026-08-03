@@ -133,6 +133,7 @@ function defaultState() {
       species: 'dog',         // fresh installs start with a friendly setup guide
       name: 'Coach',
       equipped: {},           // slot -> item key, e.g. { hat: 'top_hat' }
+      itemTransforms: {},      // item key -> {x,y,rotation,scale}; visual only
       ownedItems: [],         // item keys purchased from the shop
       points: 0,
       totalPointsEarned: 0,
@@ -340,6 +341,18 @@ function normalizeStateShape(state) {
   if (!isPlainObject(state.pet.travel.processedSteps)) state.pet.travel.processedSteps = {};
   if (state.pet.travel.leg != null && !isPlainObject(state.pet.travel.leg)) state.pet.travel.leg = null;
   if (!isPlainObject(state.pet.equipped)) state.pet.equipped = {};
+  if (!isPlainObject(state.pet.itemTransforms)) state.pet.itemTransforms = {};
+  const transforms = {};
+  Object.entries(state.pet.itemTransforms).slice(0, 100).forEach(([key, value]) => {
+    if (!isPlainObject(value) || !PET_ITEMS.some(item => item.key === key)) return;
+    transforms[key] = {
+      x: Math.max(-100, Math.min(100, Number(value.x) || 0)),
+      y: Math.max(-100, Math.min(100, Number(value.y) || 0)),
+      rotation: Math.max(-180, Math.min(180, Number(value.rotation) || 0)),
+      scale: Math.max(0.3, Math.min(2.5, Number(value.scale) || 1)),
+    };
+  });
+  state.pet.itemTransforms = transforms;
   state.pet.tutorialShopCreditGranted = !!state.pet.tutorialShopCreditGranted;
   if (!isPlainObject(state.pet.rewardedDates)) state.pet.rewardedDates = {};
   if (!isPlainObject(state.pet.rewardedWeeks)) state.pet.rewardedWeeks = {};
@@ -382,16 +395,11 @@ function normalizePageLayouts(layouts) {
   return out;
 }
 
-// Location support is deliberately sparse. A single-location user has neither
-// of these top-level keys. Custom locations are stored once, and a logged date
-// stores only a short location id instead of duplicating its workout entries.
+// Location support is deliberately sparse. Custom locations are stored once,
+// and a logged date stores only a short location id instead of duplicating its
+// workout entries. workoutLogMeta may still exist for a dated workout note.
 function normalizeOptionalWorkoutLocations(state) {
-  if (!Array.isArray(state.workoutLocations)) {
-    delete state.workoutLocations;
-    delete state.workoutLogMeta;
-    state.workoutPlan.days.forEach(day => { delete day.locationId; });
-    return;
-  }
+  if (!Array.isArray(state.workoutLocations)) state.workoutLocations = [];
   const seen = new Set();
   state.workoutLocations = state.workoutLocations.slice(0, 25).filter(isPlainObject).map(location => ({
     id: safeStateId(location.id),
@@ -399,18 +407,19 @@ function normalizeOptionalWorkoutLocations(state) {
   })).filter(location => location.name && !seen.has(location.id) && seen.add(location.id));
   if (!state.workoutLocations.length) {
     delete state.workoutLocations;
-    delete state.workoutLogMeta;
     state.workoutPlan.days.forEach(day => { delete day.locationId; });
-    return;
   }
-  const validIds = new Set(state.workoutLocations.map(location => location.id));
+  const validIds = new Set((state.workoutLocations || []).map(location => location.id));
   state.workoutPlan.days.forEach(day => { if (!validIds.has(day.locationId)) delete day.locationId; });
   const meta = {};
   if (isPlainObject(state.workoutLogMeta)) {
     Object.entries(state.workoutLogMeta).slice(0, 5000).forEach(([date, value]) => {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && isPlainObject(value) && validIds.has(value.locationId)) {
-        meta[date] = { locationId: value.locationId };
-      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isPlainObject(value)) return;
+      const normalized = {};
+      if (validIds.has(value.locationId)) normalized.locationId = value.locationId;
+      const note = String(value.note || '').trim().slice(0, 2000);
+      if (note) normalized.note = note;
+      if (Object.keys(normalized).length) meta[date] = normalized;
     });
   }
   if (Object.keys(meta).length) state.workoutLogMeta = meta;

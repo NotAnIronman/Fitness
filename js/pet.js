@@ -143,6 +143,7 @@ function renamePet(name) {
 function togglePetChangePanel() {
   UI.petChangePanelOpen = !UI.petChangePanelOpen;
   if (UI.petChangePanelOpen) markOnboarding('openedPetEditor');
+  else markOnboarding('closedPetEditor');
   render();
 }
 function togglePetCustomizePanel() {
@@ -237,7 +238,10 @@ function renderPetSprite(size) {
     const anchor = animal.anchors && animal.anchors[slotName];
     const posStyle = anchor ? `top:${anchor.top}; left:${anchor.left};` : '';
     const slotSizePx = size * defaultScale[slotName] * (anchor && anchor.scale ? anchor.scale : 1);
-    return `<span class="pet-overlay pet-slot-${slotName}" style="font-size:${slotSizePx}px; width:${slotSizePx}px; height:${slotSizePx}px; ${posStyle}">${petVisual(item, item.name, slotSizePx)}</span>`;
+    const custom = getPetItemTransform(item.key);
+    const baseTransform = slotName === 'accessory' ? '' : 'translateX(-50%) ';
+    const customTransform = `${baseTransform}translate(${custom.x * size / 100}px, ${custom.y * size / 100}px) rotate(${custom.rotation}deg) scale(${custom.scale})`;
+    return `<span class="pet-overlay pet-slot-${slotName}" data-pet-overlay-key="${escapeAttr(item.key)}" data-pet-slot="${slotName}" data-sprite-size="${size}" style="font-size:${slotSizePx}px; width:${slotSizePx}px; height:${slotSizePx}px; ${posStyle} transform:${customTransform};">${petVisual(item, item.name, slotSizePx)}</span>`;
   };
 
   return `
@@ -579,7 +583,7 @@ function renderPetTab() {
       <p class="page-sub">Earn points by checking in on steps, logging workouts, and staying on your calorie target, then spend them here.</p>
     </div>
 
-    <div class="card ${['pet_editor','pet_species','pet_name','customize_open','customize_close'].some(onboardingStepIs) ? 'onboarding-focus' : ''}" style="text-align:center;">
+    <div class="card ${['pet_editor','pet_species','pet_name','pet_editor_close','customize_open','customize_close'].some(onboardingStepIs) ? 'onboarding-focus' : ''}" style="text-align:center;">
       ${renderPetSprite(90)}
       <p class="hint" style="margin-top:8px; font-style:italic;">"${cheer}"</p>
 
@@ -650,8 +654,70 @@ function renderPetShop() {
     <div class="card">
       <div class="card-title">Shop <span style="font-family:var(--font-mono); font-size:13px; color:var(--accent);">${STATE.pet.points} pts</span></div>
       ${PET_SLOTS.map(slot => renderShopSlot(slot)).join('')}
+      ${renderPetTransformEditor()}
     </div>
   `;
+}
+
+function getPetItemTransform(itemKey) {
+  const value = STATE.pet.itemTransforms?.[itemKey] || {};
+  return {
+    x: Number(value.x) || 0,
+    y: Number(value.y) || 0,
+    rotation: Number(value.rotation) || 0,
+    scale: Number(value.scale) || 1,
+  };
+}
+
+function renderPetTransformEditor() {
+  const equipped = PET_SLOTS.map(slot => ({ slot, item: PET_ITEMS.find(item => item.key === STATE.pet.equipped[slot]) })).filter(entry => entry.item);
+  if (!equipped.length) return '';
+  return `<hr class="div"><div class="pet-transform-editor">
+    <div class="card-title">Position equipped items</div>
+    <p class="hint">Move, rotate, and scale each equipped item. Placement is saved per cosmetic, so switching pets or equipment does not erase it.</p>
+    <div class="pet-transform-preview">${renderPetSprite(150)}</div>
+    ${equipped.map(({ slot, item }) => {
+      const transform = getPetItemTransform(item.key);
+      return `<details class="pet-transform-controls">
+        <summary>${petIconSmall(item)} ${escapeAttr(item.name)} <span class="badge">${escapeAttr(PET_SLOT_LABELS[slot])}</span></summary>
+        <div class="grid grid-2">
+          ${renderPetTransformRange(item.key, 'x', 'Horizontal', -100, 100, 1, transform.x)}
+          ${renderPetTransformRange(item.key, 'y', 'Vertical', -100, 100, 1, transform.y)}
+          ${renderPetTransformRange(item.key, 'rotation', 'Rotation', -180, 180, 1, transform.rotation)}
+          ${renderPetTransformRange(item.key, 'scale', 'Scale', 30, 250, 1, Math.round(transform.scale * 100), true)}
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="resetPetItemTransform('${item.key}')">Reset placement</button>
+      </details>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderPetTransformRange(itemKey, field, label, min, max, step, value, percentScale) {
+  const suffix = field === 'rotation' ? '°' : percentScale ? '%' : '% of pet';
+  return `<div class="field pet-transform-field"><label>${label}: <span data-transform-label="${itemKey}:${field}">${Math.round(value)}${suffix}</span></label><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" oninput="previewPetItemTransform('${itemKey}','${field}',this.value,${percentScale ? 'true' : 'false'})" onchange="commitPetItemTransform()"></div>`;
+}
+
+function previewPetItemTransform(itemKey, field, value, percentScale) {
+  if (!STATE.pet.itemTransforms) STATE.pet.itemTransforms = {};
+  const next = getPetItemTransform(itemKey);
+  next[field] = percentScale ? Number(value) / 100 : Number(value);
+  STATE.pet.itemTransforms[itemKey] = next;
+  const label = document.querySelector(`[data-transform-label="${itemKey}:${field}"]`);
+  if (label) label.textContent = `${Math.round(Number(value))}${field === 'rotation' ? '°' : percentScale ? '%' : '% of pet'}`;
+  document.querySelectorAll(`[data-pet-overlay-key="${itemKey}"]`).forEach(element => applyPetOverlayTransform(element, next));
+}
+
+function applyPetOverlayTransform(element, transform) {
+  const size = Number(element.dataset.spriteSize) || 100;
+  const base = element.dataset.petSlot === 'accessory' ? '' : 'translateX(-50%) ';
+  element.style.transform = `${base}translate(${transform.x * size / 100}px, ${transform.y * size / 100}px) rotate(${transform.rotation}deg) scale(${transform.scale})`;
+}
+
+function commitPetItemTransform() { persist(); }
+
+function resetPetItemTransform(itemKey) {
+  if (STATE.pet.itemTransforms) delete STATE.pet.itemTransforms[itemKey];
+  persist(); render();
 }
 
 function renderShopSlot(slot) {

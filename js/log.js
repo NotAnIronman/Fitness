@@ -15,6 +15,8 @@ function renderLog() {
   const dateObj = new Date(date + 'T00:00:00');
   const dateLabel = dateObj.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
   const locationId = getWorkoutLogLocationId(date);
+  const workoutNote = STATE.workoutLogMeta?.[date]?.note || '';
+  const noteOpen = !!UI.logNotesOpen[date];
 
   const performedEntries = entries.map(completedExerciseEntry).filter(Boolean);
   let dayKcal = 0;
@@ -49,6 +51,11 @@ function renderLog() {
         ${!isToday ? `<button class="btn btn-sm" onclick="setLogDate('${todayISO()}')" style="flex: 0 0 auto; white-space: nowrap;">Jump to today</button>` : ''}
       </div>
       ${renderWorkoutLocationSelect(locationId, `setWorkoutLogLocation('${date}', this.value)`, 'Training location for this workout')}
+      <div class="workout-note-row">
+        <button class="icon-btn workout-note-toggle ${workoutNote ? 'has-note' : ''}" onclick="toggleWorkoutNote('${date}')" aria-expanded="${noteOpen}" aria-label="${noteOpen ? 'Hide' : 'Show'} workout note" title="${workoutNote ? 'View workout note' : 'Add workout note'}">📝</button>
+        <span class="hint">${workoutNote ? 'Workout note saved' : 'Add a private note for this workout'}</span>
+      </div>
+      ${noteOpen ? `<div class="field workout-note-editor"><label>Workout note</label><textarea maxlength="2000" rows="4" placeholder="Energy, pain-free range, equipment setup, what to change next time…" oninput="saveWorkoutNoteDraft('${date}', this.value)" onchange="saveWorkoutNote('${date}', this.value)">${escapeAttr(workoutNote)}</textarea></div>` : ''}
     </div>
 
     ${compliance ? renderComplianceCard(compliance) : ''}
@@ -101,6 +108,31 @@ function renderLog() {
       `}
     </div>
   `;
+}
+
+function toggleWorkoutNote(date) {
+  UI.logNotesOpen[date] = !UI.logNotesOpen[date];
+  render();
+}
+
+// Persist on input so a quick route change cannot discard a note before the
+// browser emits its final change/blur event. The full save below still handles
+// trimming, UI refresh, and user feedback when editing finishes.
+function saveWorkoutNoteDraft(date, value) {
+  const note = String(value || '').slice(0, 2000);
+  if (note) ensureWorkoutLogMeta(date).note = note;
+  else if (STATE.workoutLogMeta?.[date]) delete STATE.workoutLogMeta[date].note;
+  pruneWorkoutLogMeta(date);
+  persist();
+}
+
+function saveWorkoutNote(date, value) {
+  const note = String(value || '').trim().slice(0, 2000);
+  if (note) ensureWorkoutLogMeta(date).note = note;
+  else if (STATE.workoutLogMeta?.[date]) delete STATE.workoutLogMeta[date].note;
+  pruneWorkoutLogMeta(date);
+  persist(); render();
+  toast(note ? 'Workout note saved.' : 'Workout note removed.');
 }
 
 function renderComplianceCard(c) {

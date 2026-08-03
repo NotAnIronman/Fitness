@@ -36,6 +36,9 @@ let UI = {
   logAddOpen: false,
   logCopyOpen: false,
   logCopyMode: 'add',
+  logNotesOpen: {},
+  faqQuery: '',
+  faqExerciseId: null,
   progressExerciseId: null,
   progressLocationId: 'all',
   workoutLocationManagerOpen: false,
@@ -73,7 +76,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v22.1';
+const APP_VERSION = 'forge-v23';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -484,7 +487,8 @@ const NAV_ITEMS = [
   { key: 'bodyfat', label: 'Body Fat', num: '08' },
   { key: 'achievements', label: 'Achievements', num: '09' },
   { key: 'pet', label: 'Pet', num: '10' }, // hidden from the nav unless STATE.pet.enabled, see doRender()
-  { key: 'themes', label: 'Themes', num: '11' },
+  { key: 'faq', label: 'FAQ & Guides', num: '11' },
+  { key: 'themes', label: 'Themes', num: '12' },
 ];
 
 function doRender() {
@@ -541,6 +545,7 @@ function doRender() {
   else if (UI.route === 'bodyfat') main.innerHTML = renderBodyFat();
   else if (UI.route === 'achievements') main.innerHTML = renderAchievements();
   else if (UI.route === 'pet') main.innerHTML = STATE.pet.enabled ? renderPetTab() : renderHome();
+  else if (UI.route === 'faq') main.innerHTML = renderFAQ();
   else if (UI.route === 'themes') main.innerHTML = renderThemes();
   else { UI.route = 'home'; main.innerHTML = renderHome(); }
 
@@ -573,6 +578,13 @@ function navigate(route) {
 
 function afterRenderHooks() {
   if (typeof applyPageModularity === 'function') applyPageModularity(UI.route);
+  const tourStep = typeof getActiveOnboardingStep === 'function' ? getActiveOnboardingStep() : null;
+  if (tourStep?.autoRoute && tourStep.route !== UI.route) {
+    requestAnimationFrame(() => {
+      const current = getActiveOnboardingStep();
+      if (current?.autoRoute && current.route !== UI.route) navigate(current.route);
+    });
+  }
   // Associate straightforward field labels with their first control. Existing
   // explicit ids/labels win; this covers the many generated forms without
   // requiring screen-reader users to infer unnamed number inputs.
@@ -586,6 +598,9 @@ function afterRenderHooks() {
   if (UI.route === 'goals') drawGoalChart();
   if (UI.route === 'progress') { drawProgressChart(); drawStepsChart(); }
   if (UI.route === 'yourpage' && document.getElementById('steps-chart')) drawStepsChart();
+  if (UI.route === 'faq' && UI.faqExerciseId) {
+    requestAnimationFrame(() => document.getElementById(exerciseGuideAnchor(UI.faqExerciseId))?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
   if ((UI.route === 'food' || UI.route === 'themes') && typeof loadZXing === 'function') {
     // Fire-and-forget: get the scanner library loaded in the background before
     // it's needed. iOS Safari requires getUserMedia to fire very close to the

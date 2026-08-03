@@ -178,13 +178,16 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
   const removeAttr = target.scope === 'workout'
     ? `removeExercise('${target.dayId}', '${e.id}')`
     : `removeLogExercise('${e.id}')`;
+  const exerciseName = EXERCISE_LIBRARY.some(item => item.id === ex.id)
+    ? `<button class="exercise-guide-link" onclick="openExerciseGuide('${ex.id}')" title="Open ${escapeAttr(ex.name)} guide">${escapeAttr(ex.name)}</button>`
+    : escapeAttr(ex.name);
 
   // Ramping/per-set weights get their own block with one line per set, instead
   // of being crammed into a single hard-to-read row.
   if (e.perSetWeights && e.perSetWeights.length) {
     const allDone = e.perSetWeights.every(s => s.completed);
     const setRows = e.perSetWeights.map((s, i) => {
-      const displayLoad = Math.round(workoutWeightToDisplay(s.weightIsPerSide ? s.weightKg * 2 : s.weightKg) * 10) / 10;
+      const displayLoad = Math.round(workoutWeightToDisplay(s.weightKg) * 10) / 10;
       const checkboxAttr = target.scope === 'log' ? `onchange="toggleLogSetDone('${e.id}', ${i})"` : 'disabled';
       return `
         <div class="set-row ${s.completed ? 'set-done' : ''}">
@@ -198,7 +201,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
     return `
       <div class="exercise-block">
         <div class="exercise-block-header">
-          <div class="name" style="${allDone ? 'opacity:0.55;' : ''}">${escapeAttr(ex.name)}${allDone ? ' \u2713' : ''}</div>
+          <div class="name" style="${allDone ? 'opacity:0.55;' : ''}">${exerciseName}${allDone ? ' \u2713' : ''}</div>
           <div class="kcal">${kcalTip}</div>
           ${target.scope === 'log' ? `<button class="icon-btn" onclick="quickStartRestTimer('Rest before next exercise')" title="Start rest timer">\u23F1</button>` : ''}
           <button class="icon-btn" onclick="${editAttr}" title="Edit">\u270E</button>
@@ -211,9 +214,9 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
 
   let meta;
   if (ex.inputMode === 'setsRepsWeight') {
-    const load = effectiveLoadKg(e);
-    const displayLoad = Math.round(workoutWeightToDisplay(load) * 10) / 10;
-    meta = `${e.sets}x${e.reps} @ ${displayLoad ? displayLoad + ' ' + workoutWeightUnit() + ' total' : 'bodyweight'}${e.weightIsPerSide ? ' (per side x2)' : ''}`;
+    const displayKg = e.weightIsPerSide ? e.weightKg : effectiveLoadKg(e);
+    const displayLoad = Math.round(workoutWeightToDisplay(displayKg) * 10) / 10;
+    meta = `${e.sets}x${e.reps} @ ${displayLoad ? `${displayLoad} ${workoutWeightUnit()}${e.weightIsPerSide ? ' per side' : ' total'}` : 'bodyweight'}`;
   } else if (ex.inputMode === 'setsReps') {
     meta = `${e.sets}x${e.reps}`;
   } else {
@@ -223,7 +226,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
     <div class="exercise-row">
       ${showCheckbox ? `<input type="checkbox" ${e.completed ? 'checked' : ''} onchange="toggleLogExerciseDone('${e.id}')" style="width:auto; flex-shrink:0;" title="Mark done">` : ''}
       <div style="${e.completed ? 'opacity:0.55;' : ''}">
-        <div class="name">${escapeAttr(ex.name)}${e.completed ? ' \u2713' : ''}</div>
+        <div class="name">${exerciseName}${e.completed ? ' \u2713' : ''}</div>
         <div class="meta">${meta} . ${ex.bodyPart || ex.category || 'Custom'}</div>
       </div>
       <div class="kcal">${kcalTip}</div>

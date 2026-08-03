@@ -17,6 +17,57 @@
 
 const USDA_SEARCH_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 
+const MACRO_FIT_META = {
+  good: { label: 'Strong match', className: 'macro-fit-good' },
+  mixed: { label: 'Partial match', className: 'macro-fit-mixed' },
+  low: { label: 'Low match', className: 'macro-fit-low' },
+  neutral: { label: 'Not scored', className: 'macro-fit-neutral' },
+};
+
+function macroPlanShares() {
+  const guidance = getGoalGuidance();
+  const macroPlan = getGoalMacroPlan(getFoodTargetCalories());
+  if (!macroPlan || !guidance.proteinLowGrams) return null;
+  const protein = (guidance.proteinLowGrams + guidance.proteinHighGrams) / 2 * 4;
+  const carbs = macroPlan.carbEstimateGrams * 4;
+  const fat = (macroPlan.fatLowGrams + macroPlan.fatHighGrams) / 2 * 9;
+  const total = protein + carbs + fat;
+  return total > 0 ? { protein: protein / total, carbs: carbs / total, fat: fat / total } : null;
+}
+
+function macroSharesFromGrams(protein, carbs, fat) {
+  const energy = { protein: Math.max(0, Number(protein) || 0) * 4, carbs: Math.max(0, Number(carbs) || 0) * 4, fat: Math.max(0, Number(fat) || 0) * 9 };
+  const total = energy.protein + energy.carbs + energy.fat;
+  return total > 0 ? { protein: energy.protein / total, carbs: energy.carbs / total, fat: energy.fat / total, energy: total } : null;
+}
+
+function getFoodMacroFit(food) {
+  const target = macroPlanShares();
+  const actual = macroSharesFromGrams(food.protein, food.carbs, food.fat);
+  if (!target || !actual || actual.energy < 20) return MACRO_FIT_META.neutral;
+  const distance = (Math.abs(actual.protein - target.protein) + Math.abs(actual.carbs - target.carbs) + Math.abs(actual.fat - target.fat)) / 2;
+  if (distance <= 0.18) return MACRO_FIT_META.good;
+  if (distance <= 0.34) return MACRO_FIT_META.mixed;
+  return MACRO_FIT_META.low;
+}
+
+function renderFoodMacroName(food) {
+  const fit = getFoodMacroFit(food);
+  return `<div class="name food-macro-name ${fit.className}" title="${escapeAttr(fit.label)} to your selected protein/carbohydrate/fat energy pattern">${formatQty(food.qty)} x ${escapeAttr(formatFoodNameForUnits(food.name))} <span class="macro-fit-text">${fit.label}</span></div>`;
+}
+
+function getDailyMacroStatuses(totals) {
+  const target = macroPlanShares();
+  const actual = macroSharesFromGrams(totals.protein, totals.carbs, totals.fat);
+  const neutral = { protein: MACRO_FIT_META.neutral, carbs: MACRO_FIT_META.neutral, fat: MACRO_FIT_META.neutral };
+  if (!target || !actual || actual.energy < 100) return neutral;
+  const status = key => {
+    const difference = Math.abs(actual[key] - target[key]);
+    return difference <= 0.05 ? MACRO_FIT_META.good : difference <= 0.12 ? MACRO_FIT_META.mixed : MACRO_FIT_META.low;
+  };
+  return { protein: status('protein'), carbs: status('carbs'), fat: status('fat') };
+}
+
 function renderFood() {
   const date = UI.foodDate;
   const entries = STATE.foodLog[date] || [];
@@ -33,6 +84,7 @@ function renderFood() {
   }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
 
   const safety = checkIntakeSafety(totals.kcal, STATE.profile.sex);
+  const macroStatuses = getDailyMacroStatuses(totals);
   const goalTimelineCollapsed = STATE.uiPrefs.foodGoalTimelineCollapsed;
 
   return `
@@ -152,7 +204,7 @@ function renderFood() {
             <div class="exercise-row ${UI.foodCombineSelected.includes(i) ? 'food-row-selected' : ''}">
               ${UI.foodCombineOpen ? `<label class="food-combine-check"><input type="checkbox" ${UI.foodCombineSelected.includes(i) ? 'checked' : ''} onchange="toggleFoodCombineSelection(${i})"><span class="sr-only">Select ${escapeAttr(formatFoodNameForUnits(e.name))}</span></label>` : ''}
               <div>
-                <div class="name">${formatQty(e.qty)} x ${escapeAttr(formatFoodNameForUnits(e.name))}</div>
+                ${renderFoodMacroName(e)}
                 <div class="meta">P ${Math.round(e.protein * e.qty)}g . C ${Math.round(e.carbs * e.qty)}g . F ${Math.round(e.fat * e.qty)}g</div>
                 <div class="chip-row" style="margin-top:6px;">
                   ${[0.5, 1, 1.5, 2].map(q => `<button class="chip ${e.qty === q ? 'active' : ''}" onclick="setFoodQty(${i}, ${q})">${formatQty(q)}x</button>`).join('')}
@@ -170,10 +222,11 @@ function renderFood() {
       ${entries.length ? `
         <hr class="div">
         <div class="grid grid-3">
-          ${renderMacroBar('Protein', totals.protein, '#5EEAD4')}
-          ${renderMacroBar('Carbs', totals.carbs, '#F97316')}
-          ${renderMacroBar('Fat', totals.fat, '#F5C64C')}
+          ${renderMacroBar('Protein', totals.protein, macroStatuses.protein)}
+          ${renderMacroBar('Carbs', totals.carbs, macroStatuses.carbs)}
+          ${renderMacroBar('Fat', totals.fat, macroStatuses.fat)}
         </div>
+        <p class="hint macro-fit-disclaimer">Colors compare only the protein/carbohydrate/fat energy pattern with your selected plan. They do not grade healthfulness or account for fiber, micronutrients, sodium, saturated fat, allergies, food access, or the rest of your diet.</p>
       ` : ''}
     </div>
   `;
@@ -186,12 +239,13 @@ function renderGoalNutritionGuidance(totals) {
   const protein = Math.round(totals.protein);
   const carbs = Math.round(totals.carbs);
   const fat = Math.round(totals.fat);
+  const status = getDailyMacroStatuses(totals);
   return `<div class="card goal-nutrition-card">
     <div class="card-title">${escapeAttr(guidance.focus.label)} macro plan</div>
     <div class="grid grid-3">
-      <div class="stat"><div class="stat-label">Protein</div><div class="stat-value" style="font-size:20px;">${protein}<span class="unit">g logged</span></div><div class="hint">Plan ${guidance.proteinLowGrams}-${guidance.proteinHighGrams} g · ${formatProteinRateRange(guidance.proteinMin, guidance.proteinMax)}</div></div>
-      <div class="stat"><div class="stat-label">Carbohydrate</div><div class="stat-value accent" style="font-size:20px;">${carbs}<span class="unit">g logged</span></div><div class="hint">Flexible start ~${macroPlan.carbEstimateGrams} g</div></div>
-      <div class="stat"><div class="stat-label">Fat</div><div class="stat-value" style="font-size:20px;">${fat}<span class="unit">g logged</span></div><div class="hint">Plan ${macroPlan.fatLowGrams}-${macroPlan.fatHighGrams} g (${macroPlan.fatMinPct}-${macroPlan.fatMaxPct}% kcal)</div></div>
+      <div class="stat ${status.protein.className}"><div class="stat-label">Protein · ${status.protein.label}</div><div class="stat-value" style="font-size:20px;">${protein}<span class="unit">g logged</span></div><div class="hint">Plan ${guidance.proteinLowGrams}-${guidance.proteinHighGrams} g · ${formatProteinRateRange(guidance.proteinMin, guidance.proteinMax)}</div></div>
+      <div class="stat ${status.carbs.className}"><div class="stat-label">Carbohydrate · ${status.carbs.label}</div><div class="stat-value" style="font-size:20px;">${carbs}<span class="unit">g logged</span></div><div class="hint">Flexible start ~${macroPlan.carbEstimateGrams} g</div></div>
+      <div class="stat ${status.fat.className}"><div class="stat-label">Fat · ${status.fat.label}</div><div class="stat-value" style="font-size:20px;">${fat}<span class="unit">g logged</span></div><div class="hint">Plan ${macroPlan.fatLowGrams}-${macroPlan.fatHighGrams} g (${macroPlan.fatMinPct}-${macroPlan.fatMaxPct}% kcal)</div></div>
     </div>
     ${(STATE.uiPrefs.knowledgeLevel || 0) >= 4 ? '' : `<p class="hint" style="margin-top:10px;">${escapeAttr(macroPlan.carbNote)} These are starting allocations, not pass/fail scores.</p>`}
   </div>`;
@@ -276,10 +330,10 @@ function nonNegativeFoodNumber(id) {
   return Math.max(0, Number(document.getElementById(id)?.value) || 0);
 }
 
-function renderMacroBar(label, grams, color) {
+function renderMacroBar(label, grams, status) {
   return `
-    <div class="stat">
-      <div class="stat-label">${label}</div>
+    <div class="stat ${status.className}">
+      <div class="stat-label">${label} · ${status.label}</div>
       <div class="stat-value" style="font-size:18px;">${Math.round(grams)}g</div>
     </div>
   `;

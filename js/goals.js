@@ -83,6 +83,8 @@ function renderGoals() {
       </div>
     </div>
 
+    ${renderWeightLossCelebration(g.startWeightKg, cur, isImperial)}
+
     ${evalResult && !evalResult.error ? renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) : ''}
     ${evalResult && evalResult.error ? `<div class="card"><div class="section-note">${evalResult.error}</div></div>` : ''}
 
@@ -97,6 +99,44 @@ function renderGoals() {
       ${STATE.weightLog.length === 0 ? `<div class="empty-state">No entries yet - log your weight to start the trend line.</div>` : ''}
     </div>
   `;
+}
+
+const WEIGHT_COMPARISONS = [
+  { kg: 0.45, name: 'a loaf of bread', emoji: '🍞' },
+  { kg: 0.62, name: 'a basketball', emoji: '🏀' },
+  { kg: 1.1, name: 'a pineapple', emoji: '🍍' },
+  { kg: 2.3, name: 'a 5 lb bag of flour', emoji: '🛍️' },
+  { kg: 3.8, name: 'a gallon of water', emoji: '💧' },
+  { kg: 5, name: 'an average watermelon', emoji: '🍉' },
+  { kg: 7.3, name: 'a bowling ball', emoji: '🎳' },
+  { kg: 10, name: 'a passenger-car tire', emoji: '🛞' },
+  { kg: 15, name: 'a countertop microwave', emoji: '📻' },
+  { kg: 20, name: 'a full water-cooler bottle', emoji: '💧' },
+  { kg: 23, name: 'a packed checked suitcase', emoji: '🧳' },
+];
+
+function weightLossComparison(lostKg) {
+  if (!Number.isFinite(lostKg) || lostKg < 0.45) return null;
+  if (lostKg > 27.5) {
+    const count = Math.max(2, Math.round(lostKg / 5));
+    return { kg: count * 5, name: `${count} average watermelons`, emoji: '🍉' };
+  }
+  return WEIGHT_COMPARISONS.reduce((best, item) => Math.abs(item.kg - lostKg) < Math.abs(best.kg - lostKg) ? item : best);
+}
+
+function renderWeightLossCelebration(startKg, currentKg, imperial) {
+  const lostKg = Number(startKg) - Number(currentKg);
+  const comparison = weightLossComparison(lostKg);
+  if (!comparison) return '';
+  const lost = imperial ? kgToLb(lostKg) : lostKg;
+  const unit = imperial ? 'lb' : 'kg';
+  return `<div class="card weight-loss-celebration" role="status">
+    <div class="weight-loss-object" aria-hidden="true">${comparison.emoji}</div>
+    <div><div class="card-title">That progress has real weight</div>
+      <p><strong>Congratulations—you are ${lost.toFixed(1)} ${unit} down from this goal's starting point.</strong></p>
+      <p class="hint">That is roughly the weight of ${escapeAttr(comparison.name)}. Object sizes vary, but the progress is yours.</p>
+    </div>
+  </div>`;
 }
 
 function renderGoalFocusCard() {

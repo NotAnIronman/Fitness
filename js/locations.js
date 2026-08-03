@@ -25,15 +25,24 @@ function getWorkoutLogLocationId(date) {
   return getWorkoutLocation(id) ? id : DEFAULT_WORKOUT_LOCATION_ID;
 }
 
+function ensureWorkoutLogMeta(date) {
+  if (!STATE.workoutLogMeta) STATE.workoutLogMeta = {};
+  if (!STATE.workoutLogMeta[date]) STATE.workoutLogMeta[date] = {};
+  return STATE.workoutLogMeta[date];
+}
+
+function pruneWorkoutLogMeta(date) {
+  const meta = STATE.workoutLogMeta?.[date];
+  if (meta && !meta.locationId && !meta.note) delete STATE.workoutLogMeta[date];
+  if (STATE.workoutLogMeta && !Object.keys(STATE.workoutLogMeta).length) delete STATE.workoutLogMeta;
+}
+
 function setWorkoutLogLocation(date, locationId) {
   if (!getWorkoutLocation(locationId)) {
-    if (STATE.workoutLogMeta) {
-      delete STATE.workoutLogMeta[date];
-      if (!Object.keys(STATE.workoutLogMeta).length) delete STATE.workoutLogMeta;
-    }
+    if (STATE.workoutLogMeta?.[date]) delete STATE.workoutLogMeta[date].locationId;
+    pruneWorkoutLogMeta(date);
   } else {
-    if (!STATE.workoutLogMeta) STATE.workoutLogMeta = {};
-    STATE.workoutLogMeta[date] = { locationId };
+    ensureWorkoutLogMeta(date).locationId = locationId;
   }
   persist(); render();
 }
@@ -99,7 +108,10 @@ function deleteWorkoutLocation(locationId) {
   STATE.workoutLocations = getWorkoutLocations().filter(item => item.id !== locationId);
   STATE.workoutPlan.days.forEach(day => { if (day.locationId === locationId) delete day.locationId; });
   Object.keys(STATE.workoutLogMeta || {}).forEach(date => {
-    if (STATE.workoutLogMeta[date].locationId === locationId) delete STATE.workoutLogMeta[date];
+    if (STATE.workoutLogMeta[date].locationId === locationId) {
+      delete STATE.workoutLogMeta[date].locationId;
+      pruneWorkoutLogMeta(date);
+    }
   });
   if (!Object.keys(STATE.workoutLogMeta || {}).length) delete STATE.workoutLogMeta;
   if (!STATE.workoutLocations.length) delete STATE.workoutLocations;
@@ -109,11 +121,10 @@ function deleteWorkoutLocation(locationId) {
 
 function copyWorkoutLocationToLog(locationId, date) {
   if (getWorkoutLocation(locationId)) {
-    if (!STATE.workoutLogMeta) STATE.workoutLogMeta = {};
-    STATE.workoutLogMeta[date] = { locationId };
+    ensureWorkoutLogMeta(date).locationId = locationId;
   } else if (STATE.workoutLogMeta) {
-    delete STATE.workoutLogMeta[date];
-    if (!Object.keys(STATE.workoutLogMeta).length) delete STATE.workoutLogMeta;
+    if (STATE.workoutLogMeta[date]) delete STATE.workoutLogMeta[date].locationId;
+    pruneWorkoutLogMeta(date);
   }
 }
 
