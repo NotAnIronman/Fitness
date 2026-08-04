@@ -58,8 +58,8 @@ const ONBOARDING_STEPS = [
   { key: 'theme_preset', route: 'themes', title: 'Choose a theme', body: `Pick any preset as your starting point. Forge checks the active colors for readable contrast.`, action: 'Open Themes', complete: () => !!onboardingMarkers().themePresetSelected },
   { key: 'theme_shape', route: 'themes', title: 'Change the shape', body: `Move the corner-radius control to choose sharper or softer cards.`, action: 'Change shape', complete: () => !!onboardingMarkers().themeShapeChanged },
   { key: 'theme_font', route: 'themes', title: 'Change the font', body: `Choose any font pairing. You can change it again at any time.`, action: 'Change font', complete: () => !!onboardingMarkers().themeFontChanged },
-  { key: 'transfer_info', route: 'themes', title: 'Your data stays local', body: `Forge has no user account. Transfer tools let you share, copy, scan, export, or import your own data. QR is best for small transfers; file or direct share is better for a long history.`, action: 'Got it', manual: true },
-  { key: 'contact_info', route: 'themes', title: 'Contact & support', body: `The Contact & support panel has the ForgeTrainingLog@gmail.com address for bugs, ideas, or help. It opens your mail app without sharing Forge data automatically.`, action: 'Got it', manual: true },
+  { key: 'transfer_info', route: 'utilities', title: 'Your data stays local', body: `Forge has no user account. Utilities lets you share a day, copy, scan, export, or import your own data. QR is best for small transfers; file or direct share is better for a long history.`, action: 'Open Utilities', manual: true, autoRoute: true },
+  { key: 'contact_info', route: 'utilities', title: 'Contact & support', body: `The Contact & support panel has the ForgeTrainingLog@gmail.com address for bugs, ideas, or help. It opens your mail app without sharing Forge data automatically.`, action: 'Got it', manual: true },
   { key: 'complete', route: 'home', title: `You're ready!`, body: `Thank you for taking the full tour. Forge is now yours to rearrange, simplify, and grow with.`, action: 'Finish tour', manual: true, finish: true },
 ];
 

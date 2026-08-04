@@ -9,12 +9,9 @@
 // Strength/Mobility/Sports, used for calc grouping), met: MET value, inputMode:
 // which fields the user fills in ('duration' | 'setsRepsWeight' | 'setsReps').
 //
-// restAdjust: for duration-based STRENGTH entries only (things like "general gym
-// session"), a session's clock time is mostly rest between sets, not continuous
-// work. Applying the MET formula to the full duration overstates the burn a lot
-// (a 30-minute session might be ~80% rest). restAdjust scales the effective minutes
-// down to account for that. Cardio/mobility duration entries are continuous effort,
-// so they don't get this adjustment (restAdjust defaults to 1).
+// Duration-based strength entries use whole-session MET values from the adult
+// activity compendium. Those already reflect normal work/rest patterns, so the
+// person's logged session duration is not silently reduced a second time.
 const BODY_PARTS = ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core', 'Cardio', 'Full Body', 'Mobility', 'Sports'];
 
 const EXERCISE_LIBRARY = [
@@ -108,14 +105,14 @@ const EXERCISE_LIBRARY = [
   { id: 'nordic_curl',      name: 'Nordic Hamstring Curl',  bodyPart: 'Legs',  category: 'Strength', met: 5.5, inputMode: 'setsReps' },
 
   // ---- Core ----
-  { id: 'plank',             name: 'Plank',              bodyPart: 'Core',  category: 'Strength', met: 3.8, inputMode: 'duration', restAdjust: 1 },
-  { id: 'side_plank',        name: 'Side Plank',         bodyPart: 'Core',  category: 'Strength', met: 3.8, inputMode: 'duration', restAdjust: 1 },
+  { id: 'plank',             name: 'Plank',              bodyPart: 'Core',  category: 'Strength', met: 3.8, inputMode: 'duration' },
+  { id: 'side_plank',        name: 'Side Plank',         bodyPart: 'Core',  category: 'Strength', met: 3.8, inputMode: 'duration' },
   { id: 'crunch',            name: 'Crunches',           bodyPart: 'Core',  category: 'Strength', met: 4.0, inputMode: 'setsReps' },
   { id: 'bicycle_crunch',    name: 'Bicycle Crunch',     bodyPart: 'Core',  category: 'Strength', met: 5.0, inputMode: 'setsReps' },
   { id: 'russian_twist',     name: 'Russian Twist',      bodyPart: 'Core',  category: 'Strength', met: 4.5, inputMode: 'setsReps' },
   { id: 'leg_raise',         name: 'Hanging Leg Raise',  bodyPart: 'Core',  category: 'Strength', met: 5.0, inputMode: 'setsReps' },
   { id: 'ab_wheel',          name: 'Ab Wheel Rollout',   bodyPart: 'Core',  category: 'Strength', met: 5.0, inputMode: 'setsReps' },
-  { id: 'mountain_climber',  name: 'Mountain Climbers',  bodyPart: 'Core',  category: 'Strength', met: 8.0, inputMode: 'duration', restAdjust: 1 },
+  { id: 'mountain_climber',  name: 'Mountain Climbers',  bodyPart: 'Core',  category: 'Strength', met: 8.0, inputMode: 'duration' },
   { id: 'cable_crunch',      name: 'Cable Crunch',       bodyPart: 'Core',  category: 'Strength', met: 4.0, inputMode: 'setsReps' },
   { id: 'reverse_crunch',    name: 'Reverse Crunch',     bodyPart: 'Core',  category: 'Strength', met: 4.0, inputMode: 'setsReps' },
   { id: 'dead_bug',          name: 'Dead Bug',           bodyPart: 'Core',  category: 'Strength', met: 3.0, inputMode: 'setsReps' },
@@ -152,10 +149,10 @@ const EXERCISE_LIBRARY = [
   { id: 'kb_swing',         name: 'Kettlebell Swing',              bodyPart: 'Full Body',  category: 'Strength', met: 9.8, inputMode: 'setsReps' },
   { id: 'clean_press',      name: 'Clean and Press',               bodyPart: 'Full Body',  category: 'Strength', met: 6.5, inputMode: 'setsRepsWeight' },
   { id: 'thruster',         name: 'Thrusters',                     bodyPart: 'Full Body',  category: 'Strength', met: 8.0, inputMode: 'setsRepsWeight' },
-  { id: 'battle_ropes',     name: 'Battle Ropes',                  bodyPart: 'Full Body',  category: 'Strength', met: 8.0, inputMode: 'duration', restAdjust: 0.7 },
+  { id: 'battle_ropes',     name: 'Battle Ropes',                  bodyPart: 'Full Body',  category: 'Strength', met: 7.5, inputMode: 'duration' },
   { id: 'hiit',             name: 'HIIT circuit',                  bodyPart: 'Full Body',  category: 'Cardio', met: 8.0, inputMode: 'duration' },
-  { id: 'general_weights',  name: 'General gym / weight session',  bodyPart: 'Full Body',  category: 'Strength', met: 5.0, inputMode: 'duration', restAdjust: 0.55 },
-  { id: 'circuit_weights',  name: 'Circuit training (weights)',    bodyPart: 'Full Body',  category: 'Strength', met: 7.0, inputMode: 'duration', restAdjust: 0.7 },
+  { id: 'general_weights',  name: 'General gym / weight session',  bodyPart: 'Full Body',  category: 'Strength', met: 3.5, inputMode: 'duration' },
+  { id: 'circuit_weights',  name: 'Circuit training (weights)',    bodyPart: 'Full Body',  category: 'Strength', met: 5.0, inputMode: 'duration' },
   { id: 'farmers_carry',    name: "Farmer's Carry",                bodyPart: 'Full Body',  category: 'Strength', met: 6.0, inputMode: 'setsRepsWeight' },
   { id: 'sled_push',        name: 'Sled Push',                     bodyPart: 'Full Body',  category: 'Strength', met: 8.0, inputMode: 'duration' },
   { id: 'box_jump',         name: 'Box Jump',                      bodyPart: 'Full Body',  category: 'Strength', met: 8.0, inputMode: 'setsReps' },

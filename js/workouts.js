@@ -147,9 +147,9 @@ function renderGoalTrainingLens() {
 }
 
 function renderDayCard(day, bw) {
-  let dayKcal = 0;
   const rows = day.exercises.map(e => renderExerciseRow(e, bw, { scope: 'workout', dayId: day.id })).join('');
-  day.exercises.forEach(e => { dayKcal += calcExerciseCalories(e, bw); });
+  const energy = calcWorkoutEnergy(day.exercises, bw);
+  const dayKcal = (energy.totalLow + energy.totalHigh) / 2;
 
   const sessionFeedback = dayKcal > 0 ? getSessionIntensityFeedback(dayKcal) : null;
 
@@ -176,7 +176,8 @@ function renderDayCard(day, bw) {
       <div class="grid grid-2" style="align-items:end; margin-bottom:14px;">
         <div class="stat">
           <div class="stat-label">Estimated day total</div>
-          <div class="stat-value accent">${Math.round(dayKcal)}<span class="unit">kcal</span></div>
+          <div class="stat-value accent">${Math.round(energy.totalLow)}-${Math.round(energy.totalHigh)}<span class="unit">kcal</span></div>
+          <p class="hint">${Math.round(energy.duringKcal)} during + roughly ${Math.round(energy.epocLow)}-${Math.round(energy.epocHigh)} after. The post-exercise range is deliberately uncertain.</p>
         </div>
         ${sessionFeedback ? `
           <div class="stat">
@@ -254,7 +255,7 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
   } else if (ex.inputMode === 'setsReps') {
     meta = `${e.sets}x${e.reps}`;
   } else {
-    meta = `${e.durationMin} min${ex.category === 'Strength' && ex.restAdjust && ex.restAdjust < 1 ? ` (~${Math.round(ex.restAdjust * 100)}% counted as active)` : ''}`;
+    meta = `${e.durationMin} min`;
   }
   return `
     <div class="exercise-row">
@@ -338,8 +339,8 @@ function renderExerciseInputFields(ex, existingEntry) {
   if (!ex) return '';
   const perSet = existingEntry && existingEntry.perSetWeights && existingEntry.perSetWeights.length;
   if (ex.inputMode === 'duration' || ex.inputMode === 'distance') {
-    const restNote = ex.category === 'Strength' && ex.restAdjust && ex.restAdjust < 1
-      ? `<p class="hint">Heads up: gym-session time is mostly rest between sets. We count about ${Math.round(ex.restAdjust * 100)}% of this as active effort so the estimate isn't inflated. For a more accurate number, log individual exercises with sets/reps/weight instead.</p>`
+    const restNote = ex.category === 'Strength'
+      ? `<p class="hint">Duration-based strength activities use a whole-session MET value that already reflects a typical mix of effort and rest.</p>`
       : '';
     return `
       <div class="field">

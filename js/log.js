@@ -19,8 +19,8 @@ function renderLog() {
   const noteOpen = !!UI.logNotesOpen[date];
 
   const performedEntries = entries.map(completedExerciseEntry).filter(Boolean);
-  let dayKcal = 0;
-  performedEntries.forEach(e => { dayKcal += calcExerciseCalories(e, bw); });
+  const energy = calcWorkoutEnergy(performedEntries, bw);
+  const dayKcal = (energy.totalLow + energy.totalHigh) / 2;
   const completedCount = entries.filter(isExerciseFullyCompleted).length;
   const rows = entries.map(e => renderExerciseRow(e, bw, { scope: 'log', date }, true)).join('');
 
@@ -40,7 +40,7 @@ function renderLog() {
         <button class="date-nav-btn" onclick="shiftLogDate(-1)" title="Previous day">‹</button>
         <div class="date-nav-bar date-nav-label">
           ${dateLabel}${isToday ? ' (today)' : ''}
-          <span class="sub">${entries.length} exercise(s)${entries.length ? `, ${completedCount}/${entries.length} fully completed` : ''}, ${Math.round(dayKcal)} completed-work kcal${getWorkoutLocations().length ? ` · ${escapeAttr(workoutLocationName(locationId))}` : ''}</span>
+          <span class="sub">${entries.length} exercise(s)${entries.length ? `, ${completedCount}/${entries.length} fully completed` : ''}, ${Math.round(energy.totalLow)}-${Math.round(energy.totalHigh)} estimated kcal${getWorkoutLocations().length ? ` · ${escapeAttr(workoutLocationName(locationId))}` : ''}</span>
         </div>
         <button class="date-nav-btn" onclick="shiftLogDate(1)" title="Next day">›</button>
       </div>
@@ -59,6 +59,8 @@ function renderLog() {
     </div>
 
     ${compliance ? renderComplianceCard(compliance) : ''}
+
+    ${renderRecoveryCheckinCard(date)}
 
     ${renderStepCheckinCard(date)}
 
@@ -93,7 +95,8 @@ function renderLog() {
       <div class="grid grid-2" style="align-items:end; margin-bottom:14px;">
         <div class="stat">
           <div class="stat-label">Day total</div>
-          <div class="stat-value accent">${Math.round(dayKcal)}<span class="unit">kcal</span></div>
+          <div class="stat-value accent">${Math.round(energy.totalLow)}-${Math.round(energy.totalHigh)}<span class="unit">kcal</span></div>
+          <p class="hint">${Math.round(energy.duringKcal)} during + roughly ${Math.round(energy.epocLow)}-${Math.round(energy.epocHigh)} after. Only completed work is included.</p>
         </div>
         ${sessionFeedback ? `
           <div class="stat">
@@ -108,6 +111,35 @@ function renderLog() {
       `}
     </div>
   `;
+}
+
+function renderRecoveryCheckinCard(date) {
+  const entry = STATE.dailyRecovery?.[date] || {};
+  const recent = Object.entries(STATE.dailyRecovery || {})
+    .filter(([d, value]) => d <= date && value.sleepHours != null)
+    .sort(([a], [b]) => b.localeCompare(a)).slice(0, 7);
+  const sleepAverage = recent.length ? recent.reduce((sum, [, value]) => sum + Number(value.sleepHours), 0) / recent.length : null;
+  const lowRecovery = (entry.sleepHours != null && entry.sleepHours < 7) || (entry.readiness != null && entry.readiness <= 2);
+  return `<div class="card recovery-checkin-card">
+    <div class="card-title"><span>Recovery check-in</span>${sleepAverage != null ? `<span class="panel-inline-summary">${sleepAverage.toFixed(1)} hr recent avg</span>` : ''}</div>
+    <div class="grid grid-2">
+      <div class="field"><label>Sleep before this day (hours)</label><input type="number" min="0" max="24" step="0.25" value="${entry.sleepHours ?? ''}" placeholder="Optional" onchange="saveRecoveryField('${date}','sleepHours',this.value)"></div>
+      <div class="field"><label>How ready do you feel?</label><select onchange="saveRecoveryField('${date}','readiness',this.value)"><option value="">Not checked</option>${[1,2,3,4,5].map(value => `<option value="${value}" ${entry.readiness === value ? 'selected' : ''}>${value} — ${['Very low','Low','Okay','Good','Excellent'][value - 1]}</option>`).join('')}</select></div>
+    </div>
+    <p class="hint">Adults generally benefit from at least 7 hours of regular sleep, though individual needs vary. Use this as context for your training—not as a score or diagnosis.</p>
+    ${lowRecovery ? `<div class="section-note">Recovery looks lower today. Consider a lighter load, fewer sets, easier cardio, or an extra rest day if your warm-up also feels unusually difficult. One low check-in does not mean you must skip movement.</div>` : ''}
+  </div>`;
+}
+
+function saveRecoveryField(date, field, rawValue) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !['sleepHours', 'readiness'].includes(field)) return;
+  const entry = { ...(STATE.dailyRecovery?.[date] || {}) };
+  if (rawValue === '') delete entry[field];
+  else if (field === 'sleepHours') entry.sleepHours = Math.round(Math.max(0, Math.min(24, Number(rawValue) || 0)) * 10) / 10;
+  else entry.readiness = Math.max(1, Math.min(5, Math.round(Number(rawValue) || 1)));
+  if (!STATE.dailyRecovery) STATE.dailyRecovery = {};
+  if (Object.keys(entry).length) STATE.dailyRecovery[date] = entry; else delete STATE.dailyRecovery[date];
+  persist(); render();
 }
 
 function toggleWorkoutNote(date) {

@@ -91,15 +91,24 @@ function renderThemes() {
     </div>
 
     <div class="card">
-      <div class="card-title">Food search API (optional)</div>
-      <p class="hint" style="margin-bottom:12px;">Food search uses the free <a href="https://fdc.nal.usda.gov/" target="_blank" rel="noopener">USDA FoodData Central</a> database, no pricing tiers.
-      It works out of the box on USDA's public demo key, which has light rate limits shared by everyone using it. For higher limits, grab your own free key at
-      <a href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank" rel="noopener">fdc.nal.usda.gov/api-key-signup.html</a> and paste it below. Stored only in this browser.
-      The app also keeps a growing local cache of everything you've searched before (${STATE.foodIndexPool.length} item${STATE.foodIndexPool.length === 1 ? '' : 's'} cached so far), so the more you use it, the fewer searches need to hit USDA at all.</p>
-      <div class="field" style="max-width:360px;">
-        <label>USDA API key</label>
-        <input type="text" data-focus-id="usda-key" value="${escapeAttr(STATE.foodApiKey)}" placeholder="DEMO_KEY (default)" onchange="updateFoodApiKey(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
+      <div class="card-title">Mobile header size</div>
+      <div class="field" style="max-width:420px;">
+        <label>Header scale: <span id="mobile-header-scale-label">${Math.round((t.mobileHeaderScale || 1.08) * 100)}%</span></label>
+        <input type="range" min="90" max="140" step="2" value="${Math.round((t.mobileHeaderScale || 1.08) * 100)}" oninput="liveUpdateMobileHeaderScale(this.value)" onchange="commitMobileHeaderScale(this.value)">
       </div>
+      <p class="hint">Applies to the top navigation on phones and foldable cover displays. Page content size is unchanged.</p>
+    </div>
+
+    ${renderSecretSettings()}
+  `;
+}
+
+function renderUtilities() {
+  return `
+    <div class="page-head">
+      <p class="page-eyebrow">Tools & support</p>
+      <h1 class="page-title">Utilities</h1>
+      <p class="page-sub">Share a day, move or back up your local data, configure food search, and contact support.</p>
     </div>
 
     ${renderDayShareCard()}
@@ -142,6 +151,13 @@ function renderThemes() {
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-title">Food search API (optional)</div>
+      <p class="hint" style="margin-bottom:12px;">Food search uses the free <a href="https://fdc.nal.usda.gov/" target="_blank" rel="noopener">USDA FoodData Central</a> database. Forge works out of the box with the shared public demo key. For higher limits, request your own free key and paste it below; it stays in this browser. ${STATE.foodIndexPool.length} search item${STATE.foodIndexPool.length === 1 ? '' : 's'} cached locally so far.</p>
+      <div class="field" style="max-width:360px;"><label>USDA API key</label><input type="text" data-focus-id="usda-key" value="${escapeAttr(STATE.foodApiKey)}" placeholder="DEMO_KEY (default)" onchange="updateFoodApiKey(this.value)" onkeydown="if(event.key==='Enter') this.blur()"></div>
+      <a class="btn btn-sm" href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank" rel="noopener">Request a free USDA key</a>
+    </div>
+
     <div class="card ${onboardingStepIs('contact_info') ? 'onboarding-focus' : ''}">
       <div class="card-title">Contact & support</div>
       <p class="hint">Found a bug, have an idea, or need help? Contact <a href="mailto:ForgeTrainingLog@gmail.com">ForgeTrainingLog@gmail.com</a>. Forge does not attach or transmit your local health data.</p>
@@ -152,8 +168,6 @@ function renderThemes() {
       </div>
       <p class="hint" style="margin-top:8px;">Opening the email app keeps sending under your control. A future in-page Send button would require a protected server endpoint and abuse controls; no email-service credentials belong in this static app.</p>
     </div>
-
-    ${renderSecretSettings()}
   `;
 }
 
@@ -161,6 +175,7 @@ const DAY_SHARE_OPTIONS = [
   { key: 'steps', label: 'Steps' },
   { key: 'nutrition', label: 'Calories & macros' },
   { key: 'workout', label: 'Completed exercises' },
+  { key: 'recovery', label: 'Sleep & readiness' },
   { key: 'pet', label: 'Pet status' },
 ];
 
@@ -230,6 +245,13 @@ function buildDayShareSnapshot(date, sections) {
   if (selected.has('workout')) {
     const exercises = (STATE.workoutLog[date] || []).map(shareExerciseLine).filter(Boolean);
     lines.push('', 'WORKOUT', ...(exercises.length ? exercises : ['No completed exercises']));
+  }
+  if (selected.has('recovery')) {
+    const recovery = STATE.dailyRecovery?.[date];
+    const parts = [];
+    if (recovery?.sleepHours != null) parts.push(`${Number(recovery.sleepHours).toFixed(1).replace('.0', '')} hr sleep`);
+    if (recovery?.readiness != null) parts.push(`Readiness ${recovery.readiness}/5`);
+    lines.push('', 'RECOVERY', parts.length ? parts.join(' · ') : 'No recovery check-in');
   }
   if (selected.has('pet')) {
     const animal = PET_ANIMALS.find(item => item.key === STATE.pet.species);
@@ -322,6 +344,19 @@ function commitRadius(value) {
   STATE.theme.radius = Number(value);
   STATE.theme.preset = 'custom';
   markOnboarding('themeShapeChanged');
+  persist();
+}
+
+function liveUpdateMobileHeaderScale(value) {
+  STATE.theme.mobileHeaderScale = Math.max(0.9, Math.min(1.4, Number(value) / 100 || 1.08));
+  applyTheme(STATE.theme);
+  const label = document.getElementById('mobile-header-scale-label');
+  if (label) label.textContent = `${Math.round(STATE.theme.mobileHeaderScale * 100)}%`;
+}
+
+function commitMobileHeaderScale(value) {
+  liveUpdateMobileHeaderScale(value);
+  STATE.theme.preset = 'custom';
   persist();
 }
 

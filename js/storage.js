@@ -127,6 +127,11 @@ function defaultState() {
     dailyWater: {
       // 'YYYY-MM-DD': { ml: 1500 }
     },
+    // Optional recovery check-ins. Kept deliberately tiny: one sleep-duration
+    // number and one subjective 1-5 readiness rating per calendar day.
+    dailyRecovery: {
+      // 'YYYY-MM-DD': { sleepHours: 7.5, readiness: 4 }
+    },
     // Pet companion is on for fresh installs because it guides first-run setup.
     // The hidden Themes setting remains available as the opt-out.
     pet: {
@@ -191,6 +196,7 @@ function defaultState() {
       accent2: '#F97316',
       radius: 10,
       font: 'condensed',
+      mobileHeaderScale: 1.08,
     },
   };
 }
@@ -274,7 +280,7 @@ function sanitizeJsonValue(value, depth) {
 function normalizeStateShape(state) {
   const def = defaultState();
   if (!isPlainObject(state)) throw new Error('Backup root must be an object.');
-  const objectFields = ['profile', 'goal', 'workoutPlan', 'workoutLog', 'foodLog', 'bodyFat', 'uiPrefs', 'onboarding', 'usdaCache', 'usdaPortionsCache', 'dailyCheckins', 'dailyWater', 'pet', 'achievements', 'theme'];
+  const objectFields = ['profile', 'goal', 'workoutPlan', 'workoutLog', 'foodLog', 'bodyFat', 'uiPrefs', 'onboarding', 'usdaCache', 'usdaPortionsCache', 'dailyCheckins', 'dailyWater', 'dailyRecovery', 'pet', 'achievements', 'theme'];
   objectFields.forEach(key => { if (!isPlainObject(state[key])) state[key] = def[key]; });
   const arrayFields = ['weightLog', 'recentExercises', 'recentFoods', 'savedMeals', 'foodIndexPool'];
   arrayFields.forEach(key => { if (!Array.isArray(state[key])) state[key] = def[key]; });
@@ -373,12 +379,28 @@ function normalizeStateShape(state) {
   state.profile.weightKg = weightKg >= 20 && weightKg <= 400 ? weightKg : null;
   state.goal.focus = ['general', 'fat_loss', 'weight_gain', 'muscle_gain', 'recomposition', 'performance'].includes(state.goal.focus) ? state.goal.focus : 'general';
   const shareSections = Array.isArray(state.uiPrefs.dayShareSections) ? state.uiPrefs.dayShareSections : def.uiPrefs.dayShareSections;
-  state.uiPrefs.dayShareSections = [...new Set(shareSections.filter(section => ['steps', 'nutrition', 'workout', 'pet'].includes(section)))];
+  state.uiPrefs.dayShareSections = [...new Set(shareSections.filter(section => ['steps', 'nutrition', 'workout', 'recovery', 'pet'].includes(section)))];
   state.goal.trainingExperience = ['new', 'consistent', 'advanced'].includes(state.goal.trainingExperience) ? state.goal.trainingExperience : 'new';
   state.dailyCheckins = normalizeDailyCheckins(state.dailyCheckins);
+  state.dailyRecovery = normalizeDailyRecovery(state.dailyRecovery);
+  state.theme.mobileHeaderScale = Math.max(0.9, Math.min(1.4, Number(state.theme.mobileHeaderScale) || 1.08));
   state.workoutPlan.restTimerSeconds = Math.max(10, Math.min(900, Number(state.workoutPlan.restTimerSeconds) || 90));
   state.workoutPlan.stepsPerDay = Math.max(0, Math.min(200000, Number(state.workoutPlan.stepsPerDay) || 0));
   return state;
+}
+
+function normalizeDailyRecovery(log) {
+  const out = {};
+  Object.entries(log || {}).slice(-5000).forEach(([date, value]) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isPlainObject(value)) return;
+    const sleepHours = Number(value.sleepHours);
+    const readiness = Math.round(Number(value.readiness));
+    const entry = {};
+    if (Number.isFinite(sleepHours) && sleepHours >= 0 && sleepHours <= 24) entry.sleepHours = Math.round(sleepHours * 10) / 10;
+    if (readiness >= 1 && readiness <= 5) entry.readiness = readiness;
+    if (Object.keys(entry).length) out[date] = entry;
+  });
+  return out;
 }
 
 function normalizePageLayouts(layouts) {

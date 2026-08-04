@@ -200,7 +200,7 @@ function waterPetItem() {
 function petClickInteract() {
   const today = todayISO();
   if (STATE.pet.lastClickDate !== today) { STATE.pet.petClicksToday = 0; STATE.pet.lastClickDate = today; }
-  if (STATE.pet.petClicksToday >= 5) { toast(`${STATE.pet.name || 'Your pet'} needs a little space now, try again tomorrow!`); return; }
+  if (STATE.pet.petClicksToday >= 10) { toast(`${STATE.pet.name || 'Your pet'} is all loved up for today—come back tomorrow!`); return; }
   STATE.pet.petClicksToday++;
   markPetInteraction(2);
   render();

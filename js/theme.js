@@ -7,7 +7,7 @@ const THEME_PRESETS = {
     label: 'Forge (default)',
     bg: '#0B0F14', surface: '#141B22', surface2: '#1B242D', border: '#26323C',
     text: '#E7EEF3', textDim: '#8FA1AC', accent: '#5EEAD4', accent2: '#F97316',
-    radius: 10, font: 'condensed',
+    radius: 10, font: 'condensed', mobileHeaderScale: 1.08,
   },
   daylight: {
     label: 'Daylight',
@@ -100,6 +100,7 @@ function applyTheme(theme) {
   root.setProperty('--accent-2', theme.accent2);
   root.setProperty('--accent-ink', themeContrastRatio('#05100E', theme.accent) >= themeContrastRatio('#FFFFFF', theme.accent) ? '#05100E' : '#FFFFFF');
   root.setProperty('--radius', (theme.radius ?? 10) + 'px');
+  root.setProperty('--mobile-header-scale', Math.max(0.9, Math.min(1.4, Number(theme.mobileHeaderScale) || 1.08)));
   const fonts = FONT_STACKS[theme.font] || FONT_STACKS.condensed;
   root.setProperty('--font-display', fonts.display);
   root.setProperty('--font-body', fonts.body);
@@ -153,5 +154,8 @@ function themeFromPreset(key) {
     bg: p.bg, surface: p.surface, surface2: p.surface2, border: p.border,
     text: p.text, textDim: p.textDim, accent: p.accent, accent2: p.accent2,
     radius: p.radius, font: p.font,
+    // Header sizing is a personal accessibility preference, not part of a
+    // color preset. Preserve it when switching presets.
+    mobileHeaderScale: Number(STATE?.theme?.mobileHeaderScale) || 1.08,
   };
 }

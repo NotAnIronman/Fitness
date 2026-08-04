@@ -18,9 +18,9 @@
 const USDA_SEARCH_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 
 const MACRO_FIT_META = {
-  good: { label: 'Strong match', className: 'macro-fit-good' },
-  mixed: { label: 'Partial match', className: 'macro-fit-mixed' },
-  low: { label: 'Low match', className: 'macro-fit-low' },
+  good: { label: 'Strong contribution', className: 'macro-fit-good' },
+  mixed: { label: 'Useful contribution', className: 'macro-fit-mixed' },
+  low: { label: 'Limited contribution', className: 'macro-fit-low' },
   neutral: { label: 'Not scored', className: 'macro-fit-neutral' },
 };
 
@@ -42,30 +42,56 @@ function macroSharesFromGrams(protein, carbs, fat) {
 }
 
 function getFoodMacroFit(food) {
-  const target = macroPlanShares();
-  const actual = macroSharesFromGrams(food.protein, food.carbs, food.fat);
-  if (!target || !actual || actual.energy < 20) return MACRO_FIT_META.neutral;
-  const distance = (Math.abs(actual.protein - target.protein) + Math.abs(actual.carbs - target.carbs) + Math.abs(actual.fat - target.fat)) / 2;
-  if (distance <= 0.18) return MACRO_FIT_META.good;
-  if (distance <= 0.34) return MACRO_FIT_META.mixed;
-  return MACRO_FIT_META.low;
+  const guidance = getGoalGuidance();
+  const calorieTarget = getFoodTargetCalories();
+  const declaredKcal = Number(food.kcal) || 0;
+  const macroEnergy = Math.max(0, Number(food.protein) || 0) * 4 + Math.max(0, Number(food.carbs) || 0) * 4 + Math.max(0, Number(food.fat) || 0) * 9;
+  const kcal = declaredKcal >= 20 ? declaredKcal : macroEnergy;
+  if (!calorieTarget || !guidance.proteinLowGrams || kcal < 20) return MACRO_FIT_META.neutral;
+
+  // A single ingredient should not be expected to resemble a whole day's
+  // protein/carb/fat ratio. Score how usefully it contributes to the harder
+  // goal-specific target—usually protein—while daily totals judge balance.
+  const proteinPer100Kcal = Math.max(0, Number(food.protein) || 0) / kcal * 100;
+  const dailyProteinDensity = ((guidance.proteinLowGrams + guidance.proteinHighGrams) / 2) / calorieTarget * 100;
+  const focusMultiplier = ['fat_loss', 'muscle_gain', 'recomposition'].includes(guidance.focus.key) ? 1 : guidance.focus.key === 'performance' ? 0.72 : 0.82;
+  const strongProtein = Math.max(4.5, dailyProteinDensity * focusMultiplier);
+  const fatShare = macroEnergy > 0 ? (Math.max(0, Number(food.fat) || 0) * 9) / macroEnergy : 0;
+  const carbShare = macroEnergy > 0 ? (Math.max(0, Number(food.carbs) || 0) * 4) / macroEnergy : 0;
+
+  let tier = proteinPer100Kcal >= strongProtein ? 'good'
+    : proteinPer100Kcal >= strongProtein * 0.52 ? 'mixed'
+    : 'low';
+  // Performance-focused users can also get a useful contribution from a
+  // carbohydrate-dense, lower-fat fuel even when it is not protein-rich.
+  if (guidance.focus.key === 'performance' && carbShare >= 0.55 && fatShare <= 0.25) tier = 'good';
+  else if (guidance.focus.key === 'performance' && carbShare >= 0.45 && fatShare <= 0.35 && tier === 'low') tier = 'mixed';
+  // Very high fat share can still fit a day, but it is rarely a strong solo
+  // contribution to these goals unless protein density is exceptional.
+  if (fatShare > 0.65 && proteinPer100Kcal < strongProtein * 1.35 && tier === 'good') tier = 'mixed';
+  return { ...MACRO_FIT_META[tier], proteinPer100Kcal, focusLabel: guidance.focus.label };
 }
 
 function renderFoodMacroName(food) {
   const fit = getFoodMacroFit(food);
-  return `<div class="name food-macro-name ${fit.className}" title="${escapeAttr(fit.label)} to your selected protein/carbohydrate/fat energy pattern">${formatQty(food.qty)} x ${escapeAttr(formatFoodNameForUnits(food.name))} <span class="macro-fit-text">${fit.label}</span></div>`;
+  const detail = fit.proteinPer100Kcal == null ? fit.label : `${fit.label} for ${fit.focusLabel}: ${fit.proteinPer100Kcal.toFixed(1)} g protein per 100 kcal. Individual foods are scored by useful contribution; the full day is scored for balance.`;
+  return `<div class="name food-macro-name ${fit.className}" title="${escapeAttr(detail)}">${formatQty(food.qty)} x ${escapeAttr(formatFoodNameForUnits(food.name))} <span class="macro-fit-text">${fit.label}</span></div>`;
 }
 
 function getDailyMacroStatuses(totals) {
-  const target = macroPlanShares();
-  const actual = macroSharesFromGrams(totals.protein, totals.carbs, totals.fat);
+  const target = getGoalMacroPlan(getFoodTargetCalories());
   const neutral = { protein: MACRO_FIT_META.neutral, carbs: MACRO_FIT_META.neutral, fat: MACRO_FIT_META.neutral };
-  if (!target || !actual || actual.energy < 100) return neutral;
-  const status = key => {
-    const difference = Math.abs(actual[key] - target[key]);
-    return difference <= 0.05 ? MACRO_FIT_META.good : difference <= 0.12 ? MACRO_FIT_META.mixed : MACRO_FIT_META.low;
+  if (!target || Number(totals.kcal) < target.calorieTarget * 0.5) return neutral;
+  const rangeStatus = (value, low, high) => {
+    if (value >= low && value <= high) return MACRO_FIT_META.good;
+    if (value >= low * 0.75 && value <= high * 1.25) return MACRO_FIT_META.mixed;
+    return MACRO_FIT_META.low;
   };
-  return { protein: status('protein'), carbs: status('carbs'), fat: status('fat') };
+  return {
+    protein: rangeStatus(totals.protein, target.proteinLowGrams, target.proteinHighGrams * 1.1),
+    carbs: rangeStatus(totals.carbs, target.carbEstimateGrams * 0.75, target.carbEstimateGrams * 1.25),
+    fat: rangeStatus(totals.fat, target.fatLowGrams, target.fatHighGrams),
+  };
 }
 
 function renderFood() {
@@ -226,7 +252,7 @@ function renderFood() {
           ${renderMacroBar('Carbs', totals.carbs, macroStatuses.carbs)}
           ${renderMacroBar('Fat', totals.fat, macroStatuses.fat)}
         </div>
-        <p class="hint macro-fit-disclaimer">Colors compare only the protein/carbohydrate/fat energy pattern with your selected plan. They do not grade healthfulness or account for fiber, micronutrients, sodium, saturated fat, allergies, food access, or the rest of your diet.</p>
+        <p class="hint macro-fit-disclaimer">Food-name colors show how strongly one item contributes toward your selected goal, primarily from protein per calorie; performance plans also recognize lower-fat carbohydrate fuel. Daily macro colors judge the combined day only after at least half the calorie target is logged. Neither is a healthfulness grade: fiber, micronutrients, sodium, saturated fat, allergies, food access, and the rest of the diet still matter.</p>
       ` : ''}
     </div>
   `;

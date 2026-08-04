@@ -77,7 +77,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v24';
+const APP_VERSION = 'forge-v25';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -282,8 +282,9 @@ function weeklyPlanSummary() {
       totalMinutes += minutes;
       if (ex.category === 'Strength') hasStrength = true;
       if (ex.category === 'Cardio' || ex.category === 'Sports') aerobicMinutes += minutes;
-      totalKcal += calcExerciseCalories(e, bw);
     });
+    const energy = calcWorkoutEnergy(d.exercises, bw);
+    totalKcal += (energy.totalLow + energy.totalHigh) / 2;
     if (hasStrength) strengthDaysPerWeek++;
   });
   return {
@@ -357,24 +358,28 @@ function assessWeeklyBurnForGoal(weeklyKcal) {
 function getWorkoutComplianceCheck() {
   const plannedDays = STATE.workoutPlan.days.filter(d => d.exercises.length > 0).length;
   if (!plannedDays) return null;
-  const today = new Date(todayISO());
+  const today = new Date(todayISO() + 'T00:00:00');
+  const monday = new Date(today);
+  const daysElapsed = ((today.getDay() + 6) % 7) + 1; // Monday=1 ... Sunday=7
+  monday.setDate(today.getDate() - (daysElapsed - 1));
   let loggedCount = 0;
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(today); d.setDate(d.getDate() - i);
+  for (let i = 0; i < daysElapsed; i++) {
+    const d = new Date(monday); d.setDate(monday.getDate() + i);
     const iso = dateToLocalISO(d);
     if ((STATE.workoutLog[iso] || []).some(hasCompletedWork)) loggedCount++;
   }
-  const ratio = loggedCount / plannedDays;
+  const expectedByToday = Math.min(plannedDays, Math.ceil(plannedDays * daysElapsed / 7));
+  const gap = expectedByToday - loggedCount;
   let status = 'good';
-  let message = `You've logged ${loggedCount} of ${plannedDays} planned workout day(s) in the last 7 days. Good pace.`;
-  if (ratio < 0.5) {
+  let message = `${loggedCount} workout day(s) completed since Monday. You're on pace for a ${plannedDays}-day week.`;
+  if (gap >= 2) {
     status = 'way-behind';
-    message = `Only ${loggedCount} of ${plannedDays} planned workout day(s) logged this week. That's a big gap from your plan, worth catching up, or adjusting the plan to match what's realistic right now.`;
-  } else if (ratio < 0.85) {
+    message = `${loggedCount} workout day(s) completed since Monday; about ${expectedByToday} would normally be due by today for an even ${plannedDays}-day week. There is still time—adjust the remaining week or the plan itself to what is realistic.`;
+  } else if (gap === 1) {
     status = 'behind';
-    message = `${loggedCount} of ${plannedDays} planned workout day(s) logged this week. A bit behind pace, still catchable.`;
+    message = `${loggedCount} workout day(s) completed since Monday; an even ${plannedDays}-day week would be around ${expectedByToday} by today. One shifted session is not a failed week.`;
   }
-  return { status, message, loggedCount, plannedDays };
+  return { status, message, loggedCount, plannedDays, expectedByToday, daysElapsed };
 }
 
 // How well recent logged food intake matches the calorie target (used on the Food page).
@@ -490,6 +495,7 @@ const NAV_ITEMS = [
   { key: 'pet', label: 'Pet', num: '10' }, // hidden from the nav unless STATE.pet.enabled, see doRender()
   { key: 'faq', label: 'FAQ & Guides', num: '11' },
   { key: 'themes', label: 'Themes', num: '12' },
+  { key: 'utilities', label: 'Utilities', num: '13' },
 ];
 
 function doRender() {
@@ -526,7 +532,7 @@ function doRender() {
           </button>
         `).join('')}
         <div class="sidebar-foot">
-          Local-first. No Forge account. Transfer tools are in Themes.
+          Local-first. No Forge account. Transfer and support tools are in Utilities.
         </div>
       </div>
       <main class="main" id="main-content" tabindex="-1"></main>
@@ -548,6 +554,7 @@ function doRender() {
   else if (UI.route === 'pet') main.innerHTML = STATE.pet.enabled ? renderPetTab() : renderHome();
   else if (UI.route === 'faq') main.innerHTML = renderFAQ();
   else if (UI.route === 'themes') main.innerHTML = renderThemes();
+  else if (UI.route === 'utilities') main.innerHTML = renderUtilities();
   else { UI.route = 'home'; main.innerHTML = renderHome(); }
 
   afterRenderHooks();
@@ -602,7 +609,7 @@ function afterRenderHooks() {
   if (UI.route === 'faq' && UI.faqExerciseId) {
     requestAnimationFrame(() => document.getElementById(exerciseGuideAnchor(UI.faqExerciseId))?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
-  if ((UI.route === 'food' || UI.route === 'themes') && typeof loadZXing === 'function') {
+  if ((UI.route === 'food' || UI.route === 'utilities') && typeof loadZXing === 'function') {
     // Fire-and-forget: get the scanner library loaded in the background before
     // it's needed. iOS Safari requires getUserMedia to fire very close to the
     // user's tap, if there's a network/script-load delay in between (like

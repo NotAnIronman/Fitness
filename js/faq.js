@@ -11,12 +11,12 @@ function exerciseGuideAnchor(exerciseId) {
 
 function exerciseGuideFormula(exercise) {
   if (exercise.inputMode === 'duration') {
-    return `Duration estimate: MET ${exercise.met} × 3.5 × body weight (kg) ÷ 200 × completed active minutes${exercise.restAdjust && exercise.restAdjust < 1 ? ` × ${exercise.restAdjust} active-time adjustment` : ''}.`;
+    return `Duration estimate: MET ${exercise.met} × 3.5 × body weight (kg) ÷ 200 × completed minutes. Whole-session activities use a whole-session MET value.`;
   }
   if (exercise.inputMode === 'setsRepsWeight') {
-    return `Strength estimate: only completed repetitions count. Forge uses its deliberately conservative bodyweight-scaled kcal-per-rep estimate; load is recorded for progression but is not treated as a large calorie multiplier.`;
+    return `Strength estimate: only completed sets count. Forge estimates lifting time from repetitions, adds low-intensity energy during rests between sets, and shows uncertain post-exercise energy only once at session level. Load is recorded for progression but is not treated as a large linear calorie multiplier.`;
   }
-  return `Repetition estimate: only completed repetitions count, using Forge's conservative bodyweight-scaled kcal-per-rep estimate.`;
+  return `Repetition estimate: only completed repetitions count. Forge estimates rep time plus between-set rest; any post-exercise range appears only in the session total.`;
 }
 
 function exerciseGuideDefaults(exercise) {
@@ -50,7 +50,7 @@ const GENERAL_FAQ_ITEMS = [
   },
   {
     question: 'I have been dieting but am not seeing the result I expected. What should I check?',
-    answer: `<p>First compare several weeks of consistent weigh-ins, not a few days. Water, sodium, carbohydrate intake, bowel contents, menstrual-cycle changes, and weigh-in timing can temporarily hide real fat loss or gain.</p><p>If the trend is still flat, audit the log before making a large calorie change. Cooking oils, sauces, drinks, bites, restaurant portions, serving counts, and copied database entries are common sources of error in either direction. A food scale and ingredient-by-ingredient meal entries can improve accuracy, but perfection is unnecessary. After two to four consistent weeks, make a small adjustment and review the next trend.</p>`,
+    answer: `<p>First compare several weeks of consistent weigh-ins—not a few days. Water, sodium, carbohydrate intake, bowel contents, menstrual-cycle changes, and weigh-in timing can temporarily hide real fat loss or gain.</p><p>If the trend is still flat, audit the log before making a large calorie change. Cooking oils, sauces, drinks, bites, restaurant portions, serving counts, and copied database entries are common sources of error in either direction. A food scale and ingredient-by-ingredient meal entries can improve accuracy, but perfection is unnecessary. After two to four consistent weeks, make a small adjustment and review the next trend.</p>`,
   },
   {
     question: 'Where do Forge calculations and recommendations come from?',
@@ -58,7 +58,7 @@ const GENERAL_FAQ_ITEMS = [
   },
   {
     question: 'How do I add Forge to my phone?',
-    answer: `<p><strong>iPhone or iPad:</strong> Open Forge in Safari, tap the Share button, you may need to tap "More Options", choose <em>Add to Home Screen</em>, turn on <em>Open as Web App</em> if shown, then tap Add. Apple documents the current steps in its <a href="https://support.apple.com/en-mide/guide/iphone/iphea86e5236/ios" target="_blank" rel="noopener noreferrer">iPhone web-app guide</a>.</p><p><strong>Android:</strong> Open Forge in Chrome, tap the three-dot menu, choose <em>Add to Home screen</em>, then <em>Install</em> or <em>Create shortcut</em> and follow the prompt. The exact label varies by browser and device; see <a href="https://support.google.com/chrome/answer/9658361" target="_blank" rel="noopener noreferrer">Chrome's web-app instructions</a>.</p><p>Forge must be served over HTTPS for full PWA features. Installing it does not create a Forge account or move your existing local data to another browser.</p>`,
+    answer: `<p><strong>iPhone or iPad:</strong> Open Forge in Safari, tap the Share button, choose <em>Add to Home Screen</em>, turn on <em>Open as Web App</em> if shown, then tap Add. Apple documents the current steps in its <a href="https://support.apple.com/en-mide/guide/iphone/iphea86e5236/ios" target="_blank" rel="noopener noreferrer">iPhone web-app guide</a>.</p><p><strong>Android:</strong> Open Forge in Chrome, tap the three-dot menu, choose <em>Add to Home screen</em>, then <em>Install</em> or <em>Create shortcut</em> and follow the prompt. The exact label varies by browser and device; see <a href="https://support.google.com/chrome/answer/9658361" target="_blank" rel="noopener noreferrer">Chrome's web-app instructions</a>.</p><p>Forge must be served over HTTPS for full PWA features. Installing it does not create a Forge account or move your existing local data to another browser.</p>`,
   },
 ];
 

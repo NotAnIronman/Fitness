@@ -59,7 +59,7 @@ function cleanModuleTitle(element, route) {
   }
   const heading = element.querySelector('h2, h3, strong');
   if (heading?.textContent.trim()) return heading.textContent.trim().slice(0, 80);
-  const routeFallbacks = { progress: 'Exercise progress', pet: 'Pet customization', themes: 'Hidden settings', workouts: 'Workout day' };
+  const routeFallbacks = { progress: 'Exercise progress', pet: 'Pet customization', themes: 'Hidden settings', utilities: 'Utility', workouts: 'Workout day' };
   return routeFallbacks[route] || 'Page feature';
 }
 

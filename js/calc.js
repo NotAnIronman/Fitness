@@ -119,12 +119,12 @@ function isExerciseFullyCompleted(entry) {
   return !!entry.completed;
 }
 
-// Estimate an effective duration for strength sets (time under tension + rest)
-// ~ each rep takes ~3.5s of work, plus a portion of rest credited at low intensity.
+// Estimate elapsed strength-training time: rep work plus the rests between sets.
+// Rest is not treated as lifting, but it is part of session energy expenditure.
 function estimateStrengthMinutes(sets, reps) {
   if (!sets || !reps) return 0;
   const workSeconds = sets * reps * 3.5;
-  const restSeconds = sets * 60 * 0.4; // count 40% of a ~60s rest as low-level active time
+  const restSeconds = Math.max(0, sets - 1) * (Number(STATE?.workoutPlan?.restTimerSeconds) || 90);
   return (workSeconds + restSeconds) / 60;
 }
 
@@ -133,9 +133,8 @@ function estimateStrengthMinutes(sets, reps) {
 function estimateStrengthMinutesFromEntry(entry) {
   if (entry.perSetWeights && entry.perSetWeights.length) {
     let totalSeconds = 0;
-    entry.perSetWeights.forEach(set => {
-      totalSeconds += (Number(set.reps) || 0) * 3.5 + 60 * 0.4;
-    });
+    entry.perSetWeights.forEach(set => { totalSeconds += (Number(set.reps) || 0) * 3.5; });
+    totalSeconds += Math.max(0, entry.perSetWeights.length - 1) * (Number(STATE?.workoutPlan?.restTimerSeconds) || 90);
     return totalSeconds / 60;
   }
   return estimateStrengthMinutes(Number(entry.sets), Number(entry.reps));
@@ -143,30 +142,80 @@ function estimateStrengthMinutesFromEntry(entry) {
 
 // Compute calories for a single logged exercise entry.
 // entry: { exerciseId, sets, reps, weightKg, weightIsPerSide, perSetWeights, durationMin }
-function calcExerciseCalories(entry, bodyWeightKg) {
+function strengthTimingFromEntry(entry) {
+  const sets = entry.perSetWeights?.length || Math.max(0, Math.round(Number(entry.sets) || 0));
+  const reps = entry.perSetWeights
+    ? entry.perSetWeights.reduce((sum, set) => sum + (Number(set.reps) || 0), 0)
+    : sets * (Number(entry.reps) || 0);
+  return {
+    workMinutes: reps * 3.5 / 60,
+    restMinutes: Math.max(0, sets - 1) * (Number(STATE?.workoutPlan?.restTimerSeconds) || 90) / 60,
+  };
+}
+
+function calcExerciseEnergyBreakdown(entry, bodyWeightKg) {
   const ex = EXERCISE_LIBRARY.find(e => e.id === entry.exerciseId) || entry.custom;
-  if (!ex || !bodyWeightKg) return 0;
+  if (!ex || !bodyWeightKg) return { duringKcal: 0, netKcal: 0, workMinutes: 0, restMinutes: 0, isStrength: false };
   let minutes = 0;
+  let workMinutes = 0;
+  let restMinutes = 0;
+  let duringKcal = 0;
   if (ex.inputMode === 'duration') {
     minutes = Number(entry.durationMin) || 0;
-    // Duration-based STRENGTH entries (e.g. "general gym session") are mostly rest
-    // between sets, not continuous effort - scale down unless the exercise says
-    // otherwise (restAdjust defaults to 1, i.e. no adjustment, for cardio/mobility).
-    if (ex.category === 'Strength' && typeof ex.restAdjust === 'number') {
-      minutes *= ex.restAdjust;
-    }
+    workMinutes = minutes;
+    duringKcal = metCalories(ex.met, bodyWeightKg, minutes);
   } else if (ex.inputMode === 'setsRepsWeight' || ex.inputMode === 'setsReps') {
-    minutes = estimateStrengthMinutesFromEntry(entry);
-    // small intensity bump if lifting heavy relative to bodyweight
+    const timing = strengthTimingFromEntry(entry);
+    workMinutes = timing.workMinutes;
+    restMinutes = timing.restMinutes;
+    let workIntensity = ex.met;
+    // Small intensity bump if lifting heavy relative to bodyweight. Load is
+    // not converted directly to calories because external load and metabolic
+    // cost do not have a simple linear relationship.
     if (ex.inputMode === 'setsRepsWeight') {
       const totalLoad = effectiveLoadKg(entry);
       const ratio = totalLoad / bodyWeightKg;
-      if (ratio > 1) minutes *= 1.15;
+      if (ratio > 1) workIntensity *= 1.15;
     }
+    duringKcal = metCalories(workIntensity, bodyWeightKg, workMinutes)
+      + metCalories(1.8, bodyWeightKg, restMinutes);
   } else if (ex.inputMode === 'distance') {
     minutes = Number(entry.durationMin) || 0;
+    workMinutes = minutes;
+    duringKcal = metCalories(ex.met, bodyWeightKg, minutes);
   }
-  return metCalories(ex.met, bodyWeightKg, minutes);
+  const elapsedMinutes = workMinutes + restMinutes;
+  const restingKcal = metCalories(1, bodyWeightKg, elapsedMinutes);
+  return {
+    duringKcal,
+    netKcal: Math.max(0, duringKcal - restingKcal),
+    workMinutes,
+    restMinutes,
+    isStrength: ex.category === 'Strength',
+  };
+}
+
+function calcExerciseCalories(entry, bodyWeightKg) {
+  return calcExerciseEnergyBreakdown(entry, bodyWeightKg).duringKcal;
+}
+
+// EPOC varies widely with session intensity, density, volume, and the person.
+// Show it once at session level as a conservative range, never as a precise
+// per-exercise bonus. The 5-15% range is a planning approximation and is capped
+// so it cannot turn "afterburn" into a misleading weight-loss promise.
+function calcWorkoutEnergy(entries, bodyWeightKg) {
+  const parts = (entries || []).map(entry => calcExerciseEnergyBreakdown(entry, bodyWeightKg));
+  const duringKcal = parts.reduce((sum, part) => sum + part.duringKcal, 0);
+  const strengthNetKcal = parts.filter(part => part.isStrength).reduce((sum, part) => sum + part.netKcal, 0);
+  const epocLow = Math.min(60, strengthNetKcal * 0.05);
+  const epocHigh = Math.min(60, strengthNetKcal * 0.15);
+  return {
+    duringKcal,
+    epocLow,
+    epocHigh,
+    totalLow: duringKcal + epocLow,
+    totalHigh: duringKcal + epocHigh,
+  };
 }
 
 // --- Step calories: baseline vs. bonus ---
@@ -381,26 +430,28 @@ function explainExerciseCalc(entry, ex, bodyWeightKg) {
   const formulaWeightText = usesImperialUnits() ? `${bwLb} lb ÷ 2.2046` : `${bwRound} kg`;
   if (ex.inputMode === 'duration' || ex.inputMode === 'distance') {
     const rawMin = Number(entry.durationMin) || 0;
-    const adj = (ex.category === 'Strength' && typeof ex.restAdjust === 'number') ? ex.restAdjust : 1;
-    const minutes = rawMin * adj;
+    const minutes = rawMin;
     const kcal = metCalories(ex.met, bodyWeightKg, minutes);
     const perMinute = rawMin > 0 ? kcal / rawMin : 0;
     let text = `<strong>${perMinute.toFixed(2)} kcal/min × ${rawMin} min = ${Math.round(kcal)} kcal</strong><br>Uses ${bodyWeightText} bodyweight and MET ${ex.met}: ${ex.met} × 3.5 × (${formulaWeightText}) ÷ 200 × ${minutes.toFixed(1)} active min.`;
-    if (adj < 1) text += ` (${rawMin} min logged, only ${Math.round(adj * 100)}% counted as active time since most of a gym session is rest between sets, not continuous effort.)`;
+    if (ex.category === 'Strength') text += ` This is a whole-session MET value, so normal between-set rest is already represented.`;
     return text;
   }
-  let minutes = estimateStrengthMinutesFromEntry(entry);
+  const timing = strengthTimingFromEntry(entry);
+  let workMet = ex.met;
   const loadRatio = ex.inputMode === 'setsRepsWeight' ? effectiveLoadKg(entry) / bodyWeightKg : 0;
   const heavyAdjustment = loadRatio > 1 ? 1.15 : 1;
-  minutes *= heavyAdjustment;
-  const kcal = metCalories(ex.met, bodyWeightKg, minutes);
+  workMet *= heavyAdjustment;
+  const workKcal = metCalories(workMet, bodyWeightKg, timing.workMinutes);
+  const restKcal = metCalories(1.8, bodyWeightKg, timing.restMinutes);
+  const kcal = workKcal + restKcal;
   const totalReps = entry.perSetWeights
     ? entry.perSetWeights.reduce((s, st) => s + (Number(st.reps) || 0), 0)
     : (Number(entry.sets) || 0) * (Number(entry.reps) || 0);
   const perRep = totalReps > 0 ? kcal / totalReps : 0;
   const load = effectiveLoadKg(entry);
   const loadText = load > 0 ? `; top load ${formatWeightKg(load, 0)}` : '';
-  return `<strong>${perRep.toFixed(2)} kcal/rep × ${totalReps} reps = ${Math.round(kcal)} kcal</strong><br>Uses ${bodyWeightText} bodyweight${loadText}, MET ${ex.met}, about 3.5 seconds per rep, and a small low-intensity allowance between sets. Estimated active time: ${minutes.toFixed(1)} min${heavyAdjustment > 1 ? ' (load-above-bodyweight adjustment included)' : ''}.`;
+  return `<strong>${Math.round(workKcal)} lifting kcal + ${Math.round(restKcal)} between-set kcal = ${Math.round(kcal)} kcal during the exercise</strong><br>Uses ${bodyWeightText} bodyweight${loadText}, MET ${ex.met}, about 3.5 seconds per rep, and MET 1.8 for ${timing.restMinutes.toFixed(1)} estimated rest min${heavyAdjustment > 1 ? ' (small load-above-bodyweight adjustment included)' : ''}. Post-exercise energy is uncertain and is added once in the session total, not to every exercise.`;
 }
 
 // --- Strength standard ranking ---
