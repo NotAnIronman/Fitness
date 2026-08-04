@@ -558,7 +558,7 @@ function renderPetTab() {
         <div class="pet-grid">
           ${PET_ANIMALS.map(a => `
             <button class="pet-pick" onclick="choosePetSpecies('${a.key}')">
-              <span class="pet-pick-emoji">${petIconSmall(a)}</span>
+              <span class="pet-pick-emoji">${petVisual(a, a.name, 64)}</span>
               <span class="pet-pick-name">${a.name}</span>
             </button>
           `).join('')}
@@ -610,6 +610,16 @@ function renderPetTab() {
       </div>
       <p class="hint" style="margin-top:8px;">Bars only begin draining after ${PET_CARE_INTERVAL_HOURS} hours without a care interaction. You do not need to return on a schedule—normal logging, feeding, watering, or a pet tap refreshes care.</p>
 
+      <div class="field pet-speech-setting">
+        <label for="pet-speech-frequency">Floating pet speech</label>
+        <select id="pet-speech-frequency" onchange="setPetSpeechFrequency(this.value)">
+          <option value="frequent" ${STATE.pet.speechFrequency === 'frequent' ? 'selected' : ''}>Frequent — bubble on every page</option>
+          <option value="normal" ${STATE.pet.speechFrequency === 'normal' ? 'selected' : ''}>Normal — about half as often</option>
+          <option value="occasional" ${STATE.pet.speechFrequency === 'occasional' ? 'selected' : ''}>Occasional — about one in four</option>
+          <option value="off" ${STATE.pet.speechFrequency === 'off' ? 'selected' : ''}>Silent — no floating speech</option>
+        </select>
+      </div>
+
       <div class="pet-action-row">
         <button class="btn btn-sm" onclick="togglePetChangePanel()">${UI.petChangePanelOpen ? 'Close Pet Editor' : 'Change Pet'}</button>
         <button class="btn btn-sm ${UI.petCustomizeOpen ? 'btn-primary' : ''}" onclick="togglePetCustomizePanel()">${UI.petCustomizeOpen ? 'Close Customize' : 'Customize'}</button>
@@ -621,8 +631,8 @@ function renderPetTab() {
             <input type="text" data-focus-id="pet-name" value="${escapeAttr(STATE.pet.name)}" onchange="renamePet(this.value)" onkeydown="if(event.key==='Enter') this.blur()">
           </div>
           <p class="hint" style="text-align:center; margin-bottom:8px;">Species</p>
-          <div class="chip-row" style="justify-content:center;">
-            ${PET_ANIMALS.map(a => `<button class="chip ${a.key === STATE.pet.species ? 'active' : ''}" onclick="choosePetSpecies('${a.key}')">${petIconSmall(a)}</button>`).join('')}
+          <div class="pet-species-grid">
+            ${PET_ANIMALS.map(a => `<button class="pet-species-choice ${a.key === STATE.pet.species ? 'active' : ''}" onclick="choosePetSpecies('${a.key}')">${petVisual(a, a.name, 58)}<span>${escapeAttr(a.name)}</span></button>`).join('')}
           </div>
         </div>
       ` : ''}
@@ -783,10 +793,27 @@ function renderPetWidget(pageKey) {
   if (!STATE.pet.enabled || !STATE.pet.species) return '';
   const pool = (PET_CHEER[pageKey] || []).concat(PET_CHEER.generic);
   const cheer = pool[Math.floor(Math.random() * pool.length)];
+  const showSpeech = shouldShowPetWidgetSpeech(pageKey);
   return `
     <div class="pet-widget" onclick="navigate('pet')" title="Visit your pet">
-      <div class="pet-widget-bubble">${escapeAttr(cheer)}</div>
+      ${showSpeech ? `<div class="pet-widget-bubble">${escapeAttr(cheer)}</div>` : ''}
       ${renderPetSprite(46)}
     </div>
   `;
+}
+
+function shouldShowPetWidgetSpeech(pageKey) {
+  const frequency = STATE.pet.speechFrequency || 'normal';
+  if (frequency === 'off') return false;
+  if (frequency === 'frequent') return true;
+  const divisor = frequency === 'occasional' ? 4 : 2;
+  const seed = `${todayISO()}:${new Date().getHours()}:${pageKey}:${STATE.pet.species}`;
+  let hash = 0;
+  for (let index = 0; index < seed.length; index++) hash = ((hash << 5) - hash + seed.charCodeAt(index)) | 0;
+  return Math.abs(hash) % divisor === 0;
+}
+
+function setPetSpeechFrequency(value) {
+  STATE.pet.speechFrequency = ['frequent', 'normal', 'occasional', 'off'].includes(value) ? value : 'normal';
+  persist(); render();
 }

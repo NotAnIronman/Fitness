@@ -36,6 +36,7 @@ function renderGoals() {
     </div>
 
     ${renderGoalFocusCard()}
+    ${g.focus === 'weight_gain' ? renderHealthyWeightGainPlan(effTdee, isImperial) : ''}
 
     <div class="grid grid-2">
       <div class="card ${onboardingStepIs('weight_goal') ? 'onboarding-focus' : ''}">
@@ -99,6 +100,27 @@ function renderGoals() {
       ${STATE.weightLog.length === 0 ? `<div class="empty-state">No entries yet - log your weight to start the trend line.</div>` : ''}
     </div>
   `;
+}
+
+function renderHealthyWeightGainPlan(maintenanceCalories, isImperial) {
+  const guidance = getGoalGuidance();
+  const surplusLow = maintenanceCalories ? Math.round(maintenanceCalories * 1.05) : null;
+  const surplusHigh = maintenanceCalories ? Math.round(maintenanceCalories * 1.10) : null;
+  return `<div class="card healthy-gain-plan">
+    <div class="card-title">Healthy weight-gain starting plan <span class="badge badge-ok">Gradual</span></div>
+    <div class="grid grid-3">
+      <div class="stat"><div class="stat-label">Starting intake</div><div class="stat-value" style="font-size:20px;">${surplusLow ? `${surplusLow}-${surplusHigh}` : 'Add profile'}${surplusLow ? '<span class="unit">kcal/day</span>' : ''}</div><div class="hint">About 5-10% above estimated maintenance</div></div>
+      <div class="stat"><div class="stat-label">Initial trend range</div><div class="stat-value" style="font-size:20px;">0.1-0.25%<span class="unit">body weight/week</span></div><div class="hint">Use the slower end when already experienced or gaining fat quickly</div></div>
+      <div class="stat"><div class="stat-label">Protein range</div><div class="stat-value" style="font-size:20px;">${guidance.proteinLowGrams ? `${guidance.proteinLowGrams}-${guidance.proteinHighGrams}` : '—'}<span class="unit">g/day</span></div><div class="hint">Pair with progressive resistance training</div></div>
+    </div>
+    <ol class="compact-steps">
+      <li>Set a higher target weight and a realistic date below.</li>
+      <li>Use three or more regular meals, adding snacks or liquid calories if appetite makes the target difficult.</li>
+      <li>Track comparable morning weigh-ins and review the average over two to four weeks—not one day.</li>
+      <li>If the trend is flat, add roughly 100-200 kcal/day; if gain is consistently faster than planned, reduce by a similar amount.</li>
+    </ol>
+    <p class="hint">This is general adult guidance, not treatment for unexplained weight loss, poor appetite, gastrointestinal symptoms, pregnancy, or an eating disorder. Those situations deserve individualized clinical support.</p>
+  </div>`;
 }
 
 const WEIGHT_COMPARISONS = [

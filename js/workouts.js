@@ -16,6 +16,40 @@ function workoutWeightUnit() { return workoutUsesImperial() ? 'lb' : 'kg'; }
 function workoutWeightToDisplay(kg) { return workoutUsesImperial() ? kgToLb(kg) : kg; }
 function workoutWeightFromDisplay(value) { return workoutUsesImperial() ? lbToKg(value) : value; }
 
+// Small, deliberately conservative starter sessions. Loads begin blank so the
+// person must choose something they can control; Copy From never guesses a
+// safe weight. These are editable templates, not mandatory programs.
+const STARTER_WORKOUT_TEMPLATES = [
+  { id: 'full_body', name: 'Beginner Full Body', note: 'A simple whole-body session for 2-3 nonconsecutive days per week.', exercises: [
+    { exerciseId: 'goblet_squat', sets: 2, reps: 8, weightKg: 0 }, { exerciseId: 'machine_press', sets: 2, reps: 8, weightKg: 0 },
+    { exerciseId: 'seated_row', sets: 2, reps: 10, weightKg: 0 }, { exerciseId: 'dead_bug', sets: 2, reps: 8 }, { exerciseId: 'walk_brisk', durationMin: 10 },
+  ] },
+  { id: 'chest', name: 'Chest Starter', note: 'Pressing plus a controlled chest isolation.', exercises: [
+    { exerciseId: 'inc_pushup', sets: 2, reps: 8 }, { exerciseId: 'machine_press', sets: 2, reps: 10, weightKg: 0 }, { exerciseId: 'cable_fly', sets: 2, reps: 12, weightKg: 0 },
+  ] },
+  { id: 'back', name: 'Back Starter', note: 'One vertical pull, one row, and a simple trunk exercise.', exercises: [
+    { exerciseId: 'lat_pulldown', sets: 2, reps: 10, weightKg: 0 }, { exerciseId: 'seated_row', sets: 2, reps: 10, weightKg: 0 }, { exerciseId: 'hyperextension', sets: 2, reps: 10 },
+  ] },
+  { id: 'shoulders', name: 'Shoulders Starter', note: 'A supported press with side and rear-delt work.', exercises: [
+    { exerciseId: 'machine_shoulder', sets: 2, reps: 8, weightKg: 0 }, { exerciseId: 'lateral_raise', sets: 2, reps: 12, weightKg: 0 }, { exerciseId: 'rear_delt_fly', sets: 2, reps: 12, weightKg: 0 },
+  ] },
+  { id: 'arms', name: 'Arms Starter', note: 'A short biceps and triceps session.', exercises: [
+    { exerciseId: 'cable_curl', sets: 2, reps: 10, weightKg: 0 }, { exerciseId: 'hammer_curl', sets: 2, reps: 10, weightKg: 0 }, { exerciseId: 'tricep_pushdown', sets: 2, reps: 10, weightKg: 0 },
+  ] },
+  { id: 'legs', name: 'Legs Starter', note: 'Knee, hip, hamstring, and calf work with stable options.', exercises: [
+    { exerciseId: 'legpress', sets: 2, reps: 10, weightKg: 0 }, { exerciseId: 'rdl', sets: 2, reps: 8, weightKg: 0 }, { exerciseId: 'leg_curl', sets: 2, reps: 10, weightKg: 0 }, { exerciseId: 'standing_calf', sets: 2, reps: 12, weightKg: 0 },
+  ] },
+  { id: 'core', name: 'Core Starter', note: 'Controlled trunk stability without needing advanced equipment.', exercises: [
+    { exerciseId: 'dead_bug', sets: 2, reps: 8 }, { exerciseId: 'bird_dog', sets: 2, reps: 8 }, { exerciseId: 'plank', durationMin: 0.5 },
+  ] },
+  { id: 'cardio', name: 'Cardio Starter', note: 'An approachable continuous session; reduce pace or duration as needed.', exercises: [
+    { exerciseId: 'walk_brisk', durationMin: 20 }, { exerciseId: 'stretching', durationMin: 5 },
+  ] },
+  { id: 'mobility', name: 'Mobility Starter', note: 'Gentle movement for a recovery or introductory day.', exercises: [
+    { exerciseId: 'stretching', durationMin: 10 }, { exerciseId: 'foam_rolling', durationMin: 5 }, { exerciseId: 'yoga', durationMin: 10 },
+  ] },
+];
+
 function renderWorkouts() {
   const days = STATE.workoutPlan.days;
   if (!UI.workoutDayId && days.length) UI.workoutDayId = days[0].id;
@@ -239,16 +273,15 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
 
 function renderCopyDayMenu(day) {
   const otherDays = STATE.workoutPlan.days.filter(d => d.id !== day.id && d.exercises.length > 0);
-  if (!otherDays.length) {
-    return `<div class="section-note">No other days with exercises to copy from yet.</div>`;
-  }
   return `
-    <div style="background:var(--bg); border:1px solid var(--border); border-radius:calc(var(--radius)*0.6); padding:12px; margin-bottom:14px;">
-      <p class="hint" style="margin-bottom:8px;">Copy all exercises from:</p>
-      <div class="chip-row">
-        ${otherDays.map(d => `<button class="chip" onclick="copyDayInto('${d.id}', '${day.id}')">${escapeAttr(d.name)}${d.locationId ? ` · ${escapeAttr(workoutLocationName(d.locationId))}` : ''}</button>`).join('')}
-        <button class="chip" onclick="closeCopyDayMenu()">Cancel</button>
+    <div class="copy-workout-menu">
+      ${otherDays.length ? `<p class="hint">Your workout days</p><div class="chip-row">${otherDays.map(d => `<button class="chip" onclick="copyDayInto('${d.id}', '${day.id}')">${escapeAttr(d.name)}${d.locationId ? ` · ${escapeAttr(workoutLocationName(d.locationId))}` : ''}</button>`).join('')}</div>` : ''}
+      <p class="hint">Beginner starter library</p>
+      <p class="hint">Choose controlled loads that leave about 2-3 good repetitions in reserve. Edit or remove anything that is painful, inaccessible, or unsuitable for you.</p>
+      <div class="starter-template-grid">
+        ${STARTER_WORKOUT_TEMPLATES.map(template => `<button class="starter-template" onclick="copyStarterWorkoutInto('${template.id}', '${day.id}')"><strong>${escapeAttr(template.name)}</strong><span>${escapeAttr(template.note)}</span><small>${template.exercises.length} exercises</small></button>`).join('')}
       </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeCopyDayMenu()">Cancel</button>
     </div>
   `;
 }
@@ -626,4 +659,15 @@ function copyDayInto(sourceDayId, targetDayId) {
   UI.copyDayOpenFor = null;
   persist(); render();
   toast(`Copied ${copied.length} exercise(s) from ${source.name}`);
+}
+
+function copyStarterWorkoutInto(templateId, targetDayId) {
+  const template = STARTER_WORKOUT_TEMPLATES.find(item => item.id === templateId);
+  const target = STATE.workoutPlan.days.find(day => day.id === targetDayId);
+  if (!template || !target) return;
+  const copied = template.exercises.map(exercise => cloneExerciseEntry(exercise, { id: uid(), completed: false }));
+  target.exercises = target.exercises.concat(copied);
+  UI.copyDayOpenFor = null;
+  persist(); render();
+  toast(`Added ${template.name}. Edit starting loads before training.`);
 }

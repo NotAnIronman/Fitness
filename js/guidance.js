@@ -13,6 +13,7 @@
 const GOAL_FOCUS_OPTIONS = [
   { key: 'general', label: 'General health', short: 'Build sustainable activity, nutrition, and tracking habits.' },
   { key: 'fat_loss', label: 'Fat loss', short: 'Reduce body fat while protecting health, training quality, and lean mass.' },
+  { key: 'weight_gain', label: 'Healthy weight gain', short: 'Gain body weight gradually with adequate food, resistance training, and trend-based adjustments.' },
   { key: 'muscle_gain', label: 'Muscle & strength', short: 'Prioritize progressive resistance training and a conservative energy surplus when appropriate.' },
   { key: 'recomposition', label: 'Recomposition', short: 'Pursue strength and muscle while gradually reducing fat or holding body weight.' },
   { key: 'performance', label: 'Performance', short: 'Support training output, recovery, and sport-specific fueling.' },
@@ -106,6 +107,13 @@ function getGoalGuidance() {
     nuance = direction === 'gain'
       ? 'Your selected weight target rises while fat loss is the priority. Recheck whether body composition or waist/strength trends are a better target than scale weight alone.'
       : 'People who are already lean or highly trained generally benefit from a slower rate of loss than people with more fat to lose.';
+  } else if (focus.key === 'weight_gain') {
+    proteinMin = 1.4; proteinMax = 2.0;
+    energy = direction === 'loss'
+      ? 'Your scale target is lower than your current weight, which conflicts with healthy weight gain. Raise the target or choose a different focus before using a surplus.'
+      : 'Start with a modest surplus—often about 5-10% above estimated maintenance—and adjust only after at least two to four weeks of comparable weigh-ins.';
+    training = 'Use progressive resistance training so more of the gained weight supports muscle and performance; food alone cannot direct all gain toward lean tissue.';
+    nuance = 'Energy-dense foods, regular meals or snacks, and liquid calories can help when appetite is limiting. Faster gain is more likely to include unnecessary fat, and unexplained low weight or poor appetite deserves clinical support.';
   } else if (focus.key === 'muscle_gain') {
     proteinMin = 1.6; proteinMax = 2.2;
     const surplus = experience.key === 'new' ? 'about 5-15%' : experience.key === 'consistent' ? 'about 5-10%' : 'the smallest surplus that produces a reliable upward trend';

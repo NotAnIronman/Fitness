@@ -39,6 +39,33 @@ function exerciseGuideDefaults(exercise) {
   };
 }
 
+const GENERAL_FAQ_ITEMS = [
+  {
+    question: 'Why are there no accounts?',
+    answer: `<p>Forge is useful without knowing who you are. The current app ecosystem already asks people to create enough logins and surrender enough data, and an account would not improve the core calculations or local tracking.</p><p>Your information therefore stays in this browser unless <em>you</em> choose to export, transfer, or share it. The tradeoff is that Forge cannot automatically restore data after a device is lost or cleared, so keep an occasional backup from Themes.</p>`,
+  },
+  {
+    question: 'I follow a special diet or meal-timing window. Will Forge work for me?',
+    answer: `<p>Usually, yes. Weight change still depends heavily on energy intake over time, so Forge can track calories and macros regardless of whether you eat early, late, intermittently, plant-based, low-carbohydrate, culturally specific, or otherwise.</p><p>Meal timing and food choice can still affect hunger, training performance, glucose management, digestion, nutrient adequacy, and how easy the diet is to follow. Use the method that fits your preferences and health needs, log honestly, and follow clinician guidance when a medical condition, pregnancy, medication, or eating-disorder history changes what is appropriate.</p>`,
+  },
+  {
+    question: 'I have been dieting but am not seeing the result I expected. What should I check?',
+    answer: `<p>First compare several weeks of consistent weigh-ins—not a few days. Water, sodium, carbohydrate intake, bowel contents, menstrual-cycle changes, and weigh-in timing can temporarily hide real fat loss or gain.</p><p>If the trend is still flat, audit the log before making a large calorie change. Cooking oils, sauces, drinks, bites, restaurant portions, serving counts, and copied database entries are common sources of error in either direction. A food scale and ingredient-by-ingredient meal entries can improve accuracy, but perfection is unnecessary. After two to four consistent weeks, make a small adjustment and review the next trend.</p>`,
+  },
+  {
+    question: 'Where do Forge calculations and recommendations come from?',
+    answer: `<p>Calculation panels explain their formulas, assumptions, and limitations where possible. Nutrition and activity guidance links to primary research, major scientific reviews, or public-health guidance, and the evidence list on Weight Goals makes the major planning rules auditable.</p><p>Not every number is a direct measurement: calorie burn, body-fat estimates, metabolic needs, and projected weight change are estimates. Exercise-guide cues are general education assembled from established training principles and practical experience; until an individual guide has a reviewed citation or demonstration, it should not be mistaken for personalized coaching, diagnosis, or rehabilitation advice.</p>`,
+  },
+  {
+    question: 'How do I add Forge to my phone?',
+    answer: `<p><strong>iPhone or iPad:</strong> Open Forge in Safari, tap the Share button, choose <em>Add to Home Screen</em>, turn on <em>Open as Web App</em> if shown, then tap Add. Apple documents the current steps in its <a href="https://support.apple.com/en-mide/guide/iphone/iphea86e5236/ios" target="_blank" rel="noopener noreferrer">iPhone web-app guide</a>.</p><p><strong>Android:</strong> Open Forge in Chrome, tap the three-dot menu, choose <em>Add to Home screen</em>, then <em>Install</em> or <em>Create shortcut</em> and follow the prompt. The exact label varies by browser and device; see <a href="https://support.google.com/chrome/answer/9658361" target="_blank" rel="noopener noreferrer">Chrome's web-app instructions</a>.</p><p>Forge must be served over HTTPS for full PWA features. Installing it does not create a Forge account or move your existing local data to another browser.</p>`,
+  },
+];
+
+function renderGeneralFAQ() {
+  return `<div class="faq-general-list">${GENERAL_FAQ_ITEMS.map((item, index) => `<details class="card faq-question" ${index === 0 ? 'open' : ''}><summary>${escapeAttr(item.question)}</summary><div class="faq-answer">${item.answer}</div></details>`).join('')}</div>`;
+}
+
 function renderFAQ() {
   const query = String(UI.faqQuery || '').trim().toLowerCase();
   const exercises = EXERCISE_LIBRARY.filter(exercise => !query || `${exercise.name} ${exercise.bodyPart} ${exercise.category}`.toLowerCase().includes(query));
@@ -53,6 +80,8 @@ function renderFAQ() {
       <p class="hint">Programming notes follow the current evidence that consistency and goal-specific load/volume matter more than unnecessary complexity. <a href="https://acsm.org/resistance-training-guidelines-update-2026/" target="_blank" rel="noopener noreferrer">ACSM 2026 resistance-training overview</a>.</p>
       <div class="field"><label>Find an exercise</label><input type="search" value="${escapeAttr(UI.faqQuery || '')}" placeholder="Bench Press, legs, mobility…" oninput="setFaqQuery(this.value)"></div>
     </div>
+    ${renderGeneralFAQ()}
+    <div class="section-heading"><h2>Exercise guides</h2><p class="hint">Choose an exercise to open its reference outline.</p></div>
     <div class="faq-guide-list">
       ${exercises.map(renderExerciseGuide).join('') || '<div class="card empty-state">No exercises match that search.</div>'}
     </div>`;
@@ -87,4 +116,3 @@ function openExerciseGuide(exerciseId) {
   UI.faqExerciseId = exerciseId;
   navigate('faq');
 }
-

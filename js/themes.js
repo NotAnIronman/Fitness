@@ -102,6 +102,8 @@ function renderThemes() {
       </div>
     </div>
 
+    ${renderDayShareCard()}
+
     <div class="card ${onboardingStepIs('transfer_info') ? 'onboarding-focus' : ''}">
       <div class="card-title">Your data</div>
       <p class="hint" style="margin-bottom:12px;">Everything lives in this browser's local storage, nothing is sent anywhere except food searches. There's no account and no server this data passes through, syncing between your own devices is entirely up to you, using whichever option below actually works on what you've got.</p>
@@ -153,6 +155,106 @@ function renderThemes() {
 
     ${renderSecretSettings()}
   `;
+}
+
+const DAY_SHARE_OPTIONS = [
+  { key: 'steps', label: 'Steps' },
+  { key: 'nutrition', label: 'Calories & macros' },
+  { key: 'workout', label: 'Completed exercises' },
+  { key: 'pet', label: 'Pet status' },
+];
+
+function renderDayShareCard() {
+  const date = UI.shareDayDate || todayISO();
+  const selected = STATE.uiPrefs.dayShareSections || [];
+  const preview = buildDayShareSnapshot(date, selected);
+  return `<div class="card day-share-card">
+    <div class="card-title">Share a day</div>
+    <p class="hint">Create a plain-text snapshot and choose exactly what it contains. Private workout notes, profile details, targets, and history are never included. Your device's share sheet can offer text, email, messaging, or other installed apps.</p>
+    <div class="field" style="max-width:320px;"><label>Snapshot date</label><input type="date" value="${date}" onchange="setShareDayDate(this.value)"></div>
+    <fieldset class="share-section-picker"><legend>Include</legend><div class="chip-row">
+      ${DAY_SHARE_OPTIONS.map(option => `<label class="share-option ${selected.includes(option.key) ? 'active' : ''}"><input type="checkbox" ${selected.includes(option.key) ? 'checked' : ''} onchange="toggleDayShareSection('${option.key}')"><span>${escapeAttr(option.label)}</span></label>`).join('')}
+    </div></fieldset>
+    <pre class="day-share-preview">${escapeAttr(preview || 'Select at least one section to build a snapshot.')}</pre>
+    <div class="share-actions"><button class="btn btn-primary" ${preview ? '' : 'disabled'} onclick="shareDaySnapshot()">Share snapshot</button><button class="btn" ${preview ? '' : 'disabled'} onclick="copyDaySnapshot()">Copy text</button></div>
+    <p class="hint" style="margin-top:8px;">Sharing is initiated only when you press the button. Forge does not upload or retain a copy.</p>
+  </div>`;
+}
+
+function setShareDayDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return;
+  UI.shareDayDate = value;
+  render();
+}
+
+function toggleDayShareSection(key) {
+  if (!DAY_SHARE_OPTIONS.some(option => option.key === key)) return;
+  const selected = new Set(STATE.uiPrefs.dayShareSections || []);
+  if (selected.has(key)) selected.delete(key); else selected.add(key);
+  STATE.uiPrefs.dayShareSections = DAY_SHARE_OPTIONS.map(option => option.key).filter(option => selected.has(option));
+  persist(); render();
+}
+
+function shareExerciseLine(entry) {
+  const exercise = EXERCISE_LIBRARY.find(item => item.id === entry.exerciseId) || entry.custom || { name: 'Custom exercise', inputMode: 'setsReps' };
+  const completed = completedExerciseEntry(entry);
+  if (!completed) return null;
+  if (completed.perSetWeights?.length) {
+    const reps = completed.perSetWeights.reduce((sum, set) => sum + (Number(set.reps) || 0), 0);
+    return `${exercise.name}: ${completed.perSetWeights.length} set(s), ${reps} total reps`;
+  }
+  if (exercise.inputMode === 'duration' || exercise.inputMode === 'distance') return `${exercise.name}: ${Number(completed.durationMin) || 0} min`;
+  return `${exercise.name}: ${Number(completed.sets) || 0} × ${Number(completed.reps) || 0}`;
+}
+
+function buildDayShareSnapshot(date, sections) {
+  const selected = new Set(sections || []);
+  if (!selected.size) return '';
+  const lines = [`Forge day snapshot — ${date}`];
+  if (selected.has('steps')) {
+    const steps = STATE.dailyCheckins[date]?.steps;
+    lines.push('', 'STEPS', steps == null ? 'No step check-in' : `${Number(steps).toLocaleString()} steps`);
+  }
+  if (selected.has('nutrition')) {
+    const foods = STATE.foodLog[date] || [];
+    const totals = foods.reduce((sum, food) => ({
+      kcal: sum.kcal + (Number(food.kcal) || 0) * (Number(food.qty) || 1),
+      protein: sum.protein + (Number(food.protein) || 0) * (Number(food.qty) || 1),
+      carbs: sum.carbs + (Number(food.carbs) || 0) * (Number(food.qty) || 1),
+      fat: sum.fat + (Number(food.fat) || 0) * (Number(food.qty) || 1),
+    }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+    lines.push('', 'NUTRITION', foods.length
+      ? `${Math.round(totals.kcal)} kcal · P ${Math.round(totals.protein)}g · C ${Math.round(totals.carbs)}g · F ${Math.round(totals.fat)}g`
+      : 'No food logged');
+  }
+  if (selected.has('workout')) {
+    const exercises = (STATE.workoutLog[date] || []).map(shareExerciseLine).filter(Boolean);
+    lines.push('', 'WORKOUT', ...(exercises.length ? exercises : ['No completed exercises']));
+  }
+  if (selected.has('pet')) {
+    const animal = PET_ANIMALS.find(item => item.key === STATE.pet.species);
+    const medals = Object.keys(STATE.pet.travel?.medals || {}).length;
+    lines.push('', 'PET', `${STATE.pet.name || 'Pet'}${animal ? ` the ${animal.name}` : ''} · Happiness ${Math.round(STATE.pet.happiness)}% · Hunger ${Math.round(STATE.pet.hunger)}% · Thirst ${Math.round(STATE.pet.thirst)}% · ${medals} state medal${medals === 1 ? '' : 's'}`);
+  }
+  return lines.join('\n');
+}
+
+async function shareDaySnapshot() {
+  const text = buildDayShareSnapshot(UI.shareDayDate || todayISO(), STATE.uiPrefs.dayShareSections);
+  if (!text) { toast('Choose something to include first.'); return; }
+  if (!navigator.share) { await copyDaySnapshot(); toast('Sharing is not supported here, so the snapshot was copied instead.'); return; }
+  try {
+    await navigator.share({ title: `Forge day — ${UI.shareDayDate || todayISO()}`, text });
+  } catch (error) {
+    if (error?.name !== 'AbortError') { console.error(error); toast('Could not open the share sheet. Try Copy text instead.'); }
+  }
+}
+
+async function copyDaySnapshot() {
+  const text = buildDayShareSnapshot(UI.shareDayDate || todayISO(), STATE.uiPrefs.dayShareSections);
+  if (!text) { toast('Choose something to include first.'); return; }
+  try { await navigator.clipboard.writeText(text); toast('Day snapshot copied.'); }
+  catch (error) { console.error(error); toast('Could not copy automatically. Try the Share button instead.'); }
 }
 
 function renderSecretSettings() {

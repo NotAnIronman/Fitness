@@ -17,7 +17,7 @@ function defaultState() {
       unitSystem: 'imperial', // 'imperial' | 'metric'
     },
     goal: {
-      focus: 'general',       // general | fat_loss | muscle_gain | recomposition | performance
+      focus: 'general',       // general | fat_loss | weight_gain | muscle_gain | recomposition | performance
       trainingExperience: 'new', // new | consistent | advanced
       targetWeightKg: null,
       targetDate: null,     // ISO date string
@@ -66,6 +66,7 @@ function defaultState() {
       onboardingGuideCollapsed: false,
       foodGoalTimelineCollapsed: false,
       weeklyMovementCollapsed: false,
+      dayShareSections: ['steps', 'nutrition', 'workout', 'pet'],
       // Your Page stores preferences only. Empty order means the built-in
       // order; hidden/sizing entries are the user's deviations from it.
       yourPageTileOrder: [],
@@ -134,6 +135,7 @@ function defaultState() {
       name: 'Coach',
       equipped: {},           // slot -> item key, e.g. { hat: 'top_hat' }
       itemTransforms: {},      // item key -> {x,y,rotation,scale}; visual only
+      speechFrequency: 'normal', // frequent | normal | occasional | off
       ownedItems: [],         // item keys purchased from the shop
       points: 0,
       totalPointsEarned: 0,
@@ -353,6 +355,7 @@ function normalizeStateShape(state) {
     };
   });
   state.pet.itemTransforms = transforms;
+  state.pet.speechFrequency = ['frequent', 'normal', 'occasional', 'off'].includes(state.pet.speechFrequency) ? state.pet.speechFrequency : 'normal';
   state.pet.tutorialShopCreditGranted = !!state.pet.tutorialShopCreditGranted;
   if (!isPlainObject(state.pet.rewardedDates)) state.pet.rewardedDates = {};
   if (!isPlainObject(state.pet.rewardedWeeks)) state.pet.rewardedWeeks = {};
@@ -368,7 +371,9 @@ function normalizeStateShape(state) {
   state.profile.age = age >= 18 && age <= 100 ? age : null;
   state.profile.heightCm = heightCm >= 120 && heightCm <= 230 ? heightCm : null;
   state.profile.weightKg = weightKg >= 20 && weightKg <= 400 ? weightKg : null;
-  state.goal.focus = ['general', 'fat_loss', 'muscle_gain', 'recomposition', 'performance'].includes(state.goal.focus) ? state.goal.focus : 'general';
+  state.goal.focus = ['general', 'fat_loss', 'weight_gain', 'muscle_gain', 'recomposition', 'performance'].includes(state.goal.focus) ? state.goal.focus : 'general';
+  const shareSections = Array.isArray(state.uiPrefs.dayShareSections) ? state.uiPrefs.dayShareSections : def.uiPrefs.dayShareSections;
+  state.uiPrefs.dayShareSections = [...new Set(shareSections.filter(section => ['steps', 'nutrition', 'workout', 'pet'].includes(section)))];
   state.goal.trainingExperience = ['new', 'consistent', 'advanced'].includes(state.goal.trainingExperience) ? state.goal.trainingExperience : 'new';
   state.dailyCheckins = normalizeDailyCheckins(state.dailyCheckins);
   state.workoutPlan.restTimerSeconds = Math.max(10, Math.min(900, Number(state.workoutPlan.restTimerSeconds) || 90));

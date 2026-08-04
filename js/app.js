@@ -70,13 +70,14 @@ let UI = {
   qrFullPartCount: 0,
   qrExpanded: false,
   qrStatus: '',
+  shareDayDate: todayISO(),
 };
 
 // Bump this alongside CACHE_VERSION in sw.js on every deploy. Shown as a hover/
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v23';
+const APP_VERSION = 'forge-v24';
 
 function todayISO() {
   return dateToLocalISO(new Date());
