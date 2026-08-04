@@ -24,7 +24,7 @@
    in sync with this).
    ============================================================ */
 
-const CACHE_VERSION = 'forge-v23';
+const CACHE_VERSION = 'forge-v24';
 
 const PRECACHE_URLS = [
   './',
