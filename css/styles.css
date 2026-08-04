@@ -85,6 +85,7 @@
   --ok: #7FD87A;
   --warn: #F5C64C;
   --radius: 10px;
+  --mobile-header-scale: 1.08;
   --font-display: 'Oswald', sans-serif;
   --font-body: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -228,7 +229,7 @@ img, canvas, svg {
 
 /* ---- Responsive: below 900px width, or any unusually tall/narrow
    viewport (foldable cover screens etc, see max-aspect-ratio) ---- */
-@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+@media (max-width: 900px), (max-aspect-ratio: 0.65), (max-height: 500px) and (min-aspect-ratio: 1.5), (pointer: coarse) and (min-aspect-ratio: 2) {
   .shell {
     grid-template-columns: 1fr;
   }
@@ -245,7 +246,8 @@ img, canvas, svg {
     -webkit-overflow-scrolling: touch;
   }
   .brand {
-    padding: 4px 8px;
+    padding: calc(4px * var(--mobile-header-scale)) calc(8px * var(--mobile-header-scale));
+    font-size: calc(22px * var(--mobile-header-scale));
     flex-shrink: 0;
   }
   .brand small {
@@ -254,7 +256,8 @@ img, canvas, svg {
   .nav-item {
     flex-shrink: 0;
     white-space: nowrap;
-    padding: 8px 12px;
+    padding: calc(8px * var(--mobile-header-scale)) calc(12px * var(--mobile-header-scale));
+    font-size: calc(14px * var(--mobile-header-scale));
   }
   .sidebar-foot {
     display: none;
@@ -288,19 +291,17 @@ img, canvas, svg {
   }
 }
 
-/* Compact short landscape cover displays (including the Fold 7 outer screen).
-   These report phone-sized CSS pixels despite their high physical resolution. */
-@media (max-width: 900px) and (max-height: 500px) and (min-aspect-ratio: 1.5) {
-  .sidebar { padding: calc(3px + env(safe-area-inset-top)) 6px 3px; gap: 2px; }
-  .brand { font-size: 15px; padding: 2px 5px; }
-  .nav-item { padding: 5px 7px; font-size: 11px; gap: 3px; }
+/* Short landscape cover displays need the mobile one-row shell even when the
+   browser reports a desktop-like CSS width. Keep normal readable type: the old
+   scale-down rule fit more tabs but made the Fold cover effectively illegible. */
+@media (max-height: 500px) and (min-aspect-ratio: 1.5) {
+  .sidebar { padding: calc(7px + env(safe-area-inset-top)) 9px 7px; gap: 4px; }
   .nav-item .num { display: none; }
-  .main { padding: 10px 12px 54px; }
+  .main { padding: 14px 16px 64px; }
   .page-head { margin-bottom: 14px; }
-  .page-title { font-size: 20px; }
+  .page-title { font-size: 24px; }
   .page-sub { margin-bottom: 0; }
-  .pet-widget { transform: scale(.78); transform-origin: bottom right; }
-  .rest-timer-widget { top: calc(43px + env(safe-area-inset-top)); transform: scale(.82); transform-origin: top left; }
+  .rest-timer-widget { top: calc(58px + env(safe-area-inset-top)); }
 }
 
 html[data-knowledge-level="4"] .page-sub { display: none; }
@@ -375,7 +376,7 @@ html[data-knowledge-level="4"] .page-sub { display: none; }
 .grid-4 {
   grid-template-columns: repeat(4, 1fr);
 }
-@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+@media (max-width: 900px), (max-aspect-ratio: 0.65), (pointer: coarse) and (min-aspect-ratio: 2) {
   .grid-2, .grid-3, .grid-4 {
     grid-template-columns: 1fr;
   }
@@ -1561,7 +1562,7 @@ hr.div {
 .pet-widget .pet-sprite {
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
 }
-@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+@media (max-width: 900px), (max-aspect-ratio: 0.65), (pointer: coarse) and (min-aspect-ratio: 2) {
   .pet-widget {
     bottom: calc(12px + env(safe-area-inset-bottom));
     right: calc(12px + env(safe-area-inset-right));
@@ -1640,7 +1641,7 @@ hr.div {
   padding: 4px 7px;
   font-size: 11px;
 }
-@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+@media (max-width: 900px), (max-aspect-ratio: 0.65), (pointer: coarse) and (min-aspect-ratio: 2) {
   .rest-timer-widget {
     /* Keep the floating timer away from add/edit Save buttons near the bottom
        of workout forms. It sits below the sticky horizontal navigation. */
@@ -1790,7 +1791,7 @@ hr.div {
 }
 .your-page-pet { display: flex; align-items: center; gap: 16px; }
 
-@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+@media (max-width: 900px), (max-aspect-ratio: 0.65), (pointer: coarse) and (min-aspect-ratio: 2) {
   .your-page-grid, .tile-store { grid-template-columns: 1fr; }
   .your-page-tile.wide { grid-column: auto; }
   .your-page-tile[draggable="true"] { cursor: default; }
@@ -1840,7 +1841,7 @@ hr.div {
 .page-module[draggable="true"]:active { cursor: grabbing; }
 .page-module > .notice-pill { width: max-content; }
 
-@media (max-width: 900px), (max-aspect-ratio: 0.65) {
+@media (max-width: 900px), (max-aspect-ratio: 0.65), (pointer: coarse) and (min-aspect-ratio: 2) {
   .page-layout-store, .page-module-grid { grid-template-columns: 1fr; }
   .page-module-full, .page-module-half, .page-module-third, .page-module-quarter { grid-column: 1 / -1; }
   .page-module[draggable="true"] { cursor: default; }
