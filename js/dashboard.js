@@ -51,8 +51,13 @@ function isYourPageTileVisible(tile) {
 function renderYourPage() {
   const tiles = visibleYourPageTiles();
   return `<div class="page-head">
-      <p class="page-eyebrow">Dashboard</p><h1 class="page-title">Your Page</h1>
-      <p class="page-sub">A personal dashboard. Move, resize, or hide tiles without turning off any underlying tracking.</p>
+      <p class="page-eyebrow">Today</p><h1 class="page-title">${STATE.profile.name ? `Hi, ${escapeAttr(STATE.profile.name)}` : 'Today'}</h1>
+      <p class="page-sub">The things you are most likely to do right now.</p>
+    </div>
+    <div class="quick-action-row" aria-label="Quick actions">
+      <button class="quick-action primary" onclick="navigate('log')"><strong>Log workout</strong><span>Steps and recovery are here too</span></button>
+      <button class="quick-action" onclick="navigate('food')"><strong>Log food</strong><span>Search, recent foods, or scan</span></button>
+      <button class="quick-action" onclick="navigate('goals')"><strong>Log weight</strong><span>Update your trend</span></button>
     </div>
     <div class="card your-page-manager${UI.yourPageManagerOpen ? '' : ' panel-card-collapsed'}">
       <div class="card-title"><span>Tile manager</span><button class="panel-collapse-btn" onclick="toggleYourPageManager()" aria-expanded="${UI.yourPageManagerOpen}" aria-label="${UI.yourPageManagerOpen ? 'Close' : 'Open'} tile manager">${UI.yourPageManagerOpen ? '−' : '+'}</button></div>
@@ -68,13 +73,14 @@ function renderYourPageTileStore() {
 
 function renderYourPageTileShell(tile, index, list) {
   const wide = STATE.uiPrefs.yourPageTileSizes?.[tile.id] === 'wide';
-  return `<section class="your-page-tile ${wide ? 'wide' : ''}" draggable="true" ondragstart="startYourPageTileDrag(event,'${tile.id}')" ondragover="event.preventDefault()" ondrop="dropYourPageTile(event,'${tile.id}')">
-    <div class="your-page-tile-tools" aria-label="${escapeAttr(tile.name)} tile controls">
+  const editing = !!UI.yourPageManagerOpen;
+  return `<section class="your-page-tile ${wide ? 'wide' : ''}" draggable="${editing}" ${editing ? `ondragstart="startYourPageTileDrag(event,'${tile.id}')" ondragover="event.preventDefault()" ondrop="dropYourPageTile(event,'${tile.id}')"` : ''}>
+    ${editing ? `<div class="your-page-tile-tools" aria-label="${escapeAttr(tile.name)} tile controls">
       <button class="icon-btn" onclick="moveYourPageTile('${tile.id}',-1)" ${index === 0 ? 'disabled' : ''} aria-label="Move ${escapeAttr(tile.name)} earlier">↑</button>
       <button class="icon-btn" onclick="moveYourPageTile('${tile.id}',1)" ${index === list.length - 1 ? 'disabled' : ''} aria-label="Move ${escapeAttr(tile.name)} later">↓</button>
       <button class="btn btn-sm" onclick="toggleYourPageTileSize('${tile.id}')" aria-label="Make ${escapeAttr(tile.name)} ${wide ? 'standard width' : 'wide'}">${wide ? 'Standard' : 'Wide'}</button>
       <button class="icon-btn" onclick="toggleYourPageTile('${tile.id}')" aria-label="Hide ${escapeAttr(tile.name)}">×</button>
-    </div>${tile.render()}</section>`;
+    </div>` : ''}${tile.render()}</section>`;
 }
 
 function toggleYourPageManager() {

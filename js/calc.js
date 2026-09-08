@@ -270,6 +270,42 @@ function calcTDEE(bmr, activityMultiplier) {
   return bmr * activityMultiplier;
 }
 
+// --- Transparent maintenance estimate ---
+// Activity multipliers are convenient, but their broad category jumps can add
+// hundreds of calories when a person crosses an arbitrary step/workout cutoff.
+// Forge instead starts with a conservative sedentary baseline, then adds only
+// movement above that baseline and a discounted average of planned exercise.
+// The result is still an estimate, so callers receive a range as well as a
+// midpoint. The range is intentionally never narrower than +/-150 kcal/day.
+function calcMaintenanceEstimate({ bmr, weightKg, stepsPerDay, weeklyExerciseKcal, hasEnoughStepData }) {
+  if (!bmr || !weightKg) return null;
+  const baselineSteps = 3000;
+  const baseDaily = bmr * 1.2;
+  const extraSteps = Math.max(0, (Number(stepsPerDay) || 0) - baselineSteps);
+  const stepDaily = calcStepCalories(extraSteps, weightKg);
+
+  // Logged exercise energy is inherently noisy and many MET figures are gross
+  // rather than net. Counting 75% avoids treating resting energy during the
+  // session as wholly additional to the 1.2 baseline.
+  const exerciseDaily = Math.max(0, Number(weeklyExerciseKcal) || 0) / 7 * 0.75;
+  const midpoint = baseDaily + stepDaily + exerciseDaily;
+  const uncertaintyPct = hasEnoughStepData ? 0.10 : 0.12;
+  const uncertainty = Math.max(150, midpoint * uncertaintyPct);
+
+  return {
+    midpoint,
+    low: Math.max(bmr, midpoint - uncertainty),
+    high: midpoint + uncertainty,
+    uncertainty,
+    confidence: hasEnoughStepData ? 'medium' : 'low',
+    baselineSteps,
+    baseDaily,
+    stepDaily,
+    exerciseDaily,
+    extraSteps,
+  };
+}
+
 // --- Goal feasibility ---
 // 1 lb of fat ~ 3500 kcal. Returns projected rate + a feasibility verdict (no fear-mongering, just a flag).
 function evaluateGoal({ startWeightKg, targetWeightKg, startDate, targetDate, tdee }) {

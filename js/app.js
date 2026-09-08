@@ -10,9 +10,9 @@ const LAST_ROUTE_KEY = 'forge.lastRoute';
 // here just quietly lands on Home instead of a blank page.
 function loadLastRoute() {
   try {
-    return localStorage.getItem(LAST_ROUTE_KEY) || 'home';
+    return localStorage.getItem(LAST_ROUTE_KEY) || 'yourpage';
   } catch (e) {
-    return 'home';
+    return 'yourpage';
   }
 }
 function saveLastRoute(route) {
@@ -55,7 +55,7 @@ let UI = {
   foodCombineName: '',
   editingFoodIndex: null,
   secretPanelOpen: false,
-  foodQuickPicksOpen: false,
+  foodQuickPicksOpen: true,
   barcodeScannerOpen: false,
   barcodeStatus: '',
   barcodeDeviceId: '',
@@ -77,7 +77,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v25';
+const APP_VERSION = 'forge-v26';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -303,39 +303,70 @@ function getActivityLevel() {
 }
 
 function getBMR() {
-  return calcBMR(STATE.profile);
+  return calcBMR({ ...STATE.profile, weightKg: currentWeightKg() });
 }
 
 function getTDEE() {
+  return getMaintenanceEstimate()?.midpoint || null;
+}
+
+function getMaintenanceEstimate() {
   const bmr = getBMR();
-  if (!bmr) return null;
-  const lvl = getActivityLevel();
-  return calcTDEE(bmr, lvl.multiplier);
+  const weightKg = currentWeightKg();
+  if (!bmr || !weightKg) return null;
+  const summary = weeklyPlanSummary();
+  const today = todayISO();
+  const cutoff = new Date(today + 'T00:00:00');
+  cutoff.setDate(cutoff.getDate() - 27);
+  const cutoffIso = dateToLocalISO(cutoff);
+  const recentWorkouts = Object.entries(STATE.workoutLog)
+    .filter(([date, entries]) => date >= cutoffIso && date <= today && entries.some(entry => completedExerciseEntry(entry)))
+    .sort(([a], [b]) => a.localeCompare(b));
+  let weeklyExerciseKcal = summary.totalWeeklyExerciseKcal;
+  let exerciseSource = 'plan';
+  if (recentWorkouts.length >= 2) {
+    const firstDate = new Date(recentWorkouts[0][0] + 'T00:00:00');
+    const elapsedDays = Math.max(7, Math.min(28, Math.round((new Date(today + 'T00:00:00') - firstDate) / 86400000) + 1));
+    const recentTotal = recentWorkouts.reduce((sum, [, entries]) => {
+      const completed = entries.map(completedExerciseEntry).filter(Boolean);
+      const energy = calcWorkoutEnergy(completed, weightKg);
+      return sum + (energy.totalLow + energy.totalHigh) / 2;
+    }, 0);
+    weeklyExerciseKcal = recentTotal / elapsedDays * 7;
+    exerciseSource = 'recent';
+  }
+  return {
+    ...calcMaintenanceEstimate({
+    bmr,
+    weightKg,
+    stepsPerDay: summary.stepsPerDay,
+    weeklyExerciseKcal,
+    hasEnoughStepData: Object.keys(STATE.dailyCheckins).length >= 5,
+    }),
+    exerciseSource,
+  };
 }
 
 // Steps walked above the baseline already assumed by the activity level, converted
 // to a calorie bonus so ordinary daily walking isn't double counted.
 function getStepBonus() {
-  const lvl = getActivityLevel();
-  // Use the same blended rolling average that drives activity detection. Using
-  // the one-time plan estimate here made the displayed activity level and the
-  // effective TDEE disagree after real check-ins had been logged.
+  const estimate = getMaintenanceEstimate();
   const stepsPerDay = getStepsAverage();
-  const dailyKcal = calcBonusStepCalories(stepsPerDay, lvl.baselineSteps);
+  const baselineSteps = estimate?.baselineSteps || 3000;
+  const dailyKcal = estimate?.stepDaily || 0;
   return {
-    baselineSteps: lvl.baselineSteps,
+    baselineSteps,
     stepsPerDay,
-    extraSteps: Math.max(0, stepsPerDay - lvl.baselineSteps),
+    extraSteps: Math.max(0, stepsPerDay - baselineSteps),
     dailyKcal,
     weeklyKcal: dailyKcal * 7,
   };
 }
 
-// TDEE plus the daily step bonus - this is the number used for goal/food-target math.
+// Kept as the shared goal/food entry point. Steps and exercise are already
+// explicit components of getTDEE(), so nothing is added a second time here.
 function getEffectiveTDEE() {
-  const tdee = getTDEE();
-  if (!tdee) return null;
-  return tdee + getStepBonus().dailyKcal;
+  return getTDEE();
 }
 
 // Weekly exercise burn, contextualized against the person's goal direction (used
@@ -483,20 +514,17 @@ function cssEscape(s) {
 // ============================================================
 
 const NAV_ITEMS = [
-  { key: 'home', label: 'Home & BMR', num: '01' },
-  { key: 'yourpage', label: 'Your Page', num: '02' },
-  { key: 'workouts', label: 'Workout Plan', num: '03' },
-  { key: 'log', label: 'Workout Log', num: '04' },
-  { key: 'progress', label: 'Progress', num: '05' },
-  { key: 'goals', label: 'Weight Goals', num: '06' },
-  { key: 'food', label: 'Food Tracking', num: '07' },
-  { key: 'bodyfat', label: 'Body Fat', num: '08' },
-  { key: 'achievements', label: 'Achievements', num: '09' },
-  { key: 'pet', label: 'Pet', num: '10' }, // hidden from the nav unless STATE.pet.enabled, see doRender()
-  { key: 'faq', label: 'FAQ & Guides', num: '11' },
-  { key: 'themes', label: 'Themes', num: '12' },
-  { key: 'utilities', label: 'Utilities', num: '13' },
+  { key: 'yourpage', label: 'Today', icon: '⌂' },
+  { key: 'log', label: 'Workout', icon: '✓' },
+  { key: 'food', label: 'Food', icon: '+' },
+  { key: 'progress', label: 'Progress', icon: '↗' },
+  { key: 'more', label: 'More', icon: '•••' },
 ];
+
+const MORE_ROUTES = new Set(['home', 'workouts', 'goals', 'bodyfat', 'achievements', 'pet', 'faq', 'themes', 'utilities', 'more']);
+function navItemIsActive(key) {
+  return UI.route === key || (key === 'more' && MORE_ROUTES.has(UI.route));
+}
 
 function doRender() {
   applyTheme(STATE.theme);
@@ -526,9 +554,9 @@ function doRender() {
           <span class="mark">FORGE</span><small>TRAINING LOG</small>
           <span class="tip-box"><span class="tip-title">Version</span>${APP_VERSION}. If this doesn't match what you expect after a deploy, do a hard refresh, or if installed as an app, close it fully and reopen (see the README for why a normal refresh alone can be one generation behind).</span>
         </div>
-        ${NAV_ITEMS.filter(item => item.key !== 'pet' || STATE.pet.enabled).map(item => `
-          <button class="nav-item ${UI.route === item.key ? 'active' : ''}" onclick="navigate('${item.key}')">
-            <span class="num">${item.num}</span>${item.label}
+        ${NAV_ITEMS.map(item => `
+          <button class="nav-item ${navItemIsActive(item.key) ? 'active' : ''}" onclick="navigate('${item.key}')">
+            <span class="num" aria-hidden="true">${item.icon}</span><span>${item.label}</span>
           </button>
         `).join('')}
         <div class="sidebar-foot">
@@ -555,7 +583,8 @@ function doRender() {
   else if (UI.route === 'faq') main.innerHTML = renderFAQ();
   else if (UI.route === 'themes') main.innerHTML = renderThemes();
   else if (UI.route === 'utilities') main.innerHTML = renderUtilities();
-  else { UI.route = 'home'; main.innerHTML = renderHome(); }
+  else if (UI.route === 'more') main.innerHTML = renderMore();
+  else { UI.route = 'yourpage'; main.innerHTML = renderYourPage(); }
 
   afterRenderHooks();
   const sidebar = document.querySelector('.sidebar');
@@ -570,6 +599,33 @@ function doRender() {
       }
     });
   }
+}
+
+function renderMore() {
+  const items = [
+    { route: 'workouts', title: 'Workout plan', copy: 'Build reusable training days and starter routines.', icon: '▤' },
+    { route: 'home', title: 'Profile & calories', copy: 'Update your stats and review the maintenance estimate.', icon: '◎' },
+    { route: 'goals', title: 'Weight goal', copy: 'Choose a direction, pace, and starting calorie target.', icon: '◇' },
+    { route: 'bodyfat', title: 'Body-fat estimate', copy: 'Optional tape-measure estimate and education.', icon: '%' },
+    { route: 'achievements', title: 'Achievements', copy: 'Milestones earned from the habits you log.', icon: '★' },
+    ...(STATE.pet.enabled ? [{ route: 'pet', title: 'Pet & travel', copy: 'Rewards, customization, and step-powered travel.', icon: '●' }] : []),
+    { route: 'faq', title: 'Learn', copy: 'Short answers, methods, and exercise reference.', icon: '?' },
+    { route: 'themes', title: 'Appearance', copy: 'Theme, type, and interface preferences.', icon: '◐' },
+    { route: 'utilities', title: 'Data & support', copy: 'Backup, transfer, share, and contact tools.', icon: '⇄' },
+  ];
+  return `
+    <div class="page-head">
+      <p class="page-eyebrow">Everything else</p>
+      <h1 class="page-title">More</h1>
+      <p class="page-sub">Daily actions stay in the main navigation. Setup, deeper tools, and reference material live here.</p>
+    </div>
+    <div class="more-grid">
+      ${items.map(item => `<button class="more-link" onclick="navigate('${item.route}')">
+        <span class="more-link-icon" aria-hidden="true">${item.icon}</span>
+        <span><strong>${item.title}</strong><small>${item.copy}</small></span>
+        <span class="more-link-arrow" aria-hidden="true">›</span>
+      </button>`).join('')}
+    </div>`;
 }
 
 function navigate(route) {
@@ -643,9 +699,8 @@ function afterRenderHooks() {
 function renderHome() {
   const p = STATE.profile;
   const bmr = getBMR();
-  const lvl = getActivityLevel();
   const tdee = getTDEE();
-  const stepBonus = getStepBonus();
+  const maintenance = getMaintenanceEstimate();
   const summary = weeklyPlanSummary();
   const isImperial = p.unitSystem === 'imperial';
   const roundedHeightIn = p.heightCm ? Math.round(cmToIn(p.heightCm)) : null;
@@ -658,7 +713,7 @@ function renderHome() {
     <div class="page-head">
       <p class="page-eyebrow">Profile</p>
       <h1 class="page-title">Your numbers</h1>
-      <p class="page-sub">Set your stats here, your activity level is automatically calculated from the Workout Plan page.</p>
+      <p class="page-sub">Set the few inputs Forge needs, then treat the result as a starting estimate—not a verdict.</p>
     </div>
 
     ${renderStepCheckinSummary()}
@@ -710,7 +765,7 @@ function renderHome() {
       </div>
 
       <div class="card">
-        <div class="card-title">Metabolic estimate</div>
+        <div class="card-title">Daily energy estimate</div>
         ${bmr ? `
           <div class="grid grid-2" style="margin-bottom:16px;">
             <div class="stat">
@@ -718,73 +773,40 @@ function renderHome() {
               <div class="stat-value">${Math.round(bmr)}<span class="unit">kcal/day</span></div>
             </div>
             <div class="stat">
-              <div class="stat-label">TDEE: total daily burn</div>
+              <div class="stat-label">Estimated maintenance</div>
               <div class="stat-value accent">${Math.round(tdee)}<span class="unit">kcal/day</span></div>
+              <div class="hint">Likely range ${Math.round(maintenance.low)}-${Math.round(maintenance.high)}</div>
             </div>
           </div>
           <hr class="div">
-          <div class="stat" style="margin-bottom:10px;">
-            <div class="stat-label">Auto-detected activity level</div>
-            <div style="font-family:var(--font-display); font-size:18px; font-weight:600; margin-top:4px;">${lvl.label} <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px; font-weight:400;">x${lvl.multiplier}</span></div>
-            <div class="hint">${lvl.desc}</div>
+          <div class="confidence-row">
+            <span class="badge ${maintenance.confidence === 'medium' ? 'badge-ok' : 'badge-warn'}">${maintenance.confidence === 'medium' ? 'Some real activity data' : 'Low confidence'}</span>
+            <span class="hint">${Object.keys(STATE.dailyCheckins).length >= 5 ? 'Based on your recent step average and current plan.' : 'Log at least five step check-ins to replace the starting step estimate.'}</span>
           </div>
-          <div class="hint">
-            Based on your plan: <strong style="color:var(--text)">${summary.workoutDaysPerWeek}</strong> workout day(s)/week,
-            avg <strong style="color:var(--text)">${Math.round(summary.avgSessionMinutes)}</strong> min/session,
-            <strong style="color:var(--text)">${summary.stepsPerDay.toLocaleString()}</strong> steps/day.
-          </div>
-          ${stepBonus.extraSteps > 0 ? `
-            <hr class="div">
-            <div class="stat">
-              <div class="stat-label">Bonus from extra steps</div>
-              <div class="stat-value" style="font-size:18px;">+${Math.round(stepBonus.dailyKcal)}<span class="unit">kcal/day</span></div>
-              <div class="hint">${stepBonus.stepsPerDay.toLocaleString()} steps/day vs a ${stepBonus.baselineSteps.toLocaleString()}-step baseline already built into ${lvl.label.toLowerCase()}. See the Workout Plan page for the full breakdown.</div>
-            </div>
-          ` : ''}
         ` : `
           <div class="empty-state">
             <div class="big">-</div>
-            Fill in your age, height, and weight to calculate BMR and TDEE.
+            Fill in your age, height, and weight to estimate resting burn and maintenance.
           </div>
         `}
-        <p class="hint" style="margin-top:12px;">These estimates are designed for adults age 18 and older and are not intended for pregnancy, breastfeeding, or medical nutrition therapy. A clinician can help tailor targets when health conditions, medications, or eating-disorder history affect energy needs.</p>
+        <p class="hint" style="margin-top:12px;">The midpoint is useful for choosing a starting target; the range is the honest part. Compare two to four weeks of consistent intake and weight trends before adjusting. These estimates are for adults and are not intended for pregnancy, breastfeeding, or medical nutrition therapy.</p>
       </div>
     </div>
 
     <div class="card">
-      ${(() => {
-        const breakdown = getEnergyBreakdown({ bmr, tdee, dailyExerciseKcal: summary.totalWeeklyExerciseKcal / 7 });
-        if (!breakdown) return `<div class="card-title">Where your calories go</div><div class="empty-state">Fill in your profile above to see the breakdown.</div>`;
-        const segs = [
-          { key: 'bmr', label: 'BMR', color: 'var(--accent)', pct: breakdown.bmrPct, val: breakdown.bmr,
-            title: 'BMR: Basal Metabolic Rate',
-            body: 'Calories your body burns just existing: breathing, circulation, cell repair. This happens whether you move or not, and is usually the biggest single piece of your day.' },
-          { key: 'neat', label: 'NEAT', color: 'var(--accent-2)', pct: breakdown.neatPct, val: breakdown.neat,
-            title: 'NEAT: Non-Exercise Activity',
-            body: 'Walking around, fidgeting, chores, standing up, taking the stairs: all the movement that is not a planned workout. This is often the most underestimated part of someone\u2019s day.' },
-          { key: 'eat', label: 'EAT', color: '#7FD87A', pct: breakdown.eatPct, val: breakdown.eat,
-            title: 'EAT: Exercise Activity',
-            body: 'Calories burned specifically from the planned workouts in your log, an average of your weekly training spread across each day.' },
-          { key: 'tef', label: 'TEF', color: '#F5C64C', pct: breakdown.tefPct, val: breakdown.tef,
-            title: 'TEF: Thermic Effect of Food',
-            body: 'Energy your body spends digesting and processing what you eat. Roughly 10% of intake for most diets; protein costs more to digest than fat or carbs.' },
-        ];
-        return `
-          <div class="card-title">Where your calories go</div>
-          <div class="energy-bar">
-            ${segs.map(s => `<span class="energy-bar-seg" style="width:${Math.max(s.pct, 0.5)}%; background:${s.color};">${s.pct >= 6 ? Math.round(s.pct) + '%' : ''}</span>`).join('')}
-          </div>
-          <div class="energy-legend">
-            ${segs.map(s => `
-              <div class="energy-legend-item">
-                <span class="energy-legend-dot" style="background:${s.color};"></span>
-                ${tip(`<strong>${s.label}</strong> ${Math.round(s.val)} kcal`, s.title, s.body)}
-              </div>
-            `).join('')}
-          </div>
-          <p class="hint" style="margin-top:12px;">Tap or hover any label for what it means. BMR is typically 60-70% of total burn for most people; the rest comes from how much you move and eat.</p>
-        `;
-      })()}
+      <div class="card-title">How Forge got this number</div>
+      ${maintenance ? `
+        <div class="estimate-equation">
+          <div class="estimate-part"><strong>${Math.round(maintenance.baseDaily)}</strong><span>Sedentary baseline<br><small>BMR × 1.2</small></span></div>
+          <span class="estimate-op">+</span>
+          <div class="estimate-part"><strong>${Math.round(maintenance.stepDaily)}</strong><span>Walking above<br><small>${maintenance.baselineSteps.toLocaleString()} steps</small></span></div>
+          <span class="estimate-op">+</span>
+          <div class="estimate-part"><strong>${Math.round(maintenance.exerciseDaily)}</strong><span>${maintenance.exerciseSource === 'recent' ? 'Recent exercise' : 'Planned exercise'}<br><small>daily average</small></span></div>
+          <span class="estimate-op">=</span>
+          <div class="estimate-part estimate-total"><strong>${Math.round(maintenance.midpoint)}</strong><span>Starting midpoint</span></div>
+        </div>
+        <p class="hint" style="margin-top:12px;">Forge no longer jumps between broad activity multipliers. Walking uses your body weight and steps; planned exercise is discounted because activity estimates are noisy and can overlap with baseline burn.</p>
+      ` : `<div class="empty-state">Fill in your profile above to see the calculation.</div>`}
     </div>
 
     ${renderKnowledgeLevelCard()}
@@ -794,10 +816,9 @@ function renderHome() {
     `, { maxLevel: 3, defaultOpenThrough: 1, brief: '<strong>General target:</strong> work toward 150-300 weekly minutes of moderate aerobic activity plus strength work on at least 2 days; build gradually.' })}
 
     ${notice('home-why-activity', `
-      Most calculators ask you to self-report "activity level," and people reliably overestimate it.
-      This app instead reads your actual <a href="#" onclick="navigate('workouts'); return false;">workout plan</a>:
-      how many days you train, how long sessions run, and your typical step count, and picks the closest activity
-      multiplier for you. Build out your week on the Workout Plan page to sharpen this estimate.
+      Broad activity labels can hide large jumps in calorie estimates. Forge starts from a sedentary baseline and
+      adds your step trend plus a conservative daily average from the <a href="#" onclick="navigate('workouts'); return false;">workout plan</a>.
+      It still cannot directly measure your metabolism, so use the displayed range and adjust from your real trend.
     `, { maxLevel: 0, defaultOpenThrough: 0 })}
   `;
 }

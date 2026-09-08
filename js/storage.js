@@ -60,7 +60,7 @@ function defaultState() {
       knowledgeLevel: 0,    // 0 beginner ... 4 "I know it all"
       knowledgeLevelTouched: false,
       stepCheckinCollapsed: false,
-      restTimerPanelCollapsed: false,
+      restTimerPanelCollapsed: true,
       restTimerWidgetCollapsed: false,
       workoutComplianceCollapsed: false,
       onboardingGuideCollapsed: false,
@@ -76,6 +76,7 @@ function defaultState() {
       // Sparse route -> layout overrides. Tracking data never lives here.
       // A route key is created only after the user customizes that page.
       pageLayouts: {},
+      v26Simplified: true,
     },
     onboarding: {
       active: true,          // fresh installs get a guided, pet-led setup
@@ -214,6 +215,12 @@ function loadState() {
     if (!isPlainObject(parsed.onboarding)) {
       normalized.onboarding.active = false;
       normalized.onboarding.dismissed = true;
+    }
+    // One-time V26 cleanup for existing installs: secondary controls should no
+    // longer stand between the user and the daily logging action.
+    if (!parsed.uiPrefs?.v26Simplified) {
+      normalized.uiPrefs.restTimerPanelCollapsed = true;
+      normalized.uiPrefs.v26Simplified = true;
     }
     return normalized;
   } catch (e) {

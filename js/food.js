@@ -129,11 +129,7 @@ function renderFood() {
       ${renderDateNextButton('shiftFoodDate')}
     </div>
 
-    ${notice('food-hidden-cals', `The most common reason a diet stops adding up isn't the meals, it's the extras: sauces, dressings, cooking oil, coffee add-ins, drinks, and snacks eaten standing up. If your numbers aren't matching your results, that's usually the first place to look.`, { maxLevel: 2, defaultOpenThrough: 1, brief: `If intake and results do not match, first check easy-to-miss extras such as oils, sauces, drinks, and snacks.` })}
-
-    ${notice('food-pet-reward', `Your pet earns a meal once your day's total logged calories pass ${STATE.profile.sex === 'male' ? MIN_SAFE_INTAKE.male : MIN_SAFE_INTAKE.female} kcal, not once per item logged, so it rewards actually eating enough for the day rather than logging lots of tiny entries.`, { maxLevel: 0, defaultOpenThrough: 0 })}
-
-    ${notice('food-no-scale', renderPortionGuideBody(), { maxLevel: 1, defaultOpenThrough: 0 })}
+    ${notice('food-tracking-help', `<strong>Getting a useful estimate</strong><p>${renderPortionGuideBody()}</p><p>When intake and results do not match, first check easy-to-miss extras such as oils, sauces, drinks, coffee add-ins, and snacks. Consistency matters more than pretending every serving is exact.</p>`, { maxLevel: 2, defaultOpenThrough: -1, brief: `Portions are estimates. Log consistently and check easy-to-miss extras before making a large calorie change.` })}
 
     ${compliance && compliance.status !== 'good' ? `
       <div class="card">
@@ -143,8 +139,6 @@ function renderFood() {
     ` : ''}
 
     ${targetContext.warning ? `<div class="card${goalTimelineCollapsed ? ' panel-card-collapsed' : ''}"><div class="card-title"><span>Goal timeline needs adjustment</span><span class="badge badge-warn">Maintenance shown</span><button class="panel-collapse-btn" onclick="toggleRememberedPanel('foodGoalTimelineCollapsed')" aria-expanded="${!goalTimelineCollapsed}" aria-label="${goalTimelineCollapsed ? 'Expand' : 'Minimize'} goal timeline warning">${goalTimelineCollapsed ? '+' : '−'}</button></div>${goalTimelineCollapsed ? '' : `<p class="hint">${escapeAttr(targetContext.warning)}</p>`}</div>` : ''}
-
-    ${renderWaterCard(date)}
 
     <div class="grid grid-2" style="margin-bottom:16px;">
       <div class="card ${['food_log','meal'].some(onboardingStepIs) ? 'onboarding-focus' : ''}">
@@ -185,7 +179,7 @@ function renderFood() {
                 <div class="food-search-results">
                   ${UI.foodResults.map((f, i) => `
                     <div class="food-search-item" style="cursor:pointer; display:flex; justify-content:space-between;" onclick="openFoodAdjust(${i})">
-                      <span>${escapeAttr(formatFoodNameForUnits(f.name))}</span>
+                      <span>${escapeAttr(formatFoodNameForUnits(f.name))}${f.sourceLabel ? `<small class="food-source">${escapeAttr(f.sourceLabel)}</small>` : ''}</span>
                       <span style="color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">${Math.round(f.kcal)} kcal</span>
                     </div>
                   `).join('')}
@@ -203,11 +197,12 @@ function renderFood() {
       </div>
 
       <div class="card">
-        <div class="card-title">Today's target</div>
+        <div class="card-title">Today's starting target</div>
         ${goalAdjustedTarget ? `
           <div class="stat" style="margin-bottom:10px;">
-            <div class="stat-label">Calorie target</div>
+            <div class="stat-label">Midpoint</div>
             <div class="stat-value accent">${Math.round(goalAdjustedTarget)}<span class="unit">kcal</span></div>
+            <div class="hint">Estimated range ${Math.round(targetContext.targetLow)}-${Math.round(targetContext.targetHigh)} kcal</div>
           </div>
           <div class="stat">
             <div class="stat-label">Logged so far</div>
@@ -215,11 +210,10 @@ function renderFood() {
           </div>
           <hr class="div">
           ${safety ? renderSafetyWarning(safety, totals.kcal) : renderFoodFeedback(totals.kcal, goalAdjustedTarget)}
+          <p class="hint" style="margin-top:10px;">Aim near the midpoint consistently, then adjust from your two-to-four-week weight trend. The range reflects estimation uncertainty, not a daily score.</p>
         ` : `<div class="hint">Set your profile stats (Home) and optionally a weight goal to see a personalized target.</div>`}
       </div>
     </div>
-
-    ${renderGoalNutritionGuidance(totals)}
 
     <div class="card ${onboardingStepIs('meal') ? 'onboarding-focus' : ''}">
       <div class="card-title"><span>Logged today <span style="font-family:var(--font-mono); font-size:12px; color:var(--text-dim);">${entries.length} item(s)</span></span>${entries.length >= 2 ? `<button class="btn btn-sm ${UI.foodCombineOpen ? 'btn-primary' : ''}" onclick="toggleFoodCombine()">${UI.foodCombineOpen ? 'Cancel grouping' : 'Combine into meal'}</button>` : ''}</div>
@@ -255,6 +249,10 @@ function renderFood() {
         <p class="hint macro-fit-disclaimer">Food-name colors show how strongly one item contributes toward your selected goal, primarily from protein per calorie; performance plans also recognize lower-fat carbohydrate fuel. Daily macro colors judge the combined day only after at least half the calorie target is logged. Neither is a healthfulness grade: fiber, micronutrients, sodium, saturated fat, allergies, food access, and the rest of the diet still matter.</p>
       ` : ''}
     </div>
+
+    ${renderWaterCard(date)}
+
+    ${renderGoalNutritionGuidance(totals)}
   `;
 }
 
@@ -389,7 +387,8 @@ function renderFoodFeedback(logged, target) {
 
 function getFoodTargetContext() {
   const effTdee = getEffectiveTDEE();
-  if (!effTdee) return { target: null, goalApplied: false, warning: null };
+  const maintenance = getMaintenanceEstimate();
+  if (!effTdee || !maintenance) return { target: null, targetLow: null, targetHigh: null, goalApplied: false, warning: null };
   const g = STATE.goal;
   if (g.targetWeightKg != null && g.targetDate) {
     const evalResult = evaluateGoal({
@@ -403,14 +402,23 @@ function getFoodTargetContext() {
       if (evalResult.unsafeTarget || !evalResult.suggestedIntake) {
         return {
           target: effTdee,
+          targetLow: maintenance.low,
+          targetHigh: maintenance.high,
           goalApplied: false,
           warning: 'The selected weight and date would require an intake Forge cannot responsibly recommend. Extend the goal date; until then, this page shows estimated maintenance calories.',
         };
       }
-      return { target: evalResult.suggestedIntake, goalApplied: true, warning: null };
+      const adjustment = evalResult.suggestedIntake - effTdee;
+      return {
+        target: evalResult.suggestedIntake,
+        targetLow: Math.max(0, maintenance.low + adjustment),
+        targetHigh: maintenance.high + adjustment,
+        goalApplied: true,
+        warning: null,
+      };
     }
   }
-  return { target: effTdee, goalApplied: false, warning: null };
+  return { target: effTdee, targetLow: maintenance.low, targetHigh: maintenance.high, goalApplied: false, warning: null };
 }
 
 function getFoodTargetCalories() {
@@ -545,7 +553,49 @@ function searchLocalPool(query) {
   [...fromPool, ...fromFallback].forEach(f => {
     if (!seen.has(f.name)) { seen.add(f.name); combined.push(f); }
   });
-  return combined;
+  return rankFoodResults(combined, query);
+}
+
+function foodSearchText(food) {
+  return `${food.description || ''} ${food.name || ''} ${food.brandName || ''}`.toLowerCase();
+}
+
+// USDA's default relevance often fills a generic query with unfamiliar brands.
+// Rank survey/reference foods first unless the query itself names a brand, then
+// use branded products as the specific alternatives they are.
+function rankFoodResults(results, query) {
+  const q = String(query || '').trim().toLowerCase();
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const scored = (results || []).map((food, index) => {
+    const text = foodSearchText(food);
+    const description = String(food.description || food.name || '').toLowerCase();
+    const dataType = String(food.dataType || '').toLowerCase();
+    const queryNamesBrand = !!food.brandName && q.includes(String(food.brandName).toLowerCase());
+    let score = 0;
+    if (description === q) score += 120;
+    if (description.startsWith(q)) score += 70;
+    if (text.includes(q)) score += 35;
+    if (tokens.every(token => text.includes(token))) score += 25;
+    // Dataset quality is a stronger signal than USDA's description match for a
+    // generic query. Otherwise a branded item literally named "French Fries"
+    // still outranks the useful restaurant/FNDDS choices.
+    if (dataType.includes('survey') || dataType.includes('fndds')) score += 180;
+    else if (dataType.includes('sr legacy')) score += 120;
+    else if (dataType.includes('foundation')) score += 100;
+    else if (dataType.includes('branded')) score += queryNamesBrand ? 55 : -20;
+    if (!food.brandName) score += 15;
+    score -= Math.max(0, description.length - 65) * 0.15;
+    return { food, score, index };
+  });
+
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  const seen = new Set();
+  return scored.map(item => item.food).filter(food => {
+    const key = `${String(food.name).toLowerCase().replace(/\s+/g, ' ')}|${Math.round(Number(food.kcal) || 0)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function mergeIntoFoodIndexPool(results) {
@@ -571,7 +621,7 @@ async function runFoodSearch(query) {
   // Layer 1: exact repeat of a query we've already made.
   const cached = STATE.usdaCache[cacheKey];
   if (cached) {
-    UI.foodResults = cached.results;
+    UI.foodResults = rankFoodResults(cached.results, query).slice(0, 12);
     render();
     return;
   }
@@ -579,7 +629,7 @@ async function runFoodSearch(query) {
   // Layer 2: the growing local pool, answered instantly with no network call.
   const poolMatches = searchLocalPool(query);
   if (poolMatches.length >= POOL_MATCH_THRESHOLD) {
-    UI.foodResults = poolMatches.slice(0, 10);
+    UI.foodResults = poolMatches.slice(0, 12);
     render();
     return;
   }
@@ -589,19 +639,21 @@ async function runFoodSearch(query) {
   render();
   try {
     const apiKey = STATE.foodApiKey || 'DEMO_KEY';
-    const url = `${USDA_SEARCH_URL}?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&pageSize=10&dataType=Branded,Foundation,SR%20Legacy`;
+    // Request a wider mixed set, including USDA survey foods (FNDDS). Local
+    // ranking below promotes recognizable generic choices above obscure brands.
+    const url = `${USDA_SEARCH_URL}?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&pageSize=40`;
     const res = await fetch(url);
     if (res.status === 429 || res.status === 403) {
       throw new Error('rate-limited');
     }
     if (!res.ok) throw new Error('USDA request failed: ' + res.status);
     const data = await res.json();
-    const results = (data.foods || []).map(parseUsdaFood).filter(Boolean);
+    const results = rankFoodResults((data.foods || []).map(parseUsdaFood).filter(Boolean), query);
     if (results.length) {
       mergeIntoFoodIndexPool(results);
       STATE.usdaCache[cacheKey] = { results, ts: Date.now() };
       persist();
-      UI.foodResults = results;
+      UI.foodResults = results.slice(0, 12);
     } else {
       UI.foodResults = poolMatches.length ? poolMatches : searchFallbackDb(query);
     }
@@ -622,6 +674,9 @@ async function runFoodSearch(query) {
 
 function parseUsdaFood(food) {
   const name = food.brandName ? `${food.description} (${food.brandName})` : food.description;
+  const sourceLabel = /survey|fndds/i.test(food.dataType || '') ? 'Common USDA serving'
+    : /branded/i.test(food.dataType || '') ? 'Brand label'
+      : /foundation|sr legacy/i.test(food.dataType || '') ? 'USDA reference' : '';
   if (food.labelNutrients) {
     const ln = food.labelNutrients;
     return {
@@ -631,6 +686,10 @@ function parseUsdaFood(food) {
       carbs: ln.carbohydrates?.value || 0,
       fat: ln.fat?.value || 0,
       fdcId: food.fdcId,
+      description: food.description,
+      brandName: food.brandName || '',
+      dataType: food.dataType || '',
+      sourceLabel,
       perServing: true, // already the real labeled serving, not per-100g
     };
   }
@@ -646,13 +705,17 @@ function parseUsdaFood(food) {
     carbs: find('205'),
     fat: find('204'),
     fdcId: food.fdcId,
+    description: food.description,
+    brandName: food.brandName || '',
+    dataType: food.dataType || '',
+    sourceLabel,
     perServing: false, // per-100g raw value, real portions fetched lazily when adjusting (see fetchUsdaPortions)
   };
 }
 
 function searchFallbackDb(query) {
   const q = query.toLowerCase();
-  return FOOD_FALLBACK_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 8);
+  return rankFoodResults(FOOD_FALLBACK_DB.filter(f => f.name.toLowerCase().includes(q)), query).slice(0, 8);
 }
 
 // ---------- Adjust-before-adding / editing flow ----------

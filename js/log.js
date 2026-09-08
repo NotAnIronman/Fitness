@@ -58,6 +58,21 @@ function renderLog() {
       ${noteOpen ? `<div class="field workout-note-editor"><label>Workout note</label><textarea maxlength="2000" rows="4" placeholder="Energy, pain-free range, equipment setup, what to change next time…" oninput="saveWorkoutNoteDraft('${date}', this.value)" onchange="saveWorkoutNote('${date}', this.value)">${escapeAttr(workoutNote)}</textarea></div>` : ''}
     </div>
 
+    <div class="card ${onboardingStepIs('copy_workout') ? 'onboarding-focus' : ''}">
+      <div class="card-title">
+        Exercises this day
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn btn-sm" onclick="openCopyIntoLog('add')">Copy from plan</button>
+          ${entries.length ? `<button class="btn btn-sm" onclick="openCopyIntoLog('replace')">Replace</button>` : ''}
+        </div>
+      </div>
+      ${UI.logCopyOpen ? renderCopyIntoLogMenu() : ''}
+      ${entries.length ? `<div class="row-list">${rows}</div>` : `<div class="empty-state">Nothing logged yet. Copy a planned workout or add the first exercise.</div>`}
+      <hr class="div">
+      ${UI.logAddOpen ? renderAddExerciseForm({ scope: 'log' }) : `<button class="btn btn-primary" onclick="openAddExerciseLog()">+ Add exercise</button>`}
+      ${entries.length ? `<div class="workout-log-summary"><strong>${completedCount}/${entries.length} complete</strong><span>${Math.round(energy.totalLow)}-${Math.round(energy.totalHigh)} estimated kcal</span>${sessionFeedback ? `<span class="badge badge-ok">${sessionFeedback.label}</span>` : ''}</div>` : ''}
+    </div>
+
     ${compliance ? renderComplianceCard(compliance) : ''}
 
     ${renderRecoveryCheckinCard(date)}
@@ -78,38 +93,6 @@ function renderLog() {
       `}
     </div>
 
-    <div class="card ${onboardingStepIs('copy_workout') ? 'onboarding-focus' : ''}">
-      <div class="card-title">
-        Exercises this day
-        <div style="display:flex; gap:6px;">
-          <button class="btn btn-sm" onclick="openCopyIntoLog('add')">Copy from...</button>
-          <button class="btn btn-sm" onclick="openCopyIntoLog('replace')">Replace with...</button>
-        </div>
-      </div>
-
-      ${UI.logCopyOpen ? renderCopyIntoLogMenu() : ''}
-
-      ${entries.length ? `<div class="row-list">${rows}</div>` : `<div class="empty-state">Nothing logged for this day yet.</div>`}
-
-      <hr class="div">
-      <div class="grid grid-2" style="align-items:end; margin-bottom:14px;">
-        <div class="stat">
-          <div class="stat-label">Day total</div>
-          <div class="stat-value accent">${Math.round(energy.totalLow)}-${Math.round(energy.totalHigh)}<span class="unit">kcal</span></div>
-          <p class="hint">${Math.round(energy.duringKcal)} during + roughly ${Math.round(energy.epocLow)}-${Math.round(energy.epocHigh)} after. Only completed work is included.</p>
-        </div>
-        ${sessionFeedback ? `
-          <div class="stat">
-            <div class="stat-label">Session feedback</div>
-            <div style="margin-top:4px;">${tip(`<span class="badge badge-ok">${sessionFeedback.label}</span>`, sessionFeedback.label, sessionFeedback.note)}</div>
-          </div>
-        ` : ''}
-      </div>
-
-      ${UI.logAddOpen ? renderAddExerciseForm({ scope: 'log' }) : `
-        <button class="btn btn-primary" onclick="openAddExerciseLog()">+ Add exercise</button>
-      `}
-    </div>
   `;
 }
 

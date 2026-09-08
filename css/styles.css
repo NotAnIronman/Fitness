@@ -1894,3 +1894,159 @@ hr.div {
   .healthy-gain-plan .grid-3 { grid-template-columns: 1fr; }
   .day-share-preview { max-height: 220px; }
 }
+
+/* ============================================================
+   V26: CALM NAVIGATION + FOLDABLE/TOUCH READABILITY
+   The unfolded Galaxy Fold reports a tablet-like CSS width, so width-only
+   phone breakpoints leave it in the dense desktop shell. Coarse touch screens
+   use the same large bottom navigation even when their viewport is wide.
+   ============================================================ */
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.more-link {
+  min-width: 0;
+  min-height: 86px;
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.more-link:hover, .more-link:focus-visible { border-color: var(--accent); }
+.more-link-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: calc(var(--radius) * .7);
+  background: var(--surface-2);
+  color: var(--accent);
+  font: 700 20px var(--font-mono);
+}
+.more-link strong, .more-link small { display: block; }
+.more-link strong { margin-bottom: 4px; font-size: 15px; }
+.more-link small { color: var(--text-dim); font-size: 12.5px; line-height: 1.4; }
+.more-link-arrow { color: var(--text-dim); font-size: 26px; }
+
+.estimate-equation {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+  align-items: stretch;
+  gap: 10px;
+}
+.estimate-part {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px;
+  border-radius: calc(var(--radius) * .7);
+  background: var(--bg);
+}
+.estimate-part strong { color: var(--text); font: 600 24px var(--font-mono); }
+.estimate-part span { color: var(--text-dim); font-size: 12px; line-height: 1.4; }
+.estimate-part small { font-family: var(--font-mono); }
+.estimate-total { border: 1px solid var(--accent); }
+.estimate-total strong { color: var(--accent); }
+.estimate-op { align-self: center; color: var(--text-dim); font: 600 20px var(--font-mono); }
+.confidence-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.food-source { display: block; margin-top: 3px; color: var(--text-dim); font: 10px var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
+.quick-action-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.quick-action {
+  min-width: 0;
+  min-height: 76px;
+  padding: 13px 15px;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.quick-action.primary { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.quick-action strong, .quick-action span { display: block; }
+.quick-action strong { margin-bottom: 4px; font-size: 15px; }
+.quick-action span { color: var(--text-dim); font-size: 11.5px; line-height: 1.35; }
+.quick-action.primary span { color: color-mix(in srgb, var(--accent-ink) 72%, transparent); }
+.workout-log-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; color: var(--text-dim); font-size: 13px; }
+.workout-log-summary strong { color: var(--text); }
+
+@media (max-width: 1100px), (hover: none) and (pointer: coarse) {
+  body { font-size: 16px; }
+  .shell { display: block; min-height: 100dvh; }
+  .sidebar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 80;
+    width: 100%;
+    height: calc(66px + env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+    padding: 6px max(6px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(6px, env(safe-area-inset-left));
+    overflow: visible;
+    border: 0;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 28px rgba(0,0,0,.28);
+  }
+  .brand, .sidebar-foot { display: none; }
+  .nav-item {
+    min-width: 0;
+    min-height: 54px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 2px;
+    text-align: center;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 1.1;
+  }
+  .nav-item .num { width: auto; height: 20px; font-size: 17px; line-height: 20px; opacity: .9; }
+  .nav-item.active { box-shadow: inset 0 3px 0 var(--accent); }
+  .main { max-width: 920px; padding: 22px 20px calc(96px + env(safe-area-inset-bottom)); }
+  .page-head { margin-bottom: 20px; }
+  .page-title { font-size: clamp(28px, 6vw, 38px); }
+  .page-sub { max-width: 68ch; font-size: 15px; line-height: 1.55; }
+  .page-eyebrow, .stat-label { font-size: 12px; }
+  .card { padding: 18px; }
+  .card-title { font-size: 16px; }
+  .hint, label, .panel-collapsed-summary, .exercise-guide-body p, .faq-answer { font-size: 14px; }
+  .exercise-row .name, .btn { font-size: 15px; }
+  .exercise-row .meta { font-size: 13px; }
+  .btn, .btn-sm, .chip, .icon-btn, .date-nav-btn { min-height: 44px; }
+  .btn-sm { padding: 9px 12px; font-size: 14px; }
+  input, select, textarea { min-height: 46px; font-size: 17px; padding: 11px 12px; }
+  .grid-2, .grid-3, .grid-4, .page-layout-store, .page-module-grid { grid-template-columns: 1fr; }
+  .page-module-full, .page-module-half, .page-module-third, .page-module-quarter { grid-column: 1 / -1; }
+  .onboarding-guide { bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .rest-timer-widget, .pet-widget { bottom: calc(78px + env(safe-area-inset-bottom)); }
+  .shell.onboarding-active .main { padding-bottom: calc(52vh + 76px + env(safe-area-inset-bottom)); }
+  .estimate-equation { grid-template-columns: 1fr; }
+  .estimate-op { display: none; }
+  .estimate-part { display: grid; grid-template-columns: 86px 1fr; align-items: center; }
+  .quick-action-row { grid-template-columns: 1fr 1fr 1fr; }
+  .quick-action { min-height: 84px; }
+  .quick-action strong { font-size: 15px; }
+  .quick-action span { font-size: 13px; }
+}
+
+@media (max-width: 620px) {
+  .main { padding-inline: 12px; }
+  .card { padding: 16px 14px; }
+  .more-grid { grid-template-columns: 1fr; }
+  .quick-action-row { grid-template-columns: 1fr; }
+  .quick-action { min-height: 68px; }
+  .more-link { min-height: 80px; padding: 13px; }
+  .card-title { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .date-nav-row { width: 100%; max-width: none !important; }
+}

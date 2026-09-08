@@ -295,6 +295,10 @@ const FOOD_FALLBACK_DB = [
   { name: 'Wine, red or white (5 fl oz)', kcal: 125, protein: 0.1, carbs: 4, fat: 0 },
   { name: 'Butter (1 tbsp)', kcal: 102, protein: 0.1, carbs: 0, fat: 11.5 },
   { name: 'Potato chips (1 oz)', kcal: 152, protein: 2, carbs: 15, fat: 10 },
+  { name: 'French fries, restaurant-style (medium order)', kcal: 365, protein: 4, carbs: 48, fat: 17, sourceLabel: 'Quick estimate' },
+  { name: 'French fries (100g)', kcal: 312, protein: 3.4, carbs: 41, fat: 15, sourceLabel: 'Quick estimate' },
+  { name: 'Cheeseburger, typical single patty (1)', kcal: 360, protein: 18, carbs: 31, fat: 18, sourceLabel: 'Quick estimate' },
+  { name: 'Pizza, cheese (1 regular slice)', kcal: 285, protein: 12, carbs: 36, fat: 10, sourceLabel: 'Quick estimate' },
   { name: 'Chocolate chip cookie (1 medium)', kcal: 78, protein: 0.9, carbs: 10, fat: 4 },
 ];
 

@@ -6,7 +6,7 @@
    data is copied, filtered, or disabled. Layout state is sparse and per route.
    ============================================================ */
 
-const NON_MODULAR_ROUTES = new Set(['yourpage']);
+const NON_MODULAR_ROUTES = new Set(['yourpage', 'more']);
 
 function getPageLayout(route) {
   const layout = STATE.uiPrefs.pageLayouts?.[route];
@@ -137,6 +137,9 @@ function renderPageModuleShell(route, module, index, modules, layout) {
 
 function applyPageModularity(route) {
   if (NON_MODULAR_ROUTES.has(route)) return;
+  // Keep the default experience quiet. Advanced layout controls appear for
+  // experienced users, and always remain available when a saved layout exists.
+  if ((STATE.uiPrefs.knowledgeLevel || 0) < 2 && !STATE.uiPrefs.pageLayouts?.[route]) return;
   const main = document.getElementById('main-content');
   if (!main) return;
   const modules = collectPageModules(main, route);

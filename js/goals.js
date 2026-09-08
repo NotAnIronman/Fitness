@@ -271,7 +271,10 @@ function renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) {
     unlikely: `Based on this first-pass energy model, Forge should not turn this date into an intake prescription. Extend the timeline or adjust the target.`,
   };
 
-  const stepBonus = getStepBonus();
+  const maintenance = getMaintenanceEstimate();
+  const targetAdjustment = suggestedIntake && effTdee ? suggestedIntake - effTdee : 0;
+  const targetLow = maintenance && suggestedIntake ? Math.max(0, maintenance.low + targetAdjustment) : null;
+  const targetHigh = maintenance && suggestedIntake ? maintenance.high + targetAdjustment : null;
 
   return `
     <div class="card">
@@ -279,12 +282,12 @@ function renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) {
       <div class="grid grid-3" style="margin-bottom:12px;">
         <div class="stat"><div class="stat-label">Required rate</div><div class="stat-value">${rateDisplay}</div><div class="hint">${ratePctBodyWeightPerWeek != null ? ratePctBodyWeightPerWeek.toFixed(2) : '-'}% of starting weight/week</div></div>
         <div class="stat"><div class="stat-label">Timeframe</div><div class="stat-value">${weeks.toFixed(1)}<span class="unit">wks</span></div></div>
-        <div class="stat"><div class="stat-label">Suggested daily intake</div><div class="stat-value accent">${suggestedIntake ? Math.round(suggestedIntake) : 'Not provided'}${suggestedIntake ? '<span class="unit">kcal</span>' : ''}</div></div>
+        <div class="stat"><div class="stat-label">Starting intake midpoint</div><div class="stat-value accent">${suggestedIntake ? Math.round(suggestedIntake) : 'Not provided'}${suggestedIntake ? '<span class="unit">kcal</span>' : ''}</div>${targetLow ? `<div class="hint">Estimated range ${Math.round(targetLow)}-${Math.round(targetHigh)}</div>` : ''}</div>
       </div>
       <p class="hint" style="font-size:13px; line-height:1.6;">${messages[feasibility]}
         ${unsafeTarget ? ' This timeline would require an intake or deficit that Forge should not prescribe. Extend the target date; the Food page will keep showing estimated maintenance rather than turning an unsafe calculation into a target.' : ''}
-        ${effTdee ? ` Your current maintenance is ~${Math.round(effTdee)} kcal/day (TDEE of ${Math.round(tdee)}${stepBonus.dailyKcal > 0 ? ` plus a ${Math.round(stepBonus.dailyKcal)} kcal step bonus` : ''}).` : ' Fill in your profile on Home to see a suggested intake target.'}
-        This first-pass projection uses the familiar ${isImperial ? '~3,500 kcal-per-pound' : '~7,700 kcal-per-kilogram'} approximation. Human weight change is dynamic: energy needs and water weight change over time, so use the trend to adjust rather than treating the projection as a promise.
+        ${effTdee && maintenance ? ` Your estimated maintenance midpoint is ${Math.round(effTdee)} kcal/day, with a broad ${Math.round(maintenance.low)}-${Math.round(maintenance.high)} range.` : ' Fill in your profile to see a starting intake estimate.'}
+        The timeline uses the familiar ${isImperial ? '~3,500 kcal-per-pound' : '~7,700 kcal-per-kilogram'} first-pass approximation. Human weight change is dynamic, so compare two to four weeks of consistent intake and comparable weigh-ins before changing the midpoint.
       </p>
     </div>
   `;
