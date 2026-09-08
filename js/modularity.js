@@ -6,7 +6,7 @@
    data is copied, filtered, or disabled. Layout state is sparse and per route.
    ============================================================ */
 
-const NON_MODULAR_ROUTES = new Set(['yourpage', 'more']);
+const NON_MODULAR_ROUTES = new Set(['yourpage', 'habits', 'more']);
 
 function getPageLayout(route) {
   const layout = STATE.uiPrefs.pageLayouts?.[route];

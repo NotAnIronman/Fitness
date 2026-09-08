@@ -71,13 +71,16 @@ let UI = {
   qrExpanded: false,
   qrStatus: '',
   shareDayDate: todayISO(),
+  habitDate: todayISO(),
+  habitEditorOpen: false,
+  habitDraft: null,
 };
 
 // Bump this alongside CACHE_VERSION in sw.js on every deploy. Shown as a hover/
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v26';
+const APP_VERSION = 'forge-v27';
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -523,7 +526,7 @@ const NAV_ITEMS = [
 
 const MORE_ROUTES = new Set(['home', 'workouts', 'goals', 'bodyfat', 'achievements', 'pet', 'faq', 'themes', 'utilities', 'more']);
 function navItemIsActive(key) {
-  return UI.route === key || (key === 'more' && MORE_ROUTES.has(UI.route));
+  return UI.route === key || (key === 'yourpage' && UI.route === 'habits') || (key === 'more' && MORE_ROUTES.has(UI.route));
 }
 
 function doRender() {
@@ -577,6 +580,7 @@ function doRender() {
   else if (UI.route === 'progress') main.innerHTML = renderProgress();
   else if (UI.route === 'goals') main.innerHTML = renderGoals();
   else if (UI.route === 'food') main.innerHTML = renderFood();
+  else if (UI.route === 'habits') main.innerHTML = renderHabits();
   else if (UI.route === 'bodyfat') main.innerHTML = renderBodyFat();
   else if (UI.route === 'achievements') main.innerHTML = renderAchievements();
   else if (UI.route === 'pet') main.innerHTML = STATE.pet.enabled ? renderPetTab() : renderHome();
@@ -603,6 +607,7 @@ function doRender() {
 
 function renderMore() {
   const items = [
+    { route: 'habits', title: 'Habits', copy: 'Build small routines, check in once, and see your momentum.', icon: '✓' },
     { route: 'workouts', title: 'Workout plan', copy: 'Build reusable training days and starter routines.', icon: '▤' },
     { route: 'home', title: 'Profile & calories', copy: 'Update your stats and review the maintenance estimate.', icon: '◎' },
     { route: 'goals', title: 'Weight goal', copy: 'Choose a direction, pace, and starting calorie target.', icon: '◇' },

@@ -172,6 +172,7 @@ function renderUtilities() {
 }
 
 const DAY_SHARE_OPTIONS = [
+  { key: 'habits', label: 'Habits' },
   { key: 'steps', label: 'Steps' },
   { key: 'nutrition', label: 'Calories & macros' },
   { key: 'workout', label: 'Completed exercises' },
@@ -226,6 +227,13 @@ function buildDayShareSnapshot(date, sections) {
   const selected = new Set(sections || []);
   if (!selected.size) return '';
   const lines = [`Forge day snapshot — ${date}`];
+  if (selected.has('habits')) {
+    const scheduled = typeof habitsScheduledForDate === 'function' ? habitsScheduledForDate(date) : [];
+    const completed = scheduled.filter(habit => habitIsDone(habit, date));
+    lines.push('', 'HABITS', ...(scheduled.length
+      ? scheduled.map(habit => `${habitIsDone(habit, date) ? '✓' : '○'} ${habit.name}${habit.target > 1 ? ` (${habitCount(habit.id, date)}/${habit.target})` : ''}`)
+      : ['No habits scheduled']), scheduled.length ? `${completed.length} of ${scheduled.length} complete` : '');
+  }
   if (selected.has('steps')) {
     const steps = STATE.dailyCheckins[date]?.steps;
     lines.push('', 'STEPS', steps == null ? 'No step check-in' : `${Number(steps).toLocaleString()} steps`);

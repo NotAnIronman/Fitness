@@ -1,7 +1,7 @@
 {
   "name": "Forge - Training Log",
   "short_name": "Forge",
-  "description": "Workout planner, TDEE/BMR calculator, weight goal tracker, and food log. Runs entirely in your browser.",
+  "description": "Local-first workout, nutrition, progress, and habit tracking. Runs entirely in your browser.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

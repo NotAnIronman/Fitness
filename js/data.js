@@ -573,6 +573,12 @@ const ACHIEVEMENTS = [
   { id: 'personal_record',    name: 'Personal Record',      desc: 'Beat your starting weight on any exercise.',             category: 'Workouts', points: 35,check: ctx => ctx.hasPersonalRecord },
   { id: 'plan_builder',       name: 'Planner',              desc: 'Build a workout plan with 3+ active training days.',     category: 'Workouts', points: 20,check: ctx => ctx.activeplanDays >= 3, progress: ctx => ({ current: Math.min(ctx.activeplanDays, 3), target: 3 }) },
 
+  // ---- Habits ----
+  { id: 'first_habit_check', name: 'First Repeat', desc: 'Complete your first habit check-in.', category: 'Habits', points: 10, check: ctx => ctx.habitCompletions >= 1 },
+  { id: 'habit_streak_7', name: 'Finding a Rhythm', desc: 'Complete one habit on 7 scheduled days in a row.', category: 'Habits', points: 25, check: ctx => ctx.habitBestStreak >= 7, progress: ctx => ({ current: Math.min(ctx.habitBestStreak, 7), target: 7 }) },
+  { id: 'habit_days_30', name: 'Kept Showing Up', desc: 'Complete habits on 30 different days.', category: 'Habits', points: 60, check: ctx => ctx.habitCompletionDays >= 30, progress: ctx => ({ current: Math.min(ctx.habitCompletionDays, 30), target: 30 }) },
+  { id: 'habit_checks_100', name: 'Built by Repetition', desc: 'Complete 100 total habit check-ins.', category: 'Habits', points: 100, check: ctx => ctx.habitCompletions >= 100, progress: ctx => ({ current: Math.min(ctx.habitCompletions, 100), target: 100 }) },
+
   // ---- Nutrition ----
   { id: 'first_meal',         name: 'First Bite',           desc: 'Log your first food item.',                              category: 'Nutrition', points: 10,check: ctx => ctx.totalFoodDaysLogged >= 1 },
   { id: 'on_target_day',      name: 'Right on Target',      desc: 'Log food within 10% of your target for one day.',        category: 'Nutrition', points: 15,check: ctx => ctx.onTargetDays >= 1 },

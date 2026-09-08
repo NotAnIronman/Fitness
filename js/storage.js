@@ -66,7 +66,7 @@ function defaultState() {
       onboardingGuideCollapsed: false,
       foodGoalTimelineCollapsed: false,
       weeklyMovementCollapsed: false,
-      dayShareSections: ['steps', 'nutrition', 'workout', 'pet'],
+      dayShareSections: ['habits', 'steps', 'nutrition', 'workout', 'pet'],
       // Your Page stores preferences only. Empty order means the built-in
       // order; hidden/sizing entries are the user's deviations from it.
       yourPageTileOrder: [],
@@ -132,6 +132,14 @@ function defaultState() {
     // number and one subjective 1-5 readiness rating per calendar day.
     dailyRecovery: {
       // 'YYYY-MM-DD': { sleepHours: 7.5, readiness: 4 }
+    },
+    habits: {
+      items: [
+        // { id, name, icon, cue, difficulty, target, days: [0..6], createdDate, archivedAt }
+      ],
+      log: {
+        // 'YYYY-MM-DD': { habitId: completedCount }
+      },
     },
     // Pet companion is on for fresh installs because it guides first-run setup.
     // The hidden Themes setting remains available as the opt-out.
@@ -287,7 +295,7 @@ function sanitizeJsonValue(value, depth) {
 function normalizeStateShape(state) {
   const def = defaultState();
   if (!isPlainObject(state)) throw new Error('Backup root must be an object.');
-  const objectFields = ['profile', 'goal', 'workoutPlan', 'workoutLog', 'foodLog', 'bodyFat', 'uiPrefs', 'onboarding', 'usdaCache', 'usdaPortionsCache', 'dailyCheckins', 'dailyWater', 'dailyRecovery', 'pet', 'achievements', 'theme'];
+  const objectFields = ['profile', 'goal', 'workoutPlan', 'workoutLog', 'foodLog', 'bodyFat', 'uiPrefs', 'onboarding', 'usdaCache', 'usdaPortionsCache', 'dailyCheckins', 'dailyWater', 'dailyRecovery', 'habits', 'pet', 'achievements', 'theme'];
   objectFields.forEach(key => { if (!isPlainObject(state[key])) state[key] = def[key]; });
   const arrayFields = ['weightLog', 'recentExercises', 'recentFoods', 'savedMeals', 'foodIndexPool'];
   arrayFields.forEach(key => { if (!Array.isArray(state[key])) state[key] = def[key]; });
@@ -386,14 +394,48 @@ function normalizeStateShape(state) {
   state.profile.weightKg = weightKg >= 20 && weightKg <= 400 ? weightKg : null;
   state.goal.focus = ['general', 'fat_loss', 'weight_gain', 'muscle_gain', 'recomposition', 'performance'].includes(state.goal.focus) ? state.goal.focus : 'general';
   const shareSections = Array.isArray(state.uiPrefs.dayShareSections) ? state.uiPrefs.dayShareSections : def.uiPrefs.dayShareSections;
-  state.uiPrefs.dayShareSections = [...new Set(shareSections.filter(section => ['steps', 'nutrition', 'workout', 'recovery', 'pet'].includes(section)))];
+  state.uiPrefs.dayShareSections = [...new Set(shareSections.filter(section => ['habits', 'steps', 'nutrition', 'workout', 'recovery', 'pet'].includes(section)))];
   state.goal.trainingExperience = ['new', 'consistent', 'advanced'].includes(state.goal.trainingExperience) ? state.goal.trainingExperience : 'new';
   state.dailyCheckins = normalizeDailyCheckins(state.dailyCheckins);
   state.dailyRecovery = normalizeDailyRecovery(state.dailyRecovery);
+  state.habits = normalizeHabits(state.habits);
   state.theme.mobileHeaderScale = Math.max(0.9, Math.min(1.4, Number(state.theme.mobileHeaderScale) || 1.08));
   state.workoutPlan.restTimerSeconds = Math.max(10, Math.min(900, Number(state.workoutPlan.restTimerSeconds) || 90));
   state.workoutPlan.stepsPerDay = Math.max(0, Math.min(200000, Number(state.workoutPlan.stepsPerDay) || 0));
   return state;
+}
+
+function normalizeHabits(habits) {
+  const source = isPlainObject(habits) ? habits : {};
+  const seen = new Set();
+  const items = (Array.isArray(source.items) ? source.items : []).slice(0, 100).filter(isPlainObject).map(item => {
+    const id = safeStateId(item.id);
+    const days = [...new Set((Array.isArray(item.days) ? item.days : [0,1,2,3,4,5,6]).map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6))];
+    return {
+      id,
+      name: String(item.name || 'Habit').trim().slice(0, 80) || 'Habit',
+      icon: String(item.icon || '✓').slice(0, 8),
+      cue: String(item.cue || '').trim().slice(0, 100),
+      difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'easy',
+      target: Math.max(1, Math.min(20, Math.round(Number(item.target) || 1))),
+      days: days.length ? days.sort((a, b) => a - b) : [0,1,2,3,4,5,6],
+      createdDate: /^\d{4}-\d{2}-\d{2}$/.test(item.createdDate) ? item.createdDate : dateToLocalISO(new Date()),
+      archivedAt: /^\d{4}-\d{2}-\d{2}$/.test(item.archivedAt) ? item.archivedAt : null,
+    };
+  }).filter(item => !seen.has(item.id) && seen.add(item.id));
+  const validIds = new Set(items.map(item => item.id));
+  const log = {};
+  Object.entries(isPlainObject(source.log) ? source.log : {}).slice(-5000).forEach(([date, values]) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isPlainObject(values)) return;
+    const entry = {};
+    Object.entries(values).slice(0, 100).forEach(([id, count]) => {
+      if (!validIds.has(id)) return;
+      const value = Math.max(0, Math.min(20, Math.round(Number(count) || 0)));
+      if (value) entry[id] = value;
+    });
+    if (Object.keys(entry).length) log[date] = entry;
+  });
+  return { items, log };
 }
 
 function normalizeDailyRecovery(log) {

@@ -1,13 +1,13 @@
 # Forge Training Log
 
-Forge is a local-first fitness tracker for people who want useful planning and
-logging without creating an account or surrendering a health history. It runs as
+Forge is a local-first fitness, nutrition, and habit tracker for people who want
+useful planning and logging without creating an account or surrendering a health history. It runs as
 a website or installable PWA and keeps its app state in the current browser.
 
 ## Product direction
 
-The daily loop should be obvious: open **Today**, log a workout or steps, log
-food, and review progress. Setup and occasional tools live under **More**. The
+The daily loop should be obvious: open **Today**, check off habits, log a workout
+or steps, log food, and review progress. Setup and occasional tools live under **More**. The
 app should give a useful starting estimate while showing where uncertainty comes
 from; it should never present calculated calories, exercise burn, body fat, or a
 projected weight path as a direct measurement.
@@ -52,6 +52,20 @@ Primary references:
 - NIDDK Body Weight Planner research: https://www.niddk.nih.gov/research-funding/at-niddk/labs-branches/laboratory-biological-modeling/integrative-physiology-section/research/body-weight-planner
 - USDA FoodData Central API: https://fdc.nal.usda.gov/api-guide/
 
+## Habit design
+
+Habits use scheduled-day streaks: a rest day is skipped, and an unfinished habit
+today does not erase yesterday's run while there is still time to act. The app
+encourages a small action tied to a repeatable cue and avoids a false universal
+deadline for "forming" a habit. Habit records, including archived history, stay
+inside the same local backup as every other Forge tracker.
+
+Primary references:
+
+- Lally et al., 2010: https://doi.org/10.1002/ejsp.674
+- Wood & Rünger, 2016: https://pubmed.ncbi.nlm.nih.gov/26361052/
+- Berry et al., 2021: https://pubmed.ncbi.nlm.nih.gov/34192411/
+
 ## Running locally
 
 Serve the folder over HTTP rather than opening `index.html` with `file://` so the
@@ -61,10 +75,11 @@ service worker and browser APIs behave normally:
 node tests/dev-server.js
 ```
 
-Run the calculation checks with:
+Run the calculation and habit checks with:
 
 ```powershell
 node tests/calculations.test.js
+node tests/habits.test.js
 ```
 
 When app files change, bump both `APP_VERSION` in `js/app.js` and

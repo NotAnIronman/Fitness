@@ -6,6 +6,7 @@
    ============================================================ */
 
 const YOUR_PAGE_TILES = [
+  { id: 'habits', name: 'Habits', render: () => renderHabitTodayCard(todayISO(), true) },
   { id: 'steps', name: 'Steps', render: renderYourStepsTile },
   { id: 'workout', name: 'Today\'s workout', render: renderYourWorkoutTile },
   { id: 'nutrition', name: 'Calories & macros', render: renderYourNutritionTile },
@@ -55,7 +56,8 @@ function renderYourPage() {
       <p class="page-sub">The things you are most likely to do right now.</p>
     </div>
     <div class="quick-action-row" aria-label="Quick actions">
-      <button class="quick-action primary" onclick="navigate('log')"><strong>Log workout</strong><span>Steps and recovery are here too</span></button>
+      <button class="quick-action primary" onclick="navigate('habits')"><strong>Check habits</strong><span>One tap to keep momentum</span></button>
+      <button class="quick-action" onclick="navigate('log')"><strong>Log workout</strong><span>Steps and recovery are here too</span></button>
       <button class="quick-action" onclick="navigate('food')"><strong>Log food</strong><span>Search, recent foods, or scan</span></button>
       <button class="quick-action" onclick="navigate('goals')"><strong>Log weight</strong><span>Update your trend</span></button>
     </div>

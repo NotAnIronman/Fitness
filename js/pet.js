@@ -44,6 +44,9 @@ function evaluatePetDailyRewards() {
       if (Math.abs(kcal - target) <= target * 0.15) grant('calorie', 10, 'Stayed on calorie target');
     }
   }
+  if (typeof habitDaySummary === 'function' && habitDaySummary(date).allDone) {
+    grant('habits', 5, 'Completed today\'s habits');
+  }
 
   STATE.pet.rewardedDates[date] = record;
 

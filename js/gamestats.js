@@ -106,6 +106,11 @@ function buildGameContext() {
   }) != null;
   const guidedTourComplete = !!STATE.onboarding.completedAt && !(STATE.onboarding.skippedSteps || []).length;
 
+  // ---- Habits ----
+  const habitStats = typeof getHabitStats === 'function'
+    ? getHabitStats()
+    : { totalCompletions: 0, completionDays: 0, bestStreak: 0 };
+
   // ---- Pet ----
   const hasPet = !!STATE.pet.species;
   const ownedItemsCount = STATE.pet.ownedItems.length;
@@ -127,6 +132,7 @@ function buildGameContext() {
     totalFoodDaysLogged, onTargetDays, onTargetStreak, savedMealsCount, maxItemsInADay,
     weightLogCount, weightStreak, hasGoal, goalReached,
     profileComplete, bodyFatCalculated, guidedTourComplete,
+    habitCompletions: habitStats.totalCompletions, habitCompletionDays: habitStats.completionDays, habitBestStreak: habitStats.bestStreak,
     hasPet, ownedItemsCount, ownsCrown, slotsEquipped, totalPointsEarned,
     silverOrHigherStates, goldOrHigherStates, platinumStates,
   };
