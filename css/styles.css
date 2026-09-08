@@ -1726,10 +1726,20 @@ hr.div {
 .food-combine-actions .field, .barcode-manual-entry .field { flex: 1 1 220px; margin-bottom: 0; }
 .food-combine-check { display: inline-flex; align-items: center; padding: 8px; }
 .food-row-selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
-.barcode-video { width: 100%; max-height: 340px; border-radius: calc(var(--radius)*.5); background: #000; object-fit: contain; }
+.barcode-scanner-panel { margin-bottom: 14px; padding: 14px; border: 1px solid var(--border); border-radius: calc(var(--radius) * .6); background: var(--bg); }
+.barcode-status { min-height: 21px; margin: 0 0 10px; color: var(--text); font-size: 13px; line-height: 1.5; }
+.barcode-video-shell { position: relative; overflow: hidden; border-radius: calc(var(--radius) * .5); background: #000; }
+.barcode-video { display: block; width: 100%; min-height: 220px; max-height: 380px; background: #000; object-fit: cover; }
+.barcode-aim { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.barcode-aim span { position: relative; width: min(78%, 440px); height: clamp(92px, 26%, 132px); border: 2px solid rgba(255,255,255,.9); border-radius: 12px; box-shadow: 0 0 0 999px rgba(0,0,0,.22); }
+.barcode-aim span::after { content: ''; position: absolute; left: 8%; right: 8%; top: 50%; height: 2px; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 .barcode-camera-tools { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-top: 10px; }
 .barcode-camera-tools .field { min-width: 150px; flex: 1; margin: 0; }
+.barcode-primary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .barcode-manual-entry { display: flex; gap: 8px; margin-top: 12px; margin-bottom: 0; }
+.barcode-diagnostics { margin-top: 12px; color: var(--text-dim); }
+.barcode-diagnostics summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 12px; }
+.barcode-diagnostics pre { max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; border: 1px solid var(--border); border-radius: calc(var(--radius) * .5); background: var(--surface); color: var(--text-dim); font: 10.5px/1.5 var(--font-mono); }
 .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 /* ============================================================
@@ -2137,6 +2147,13 @@ hr.div {
   .habit-day-picker small { display: none; }
   .habit-row { grid-template-columns: 50px minmax(0, 1fr); }
   .habit-counter, .habit-streak { grid-column: 2; justify-self: start; }
+  .barcode-scanner-panel { padding: 10px; }
+  .barcode-video { min-height: 260px; max-height: 52vh; }
+  .barcode-primary-actions > .btn { flex: 1 1 130px; }
+  .barcode-camera-tools { align-items: stretch; }
+  .barcode-camera-tools .field, .barcode-camera-tools > .btn { flex: 1 1 100%; }
+  .barcode-manual-entry { flex-direction: column; align-items: stretch; }
+  .barcode-manual-entry .btn { width: 100%; }
   .card-title { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
   .date-nav-row { width: 100%; max-width: none !important; }
 }

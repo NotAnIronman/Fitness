@@ -59,6 +59,7 @@ let UI = {
   barcodeScannerOpen: false,
   barcodeStatus: '',
   barcodeDeviceId: '',
+  barcodeDiagnostics: '',
   petShopGroupOpen: {},
   petChangePanelOpen: false,
   petCustomizeOpen: false,
@@ -80,7 +81,7 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v27';
+const APP_VERSION = 'forge-v28';
 
 function todayISO() {
   return dateToLocalISO(new Date());

@@ -66,6 +66,18 @@ Primary references:
 - Wood & Rünger, 2016: https://pubmed.ncbi.nlm.nih.gov/26361052/
 - Berry et al., 2021: https://pubmed.ncbi.nlm.nih.gov/34192411/
 
+## Barcode reliability
+
+Live barcode scanning uses the browser's native detector when it exists and the
+bundled ZXing decoder as a cross-browser fallback. Forge asks for a moderate
+720p feed, tries progressively simpler camera constraints, enables continuous
+focus where supported, exposes every reported camera/lens, and reports useful
+diagnostics instead of a generic failure. **Scan a photo** uses the device's
+normal camera autofocus and decodes the image locally; it does not upload it.
+
+On multi-camera phones, a browser may initially select an ultrawide rear lens
+that cannot focus closely. Try **Refocus**, **Try next camera**, or take a photo.
+
 ## Running locally
 
 Serve the folder over HTTP rather than opening `index.html` with `file://` so the
@@ -80,6 +92,7 @@ Run the calculation and habit checks with:
 ```powershell
 node tests/calculations.test.js
 node tests/habits.test.js
+node tests/barcode.test.js
 ```
 
 When app files change, bump both `APP_VERSION` in `js/app.js` and
