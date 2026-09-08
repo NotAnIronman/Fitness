@@ -87,7 +87,7 @@ function renderWorkouts() {
         </div>
       </div>
       <div class="card ${onboardingStepIs('starting_steps') ? 'onboarding-focus' : ''}">
-        <div class="stat-label">Starting step estimate ${tip('ⓘ', 'This is just a starting point', 'Once you check in your steps a few times on the Workout Log page, your real rolling average takes over completely. This number only matters before that history builds up.')}</div>
+        <div class="stat-label">Starting step estimate ${tip(appIcon('learn', ''), 'This is just a starting point', 'Once you check in your steps a few times on the Workout Log page, your real rolling average takes over completely. This number only matters before that history builds up.')}</div>
         <input aria-label="Starting daily step estimate" type="number" data-focus-id="steps-per-day" min="0" max="200000" step="500" value="${STATE.workoutPlan.stepsPerDay}" onchange="updateSteps(this.value)" onkeydown="if(event.key==='Enter') this.blur()" style="margin-top:6px;">
       </div>
     </div>
@@ -102,7 +102,7 @@ function renderWorkouts() {
     <div class="card">
       <div class="card-title">
         Steps: baseline vs. bonus
-        ${tip('ⓘ', 'Why steps are split this way', `Your activity level already assumes a baseline step count is happening every day, that's part of what sets your TDEE multiplier. Counting all your steps again on top of that would double count. Only steps above the baseline convert to a bonus.`)}
+        ${tip(appIcon('learn', ''), 'Why steps are split this way', `Forge's sedentary baseline already assumes some daily movement. Counting all steps again would overlap, so only steps above the 3,000-step starting baseline enter the separate walking estimate. The threshold and per-step conversion are modeling assumptions, not an individual measurement.`)}
       </div>
       <div class="grid grid-3">
         <div class="stat"><div class="stat-label">Your avg steps/day</div><div class="stat-value" style="font-size:20px;">${stepBonus.stepsPerDay.toLocaleString()}</div></div>
@@ -113,7 +113,7 @@ function renderWorkouts() {
 
     ${notice('cardio-step-overlap-general', `Logging running or walking as a workout below can overlap with the step count above. If a walk/run is already part of your normal daily steps, log it in one place only.`, { maxLevel: 3, defaultOpenThrough: 1, brief: 'Avoid double counting: if a walk or run is already included in your step total, do not also log the same activity as extra exercise.' })}
 
-    ${notice('strength-consistency-2026', `<strong>Keep strength training simple enough to repeat:</strong> current evidence supports many combinations of loads, sets, and equipment. Consistency is the biggest step up from doing none; multiple sets can help muscle growth and heavier loads tend to favor maximal strength, but training to failure and advanced programming are not required for most healthy adults.`, { maxLevel: 2, defaultOpenThrough: 1, brief: '<strong>Repeatable beats elaborate:</strong> multiple sets can support muscle growth and heavier loads favor maximal strength, but failure training and advanced programming are optional.' })}
+    ${notice('strength-consistency-2026', `<strong>Keep strength training simple enough to repeat:</strong> current evidence supports many combinations of loads, sets, and equipment. Consistency is the biggest step up from doing none; multiple sets can help muscle growth and heavier loads tend to favor maximal strength, but training to failure and advanced programming are not required for most healthy adults. ${evidenceLinks(['resistanceTraining'])}`, { maxLevel: 2, defaultOpenThrough: 1, brief: '<strong>Repeatable beats elaborate:</strong> multiple sets can support muscle growth and heavier loads favor maximal strength, but failure training and advanced programming are optional.' })}
 
     ${notice('weight-vs-calories-tip', `
       <strong>Heads up on what "burning more calories" actually depends on:</strong> lifting heavier doesn't directly burn a lot
@@ -236,10 +236,10 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
     return `
       <div class="exercise-block">
         <div class="exercise-block-header">
-          <div class="name" style="${allDone ? 'opacity:0.55;' : ''}">${exerciseName}${allDone ? ' \u2713' : ''}</div>
+          <div class="name" style="${allDone ? 'opacity:0.55;' : ''}">${exerciseName}${allDone ? ` ${appIcon('check', '')}` : ''}</div>
           <div class="kcal">${kcalTip}</div>
           ${target.scope === 'log' ? `<button class="icon-btn" onclick="quickStartRestTimer('Rest before next exercise')" title="Start rest timer">\u23F1</button>` : ''}
-          <button class="icon-btn" onclick="${editAttr}" title="Edit">\u270E</button>
+          <button class="icon-btn" onclick="${editAttr}" title="Edit" aria-label="Edit exercise">${appIcon('note', '')}</button>
           <button class="icon-btn" onclick="${removeAttr}" title="Remove">x</button>
         </div>
         ${setRows}
@@ -261,12 +261,12 @@ function renderExerciseRow(e, bw, target, showCheckbox) {
     <div class="exercise-row">
       ${showCheckbox ? `<input type="checkbox" ${e.completed ? 'checked' : ''} onchange="toggleLogExerciseDone('${e.id}')" style="width:auto; flex-shrink:0;" title="Mark done">` : ''}
       <div style="${e.completed ? 'opacity:0.55;' : ''}">
-        <div class="name">${exerciseName}${e.completed ? ' \u2713' : ''}</div>
+        <div class="name">${exerciseName}${e.completed ? ` ${appIcon('check', '')}` : ''}</div>
         <div class="meta">${meta} . ${ex.bodyPart || ex.category || 'Custom'}</div>
       </div>
       <div class="kcal">${kcalTip}</div>
       ${target.scope === 'log' && ex.category === 'Strength' ? `<button class="icon-btn" onclick="quickStartRestTimer(${inlineArg(`Rest, ${ex.name}`)})" title="Start rest timer" aria-label="Start rest timer after ${escapeAttr(ex.name)}">\u23F1</button>` : ''}
-      <button class="icon-btn" onclick="${editAttr}" title="Edit">\u270E</button>
+      <button class="icon-btn" onclick="${editAttr}" title="Edit" aria-label="Edit exercise">${appIcon('note', '')}</button>
       <button class="icon-btn" onclick="${removeAttr}" title="Remove">x</button>
     </div>
   `;
@@ -294,7 +294,8 @@ function renderCopyDayMenu(day) {
 function renderAddExerciseForm(target) {
   const editing = UI.editingExercise;
   const editingEntry = editing ? findExerciseEntry(editing) : null;
-  const filtered = EXERCISE_LIBRARY.filter(e => e.bodyPart === UI.addExerciseCategory);
+  const query = String(UI.exerciseQuery || '').trim().toLowerCase();
+  const filtered = EXERCISE_LIBRARY.filter(e => (UI.addExerciseCategory === 'All' || e.bodyPart === UI.addExerciseCategory) && (!query || e.name.toLowerCase().includes(query)));
   const recents = STATE.recentExercises;
 
   return `
@@ -310,6 +311,7 @@ function renderAddExerciseForm(target) {
 
       <p class="hint" style="margin-bottom:8px;">Filter by body part:</p>
       <div class="chip-row" style="margin-bottom:12px;">
+        <button class="chip ${UI.addExerciseCategory === 'All' ? 'active' : ''}" onclick="setExerciseCategory('All')">All</button>
         ${BODY_PARTS.map(c => `<button class="chip ${UI.addExerciseCategory === c ? 'active' : ''}" onclick="setExerciseCategory('${c}')">${c}</button>`).join('')}
         <button class="chip ${UI.addExerciseCategory === 'Custom' ? 'active' : ''}" onclick="setExerciseCategory('Custom')">Custom</button>
       </div>
@@ -319,13 +321,14 @@ function renderAddExerciseForm(target) {
       ` : ''}
 
       ${UI.addExerciseCategory === 'Custom' ? renderCustomExerciseForm(target, editingEntry) : `
+        <div class="field exercise-search-field"><label for="exercise-search">Search exercises</label><input id="exercise-search" type="search" placeholder="Try row, squat, cycling..." value="${escapeAttr(UI.exerciseQuery || '')}" oninput="setExerciseQuery(this.value)"></div>
         <div class="field">
           <label>Exercise</label>
           <select id="ex-select" data-focus-id="ex-select">
-            ${filtered.map(e => `<option value="${e.id}" ${editingEntry && editingEntry.exerciseId === e.id ? 'selected' : ''}>${e.name}</option>`).join('')}
+            ${filtered.map(e => `<option value="${e.id}" ${editingEntry && editingEntry.exerciseId === e.id ? 'selected' : ''}>${e.name} · ${e.bodyPart}</option>`).join('')}
           </select>
         </div>
-        <div id="ex-input-fields">${renderExerciseInputFields(filtered.find(e => editingEntry && e.id === editingEntry.exerciseId) || filtered[0], editingEntry)}</div>
+        ${filtered.length ? `<div id="ex-input-fields">${renderExerciseInputFields(filtered.find(e => editingEntry && e.id === editingEntry.exerciseId) || filtered[0], editingEntry)}</div>` : '<div class="empty-state">No matching exercise. Try another search or choose Custom.</div>'}
         <div style="display:flex; gap:8px; margin-top:10px;">
           <button class="btn btn-primary" onclick="submitExerciseForm('${target.scope}', '${target.dayId || ''}')">${editing ? 'Save changes' : 'Add'}</button>
           <button class="btn btn-ghost" onclick="closeExerciseForm('${target.scope}')">Cancel</button>
@@ -488,7 +491,8 @@ function updateSteps(val) {
 function openAddExercise(dayId) {
   UI.addExerciseOpenFor = dayId;
   UI.editingExercise = null;
-  UI.addExerciseCategory = 'Chest';
+  UI.addExerciseCategory = 'All';
+  UI.exerciseQuery = '';
   _weightIsPerSide = false;
   render();
 }
@@ -502,6 +506,10 @@ function setExerciseCategory(cat) {
   UI.addExerciseCategory = cat;
   if (!UI.editingExercise) _weightIsPerSide = false;
   render();
+}
+function setExerciseQuery(value) {
+  UI.exerciseQuery = String(value || '').slice(0, 80);
+  renderSoon(180);
 }
 
 function findExerciseEntry(editing) {

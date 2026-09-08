@@ -24,23 +24,6 @@ const MACRO_FIT_META = {
   neutral: { label: 'Not scored', className: 'macro-fit-neutral' },
 };
 
-function macroPlanShares() {
-  const guidance = getGoalGuidance();
-  const macroPlan = getGoalMacroPlan(getFoodTargetCalories());
-  if (!macroPlan || !guidance.proteinLowGrams) return null;
-  const protein = (guidance.proteinLowGrams + guidance.proteinHighGrams) / 2 * 4;
-  const carbs = macroPlan.carbEstimateGrams * 4;
-  const fat = (macroPlan.fatLowGrams + macroPlan.fatHighGrams) / 2 * 9;
-  const total = protein + carbs + fat;
-  return total > 0 ? { protein: protein / total, carbs: carbs / total, fat: fat / total } : null;
-}
-
-function macroSharesFromGrams(protein, carbs, fat) {
-  const energy = { protein: Math.max(0, Number(protein) || 0) * 4, carbs: Math.max(0, Number(carbs) || 0) * 4, fat: Math.max(0, Number(fat) || 0) * 9 };
-  const total = energy.protein + energy.carbs + energy.fat;
-  return total > 0 ? { protein: energy.protein / total, carbs: energy.carbs / total, fat: energy.fat / total, energy: total } : null;
-}
-
 function getFoodMacroFit(food) {
   const guidance = getGoalGuidance();
   const calorieTarget = getFoodTargetCalories();
@@ -145,7 +128,7 @@ function renderFood() {
         <div class="card-title">
           Log food
           <div style="display:flex; gap:6px;">
-            <button class="btn btn-sm" onclick="openBarcodeScanner()">📷 Scan barcode</button>
+            <button class="btn btn-sm" onclick="openBarcodeScanner()">${appIcon('camera', '')} Scan barcode</button>
             <button class="btn btn-sm" onclick="openMealBuilder()">+ Build a meal</button>
           </div>
         </div>
@@ -201,8 +184,8 @@ function renderFood() {
         ${goalAdjustedTarget ? `
           <div class="stat" style="margin-bottom:10px;">
             <div class="stat-label">Midpoint</div>
-            <div class="stat-value accent">${Math.round(goalAdjustedTarget)}<span class="unit">kcal</span></div>
-            <div class="hint">Estimated range ${Math.round(targetContext.targetLow)}-${Math.round(targetContext.targetHigh)} kcal</div>
+            <div class="stat-value accent">${calculationTip(`${Math.round(goalAdjustedTarget)}<span class="unit">kcal</span>`, 'How the calorie target is calculated', `Estimated maintenance midpoint plus the daily energy adjustment implied by your selected weight and date. This is a starting prescription, not a measured requirement; Forge will not prescribe below its adult safety floor.`, ['mifflin','energyPlanner','gradualLoss'], 'Published BMR + Forge planning model')}</div>
+            <div class="hint">${calculationTip(`Estimated range ${Math.round(targetContext.targetLow)}-${Math.round(targetContext.targetHigh)} kcal`, 'Why the target has a range', 'The same goal adjustment is applied to both ends of your maintenance range. Treat the midpoint as a consistent starting point and the range as uncertainty—not a daily pass/fail zone.', ['energyPlanner'], 'Forge uncertainty allowance')}</div>
           </div>
           <div class="stat">
             <div class="stat-label">Logged so far</div>
@@ -232,7 +215,7 @@ function renderFood() {
                 </div>
               </div>
               <div class="kcal">${Math.round(e.kcal * e.qty)} kcal</div>
-              <button class="icon-btn" onclick="openFoodEdit(${i})" title="Edit">✎</button>
+              <button class="icon-btn" onclick="openFoodEdit(${i})" title="Edit" aria-label="Edit food">${appIcon('note', '')}</button>
               <button class="icon-btn" onclick="removeFoodEntry(${i})" title="Remove entirely">x</button>
             </div>
           `).join('')}
@@ -267,9 +250,9 @@ function renderGoalNutritionGuidance(totals) {
   return `<div class="card goal-nutrition-card">
     <div class="card-title">${escapeAttr(guidance.focus.label)} macro plan</div>
     <div class="grid grid-3">
-      <div class="stat ${status.protein.className}"><div class="stat-label">Protein · ${status.protein.label}</div><div class="stat-value" style="font-size:20px;">${protein}<span class="unit">g logged</span></div><div class="hint">Plan ${guidance.proteinLowGrams}-${guidance.proteinHighGrams} g · ${formatProteinRateRange(guidance.proteinMin, guidance.proteinMax)}</div></div>
-      <div class="stat ${status.carbs.className}"><div class="stat-label">Carbohydrate · ${status.carbs.label}</div><div class="stat-value" style="font-size:20px;">${carbs}<span class="unit">g logged</span></div><div class="hint">Flexible start ~${macroPlan.carbEstimateGrams} g</div></div>
-      <div class="stat ${status.fat.className}"><div class="stat-label">Fat · ${status.fat.label}</div><div class="stat-value" style="font-size:20px;">${fat}<span class="unit">g logged</span></div><div class="hint">Plan ${macroPlan.fatLowGrams}-${macroPlan.fatHighGrams} g (${macroPlan.fatMinPct}-${macroPlan.fatMaxPct}% kcal)</div></div>
+      <div class="stat ${status.protein.className}"><div class="stat-label">Protein · ${status.protein.label}</div><div class="stat-value" style="font-size:20px;">${protein}<span class="unit">g logged</span></div><div class="hint">${calculationTip(`Plan ${guidance.proteinLowGrams}-${guidance.proteinHighGrams} g · ${formatProteinRateRange(guidance.proteinMin, guidance.proteinMax)}`, 'How the protein range is calculated', `${formatWeightKg(guidance.proteinReferenceKg, 1)} reference weight × ${formatProteinRateRange(guidance.proteinMin, guidance.proteinMax)}. Forge uses a range because training status, energy balance, age, preference, and individual response vary.`, ['protein'])}</div></div>
+      <div class="stat ${status.carbs.className}"><div class="stat-label">Carbohydrate · ${status.carbs.label}</div><div class="stat-value" style="font-size:20px;">${carbs}<span class="unit">g logged</span></div><div class="hint">${calculationTip(`Flexible start ~${macroPlan.carbEstimateGrams} g`, 'How carbohydrate is allocated', 'Calories remaining after the midpoint protein allocation and midpoint fat allocation, divided by 4 kcal per gram. This is a flexible Forge allocation—not a universal carbohydrate requirement.', ['fatRange'], 'Forge allocation')}</div></div>
+      <div class="stat ${status.fat.className}"><div class="stat-label">Fat · ${status.fat.label}</div><div class="stat-value" style="font-size:20px;">${fat}<span class="unit">g logged</span></div><div class="hint">${calculationTip(`Plan ${macroPlan.fatLowGrams}-${macroPlan.fatHighGrams} g (${macroPlan.fatMinPct}-${macroPlan.fatMaxPct}% kcal)`, 'How the fat range is calculated', `${macroPlan.fatMinPct}–${macroPlan.fatMaxPct}% of target calories divided by 9 kcal per gram, aligned with the adult acceptable macronutrient distribution range.`, ['fatRange'])}</div></div>
     </div>
     ${(STATE.uiPrefs.knowledgeLevel || 0) >= 4 ? '' : `<p class="hint" style="margin-top:10px;">${escapeAttr(macroPlan.carbNote)} These are starting allocations, not pass/fail scores.</p>`}
   </div>`;
@@ -451,10 +434,10 @@ function renderWaterCard(date) {
       ${target ? `
         <div class="grid grid-2" style="margin-bottom:10px;">
           <div class="stat"><div class="stat-label">Logged today</div><div class="stat-value" style="font-size:20px;">${toDisplay(loggedMl)}</div></div>
-          <div class="stat"><div class="stat-label">Logging estimate</div><div class="stat-value accent" style="font-size:20px;">${toDisplay(target)}</div></div>
+          <div class="stat"><div class="stat-label">Logging estimate</div><div class="stat-value accent" style="font-size:20px;">${calculationTip(toDisplay(target), 'How the fluid estimate is calculated', `${p.weightKg.toFixed(1)} kg × 33 mL/kg = ${Math.round(target)} mL. This is a Forge logging convenience, not an official individual requirement. National Academies values describe total water from beverages and food; needs vary with sweat, heat, diet, health, pregnancy, and more.`, ['water'], 'Forge model assumption')}</div></div>
         </div>
         <div class="macro-bar-track" style="margin-bottom:12px;"><div class="macro-bar-fill" style="width:${pct}%; background:#38BDF8;"></div></div>
-        <p class="hint" style="margin-bottom:10px;">${expert ? `Fluid-log estimate: ${hydrationRate}; adjust for conditions and sweat.` : `A practical fluid-logging estimate of ~${hydrationRate}, not an official requirement. <a href="https://www.nationalacademies.org/read/10925/chapter/2" target="_blank" rel="noopener noreferrer">National Academies reference values</a> cover total water from food and every beverage; individual needs vary with heat, altitude, illness, pregnancy or breastfeeding, and sweat losses. Thirst is a useful day-to-day guide. Reach this logged-fluid target and your pet earns one water item.`}</p>
+        <p class="hint" style="margin-bottom:10px;">${expert ? `Fluid-log estimate: ${hydrationRate}; adjust for conditions and sweat.` : `A practical fluid-logging estimate of ~${hydrationRate}, not an official requirement. ${evidenceLinks(['water'])} Individual needs vary with heat, altitude, illness, pregnancy or breastfeeding, and sweat losses. Thirst is a useful day-to-day guide. Reach this logged-fluid target and your pet earns one water item.`}</p>
         <div class="chip-row">
           ${[250, 350, 500, 750].map(ml => `<button class="chip" onclick="logWater(${ml}, '${date}')">+${toDisplay(ml)}</button>`).join('')}
           <button class="chip" onclick="undoLastWater('${date}')">Undo last</button>

@@ -20,31 +20,11 @@
 const ZXING_BROWSER_CDN = 'js/vendor/zxing-browser.min.js';
 const OPEN_FOOD_FACTS_URL = 'https://world.openfoodfacts.org/api/v2/product/';
 
-let _zxingLoadPromise = null;
 function loadZXing() {
   if (typeof ZXingBrowser !== 'undefined') return Promise.resolve();
-  if (_zxingLoadPromise) return _zxingLoadPromise;
-  _zxingLoadPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = ZXING_BROWSER_CDN;
-    script.onload = () => {
-      // A script can "load" (network success) while still failing to define
-      // what we need (wrong build, blocked by an extension, etc.), so verify
-      // the actual global exists before declaring success.
-      if (typeof ZXingBrowser === 'undefined') {
-        _zxingLoadPromise = null;
-        reject(new Error('Scanner library loaded but did not initialize correctly.'));
-      } else {
-        resolve();
-      }
-    };
-    script.onerror = () => {
-      _zxingLoadPromise = null;
-      reject(new Error('Could not load the barcode scanning library (check your connection).'));
-    };
-    document.head.appendChild(script);
+  return loadOptionalScript(ZXING_BROWSER_CDN, 'ZXingBrowser').then(() => undefined).catch(error => {
+    throw new Error(`Could not load the barcode scanning library (${error.message})`);
   });
-  return _zxingLoadPromise;
 }
 
 let _zxingReader = null;

@@ -25,6 +25,38 @@ const TRAINING_EXPERIENCE_OPTIONS = [
   { key: 'advanced', label: 'Highly trained' },
 ];
 
+const SCIENCE_SOURCES = Object.freeze({
+  mifflin: { label: 'Mifflin-St Jeor resting-energy equation', url: 'https://pubmed.ncbi.nlm.nih.gov/2305711/', note: 'The original adult resting-energy prediction equation used by Forge.' },
+  energyPlanner: { label: 'NIDDK Body Weight Planner', url: 'https://www.niddk.nih.gov/research-funding/at-niddk/labs-branches/laboratory-biological-modeling/integrative-physiology-section/research/body-weight-planner', note: 'Shows why body-weight change is dynamic and why a fixed calories-per-pound rule is only a rough starting approximation.' },
+  compendium: { label: '2024 Adult Compendium of Physical Activities', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC10818145/', note: 'The source for published MET values used for duration-based activity estimates.' },
+  sessionRpe: { label: 'Foster session-RPE method', url: 'https://pubmed.ncbi.nlm.nih.gov/11708692/', note: 'Session training load is calculated as whole-session effort from 1–10 multiplied by duration in minutes.' },
+  sessionRpeReview: { label: 'Session-RPE validity review', url: 'https://pubmed.ncbi.nlm.nih.gov/29163016/', note: 'A systematic review of session-RPE as a practical internal training-load method.' },
+  repetitionsInReserve: { label: 'Repetitions-in-reserve scale validation', url: 'https://pubmed.ncbi.nlm.nih.gov/27531969/', note: 'Supports using repetitions in reserve as a practical resistance-training effort scale while acknowledging imperfect accuracy.' },
+  resistanceTraining: { label: '2026 ACSM resistance-training position stand', url: 'https://pubmed.ncbi.nlm.nih.gov/41843416/', note: 'A synthesis of 137 reviews on resistance-training prescription for healthy adults.' },
+  physicalActivity: { label: 'Physical Activity Guidelines for Americans', url: 'https://pubmed.ncbi.nlm.nih.gov/30418471/', note: 'Adults should build toward 150–300 minutes of moderate aerobic activity or 75–150 vigorous minutes weekly, plus strength work on at least two days.' },
+  protein: { label: 'Protein and resistance-training meta-analysis', url: 'https://pubmed.ncbi.nlm.nih.gov/28698222/', note: 'Average lean-mass benefits plateaued around 1.6 g/kg/day, with uncertainty between individuals.' },
+  fatRange: { label: 'National Academies macronutrient ranges', url: 'https://nap.nationalacademies.org/skim.php?chap=122-139&record_id=11537', note: 'The adult acceptable macronutrient distribution range for fat is 20–35% of energy.' },
+  water: { label: 'National Academies water intake report', url: 'https://nap.nationalacademies.org/read/10925/chapter/2', note: 'Adequate Intake concerns total water from food and beverages and varies with activity, heat, physiology, and diet.' },
+  sleep: { label: 'Adult sleep-duration consensus', url: 'https://pubmed.ncbi.nlm.nih.gov/26039963/', note: 'Most adults should sleep seven or more hours regularly; individual needs and circumstances vary.' },
+  habitFormation: { label: 'Habit formation in the real world', url: 'https://onlinelibrary.wiley.com/doi/10.1002/ejsp.674', note: 'Automaticity developed at very different rates; one missed opportunity did not materially derail formation in this study.' },
+  navyBodyFat: { label: 'U.S. Navy body-composition methods report', url: 'https://ntrl.ntis.gov/NTRL/dashboard/searchResults/titleDetail/ADA370158.xhtml', note: 'The circumference equation is a field estimate, not a direct measurement of body fat.' },
+  gradualLoss: { label: 'CDC: Steps for Losing Weight', url: 'https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html', note: 'CDC describes gradual, steady loss as more sustainable and emphasizes individualized support.' },
+});
+
+function evidenceLinks(sourceIds) {
+  const sources = (sourceIds || []).map(id => SCIENCE_SOURCES[id]).filter(Boolean);
+  if (!sources.length) return '';
+  return `<span class="evidence-links">${sources.map(source => `<a href="${source.url}" target="_blank" rel="noopener noreferrer">${escapeAttr(source.label)}</a>`).join('')}</span>`;
+}
+
+// Wrap a displayed number so its derivation is available by keyboard, mouse,
+// or touch. "Published equation" is reserved for methods that a cited source
+// actually specifies; Forge estimates are labeled as model assumptions.
+function calculationTip(valueHtml, title, basisHtml, sourceIds, classification) {
+  const kind = classification || 'Published equation';
+  return tip(valueHtml, title, `<span class="evidence-kind">${escapeAttr(kind)}</span><p>${basisHtml}</p>${evidenceLinks(sourceIds)}`);
+}
+
 const GUIDANCE_EVIDENCE = [
   {
     label: 'Physical Activity Guidelines for Americans',

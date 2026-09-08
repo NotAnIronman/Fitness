@@ -33,7 +33,7 @@ function ensureWorkoutLogMeta(date) {
 
 function pruneWorkoutLogMeta(date) {
   const meta = STATE.workoutLogMeta?.[date];
-  if (meta && !meta.locationId && !meta.note) delete STATE.workoutLogMeta[date];
+  if (meta && !meta.locationId && !meta.note && !meta.sessionStartedAt && !meta.sessionElapsedSeconds && !meta.sessionEndedAt && !meta.sessionRpe) delete STATE.workoutLogMeta[date];
   if (STATE.workoutLogMeta && !Object.keys(STATE.workoutLogMeta).length) delete STATE.workoutLogMeta;
 }
 

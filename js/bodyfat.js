@@ -34,7 +34,7 @@ function renderBodyFat() {
     <div class="card">
       <div class="card-title">
         Estimate yours (tape measure method)
-        ${tip('ⓘ', 'About this method', 'The US Navy circumference method estimates body fat from a few tape measurements. It is not as precise as a DEXA scan or BodPod, but it is free, repeatable, and good enough to track your own trend over months.')}
+        ${tip(appIcon('learn', ''), 'About this method', `The U.S. Navy circumference method estimates body fat from a few tape measurements. It is a field estimate—not a direct measurement—and repeatability depends heavily on consistent tape placement.${evidenceLinks(['navyBodyFat'])}`)}
       </div>
       <p class="hint" style="margin-bottom:14px;">You'll need a flexible tape measure. Measure snug but not tight, and measure at the same time of day for consistent tracking (mornings, before eating, tend to be most consistent).</p>
 
@@ -63,7 +63,7 @@ function renderBodyFat() {
         <div class="grid grid-2">
           <div class="stat">
             <div class="stat-label">Estimated body fat</div>
-            <div class="stat-value accent">${result.toFixed(1)}<span class="unit">%</span></div>
+            <div class="stat-value accent">${calculationTip(`${result.toFixed(1)}<span class="unit">%</span>`, 'How body fat is estimated', p.sex === 'male' ? '86.010 × log10(waist − neck) − 70.041 × log10(height) + 36.76, using inches.' : '163.205 × log10(waist + hip − neck) − 97.684 × log10(height) − 78.387, using inches.', ['navyBodyFat'])}</div>
           </div>
           <div class="stat">
             <div class="stat-label">Category</div>

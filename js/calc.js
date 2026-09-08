@@ -218,13 +218,12 @@ function calcWorkoutEnergy(entries, bodyWeightKg) {
   };
 }
 
-// --- Step calories: baseline vs. bonus ---
-// Each activity level already assumes a "baseline" amount of daily walking is baked
-// into its multiplier. Counting all steps again on top of that would double count.
-// Instead, only steps ABOVE that baseline are converted to a calorie bonus.
+// Each activity level already assumes a baseline amount of daily walking.
+// Only steps above that baseline are eligible for a separate planning bonus,
+// which avoids counting the same movement twice.
 function calcBonusStepCalories(stepsPerDay, baselineSteps) {
   const extra = Math.max(0, (Number(stepsPerDay) || 0) - (baselineSteps || 0));
-  return extra * 0.04; // ~0.04 kcal per step above baseline, a commonly used approximation
+  return extra * 0.04;
 }
 
 // Legacy full-step formula, kept for reference/possible future use (not used for totals
@@ -263,11 +262,6 @@ function autoDetectActivityLevel({ workoutDaysPerWeek, avgSessionMinutes, stepsP
   if (score >= 1.3) return ACTIVITY_LEVELS[2]; // moderate
   if (score >= 0.4) return ACTIVITY_LEVELS[1]; // light
   return ACTIVITY_LEVELS[0]; // sedentary
-}
-
-function calcTDEE(bmr, activityMultiplier) {
-  if (!bmr) return null;
-  return bmr * activityMultiplier;
 }
 
 // --- Transparent maintenance estimate ---
@@ -396,37 +390,6 @@ function getBodyFatCategory(bf, sex) {
   return bands.find(b => bf >= b.min && bf <= b.max) || bands[bands.length - 1];
 }
 // Finds the current band and how much more (in kcal) would reach the next one up.
-function getNextTierGap(kcal, bands) {
-  const idx = bands.findIndex(b => kcal <= b.max);
-  if (idx === -1 || idx === bands.length - 1) return null; // already at the top band
-  const next = bands[idx + 1];
-  const gapKcal = Math.max(1, Math.ceil(bands[idx].max - kcal + 1));
-  return { nextLabel: next.label, gapKcal };
-}
-
-// --- Energy expenditure breakdown: BMR / NEAT / TEF / EAT ---
-// A commonly cited rough split of total daily energy expenditure:
-//  - BMR is usually ~60-70% of TDEE for most people
-//  - TEF (thermic effect of food, digesting/processing what you eat) is
-//    approximated here as ~10% of TDEE, a widely used rule of thumb
-//  - EAT (exercise activity thermogenesis) is calories from planned workouts
-//  - NEAT (non-exercise activity thermogenesis: walking around, fidgeting,
-//    chores, standing) is whatever's left over, this is often the most
-//    under-counted piece of someone's day
-function getEnergyBreakdown({ bmr, tdee, dailyExerciseKcal }) {
-  if (!bmr || !tdee) return null;
-  const tef = tdee * 0.10;
-  const eat = Math.min(dailyExerciseKcal || 0, tdee - bmr); // can't exceed remaining budget
-  const neat = Math.max(0, tdee - bmr - tef - eat);
-  return {
-    bmr, tef, eat, neat, tdee,
-    bmrPct: (bmr / tdee) * 100,
-    tefPct: (tef / tdee) * 100,
-    eatPct: (eat / tdee) * 100,
-    neatPct: (neat / tdee) * 100,
-  };
-}
-
 // --- Food intake safety check ---
 // Flags dangerously low logged intake. This is a coarse rule-of-thumb floor, not
 // personalized medical advice, intended to catch clearly-too-low days (e.g. a few
@@ -471,7 +434,7 @@ function explainExerciseCalc(entry, ex, bodyWeightKg) {
     const perMinute = rawMin > 0 ? kcal / rawMin : 0;
     let text = `<strong>${perMinute.toFixed(2)} kcal/min × ${rawMin} min = ${Math.round(kcal)} kcal</strong><br>Uses ${bodyWeightText} bodyweight and MET ${ex.met}: ${ex.met} × 3.5 × (${formulaWeightText}) ÷ 200 × ${minutes.toFixed(1)} active min.`;
     if (ex.category === 'Strength') text += ` This is a whole-session MET value, so normal between-set rest is already represented.`;
-    return text;
+    return `${text}<br><span class="evidence-kind">Published MET equation</span>${typeof evidenceLinks === 'function' ? evidenceLinks(['compendium']) : ''}`;
   }
   const timing = strengthTimingFromEntry(entry);
   let workMet = ex.met;
@@ -487,7 +450,7 @@ function explainExerciseCalc(entry, ex, bodyWeightKg) {
   const perRep = totalReps > 0 ? kcal / totalReps : 0;
   const load = effectiveLoadKg(entry);
   const loadText = load > 0 ? `; top load ${formatWeightKg(load, 0)}` : '';
-  return `<strong>${Math.round(workKcal)} lifting kcal + ${Math.round(restKcal)} between-set kcal = ${Math.round(kcal)} kcal during the exercise</strong><br>Uses ${bodyWeightText} bodyweight${loadText}, MET ${ex.met}, about 3.5 seconds per rep, and MET 1.8 for ${timing.restMinutes.toFixed(1)} estimated rest min${heavyAdjustment > 1 ? ' (small load-above-bodyweight adjustment included)' : ''}. Post-exercise energy is uncertain and is added once in the session total, not to every exercise.`;
+  return `<strong>${Math.round(workKcal)} lifting kcal + ${Math.round(restKcal)} between-set kcal = ${Math.round(kcal)} kcal during the exercise</strong><br>Uses ${bodyWeightText} bodyweight${loadText}, MET ${ex.met}, about 3.5 seconds per rep, and MET 1.8 for ${timing.restMinutes.toFixed(1)} estimated rest min${heavyAdjustment > 1 ? ' (small load-above-bodyweight adjustment included)' : ''}. Timing, rest intensity, and the load adjustment are Forge modeling assumptions because sets and load do not directly measure energy expenditure. Post-exercise energy is uncertain and is added once in the session total, not to every exercise.<br><span class="evidence-kind">Published MET input + Forge model</span>${typeof evidenceLinks === 'function' ? evidenceLinks(['compendium']) : ''}`;
 }
 
 // --- Strength standard ranking ---

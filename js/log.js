@@ -17,6 +17,10 @@ function renderLog() {
   const locationId = getWorkoutLogLocationId(date);
   const workoutNote = STATE.workoutLogMeta?.[date]?.note || '';
   const noteOpen = !!UI.logNotesOpen[date];
+  const sessionMeta = gymSessionMeta(date);
+  const sessionSeconds = gymSessionElapsedSeconds(date);
+  const sessionRunning = !!sessionMeta.sessionStartedAt;
+  const sessionLoad = gymSessionLoad(date);
 
   const performedEntries = entries.map(completedExerciseEntry).filter(Boolean);
   const energy = calcWorkoutEnergy(performedEntries, bw);
@@ -52,10 +56,28 @@ function renderLog() {
       </div>
       ${renderWorkoutLocationSelect(locationId, `setWorkoutLogLocation('${date}', this.value)`, 'Training location for this workout')}
       <div class="workout-note-row">
-        <button class="icon-btn workout-note-toggle ${workoutNote ? 'has-note' : ''}" onclick="toggleWorkoutNote('${date}')" aria-expanded="${noteOpen}" aria-label="${noteOpen ? 'Hide' : 'Show'} workout note" title="${workoutNote ? 'View workout note' : 'Add workout note'}">📝</button>
+        <button class="icon-btn workout-note-toggle ${workoutNote ? 'has-note' : ''}" onclick="toggleWorkoutNote('${date}')" aria-expanded="${noteOpen}" aria-label="${noteOpen ? 'Hide' : 'Show'} workout note" title="${workoutNote ? 'View workout note' : 'Add workout note'}">${appIcon('note', '')}</button>
         <span class="hint">${workoutNote ? 'Workout note saved' : 'Add a private note for this workout'}</span>
       </div>
       ${noteOpen ? `<div class="field workout-note-editor"><label>Workout note</label><textarea maxlength="2000" rows="4" placeholder="Energy, pain-free range, equipment setup, what to change next time…" oninput="saveWorkoutNoteDraft('${date}', this.value)" onchange="saveWorkoutNote('${date}', this.value)">${escapeAttr(workoutNote)}</textarea></div>` : ''}
+    </div>
+
+    <div class="card gym-session-card">
+      <div class="card-title"><span>${appIcon('timer', '')} Gym session</span><span class="badge ${sessionRunning ? 'badge-ok' : ''}">${sessionRunning ? 'Running' : sessionMeta.sessionEndedAt ? 'Finished' : sessionSeconds ? 'Paused' : 'Not started'}</span></div>
+      <div class="gym-session-grid">
+        <div class="gym-clock" id="gym-session-time" role="timer" aria-live="off">${formatGymTime(sessionSeconds)}</div>
+        <div class="gym-session-actions">
+          ${sessionRunning
+            ? `<button class="btn btn-primary" onclick="pauseGymSession('${date}',false)">Pause</button><button class="btn" onclick="pauseGymSession('${date}',true)">Finish</button>`
+            : `<button class="btn btn-primary" onclick="startGymSession('${date}')">${sessionSeconds ? 'Resume' : 'Start session'}</button>`}
+          ${sessionSeconds || sessionMeta.sessionRpe ? `<button class="btn btn-ghost" onclick="clearGymSession('${date}')">Clear</button>` : ''}
+        </div>
+      </div>
+      <div class="gym-effort-grid">
+        <div class="field"><label for="gym-session-rpe">Whole-session effort (1–10)</label><select id="gym-session-rpe" onchange="saveGymSessionRpe('${date}',this.value)"><option value="">Not rated</option>${Array.from({ length: 10 }, (_, index) => index + 1).map(value => `<option value="${value}" ${sessionMeta.sessionRpe === value ? 'selected' : ''}>${value} — ${gymEffortLabel(value)}</option>`).join('')}</select></div>
+        <div class="stat"><div class="stat-label">Session load</div><div class="stat-value" id="gym-session-load">${sessionLoad ?? '-'}</div><div class="hint">${sessionLoad != null ? calculationTip('minutes × effort', 'How session load is calculated', `${Math.round(sessionSeconds / 60)} minutes × ${sessionMeta.sessionRpe} session RPE = <strong>${sessionLoad}</strong> arbitrary units. Rate the entire session about 30 minutes after finishing when practical. This measures internal load; it is not calories or a grade.`, ['sessionRpe','sessionRpeReview']) : 'Add a 1–10 effort rating to calculate duration × session RPE.'}</div></div>
+      </div>
+      <p class="hint">Use 10 only for a genuinely maximal session. Progress comes from an appropriate challenge you can recover from, not from forcing every workout to feel maximal.</p>
     </div>
 
     <div class="card ${onboardingStepIs('copy_workout') ? 'onboarding-focus' : ''}">
@@ -109,7 +131,7 @@ function renderRecoveryCheckinCard(date) {
       <div class="field"><label>Sleep before this day (hours)</label><input type="number" min="0" max="24" step="0.25" value="${entry.sleepHours ?? ''}" placeholder="Optional" onchange="saveRecoveryField('${date}','sleepHours',this.value)"></div>
       <div class="field"><label>How ready do you feel?</label><select onchange="saveRecoveryField('${date}','readiness',this.value)"><option value="">Not checked</option>${[1,2,3,4,5].map(value => `<option value="${value}" ${entry.readiness === value ? 'selected' : ''}>${value} — ${['Very low','Low','Okay','Good','Excellent'][value - 1]}</option>`).join('')}</select></div>
     </div>
-    <p class="hint">Adults generally benefit from at least 7 hours of regular sleep, though individual needs vary. Use this as context for your training—not as a score or diagnosis.</p>
+    <p class="hint">${calculationTip('Adults generally benefit from at least 7 hours of regular sleep', 'Why Forge shows seven hours', 'An expert consensus recommends that adults sleep seven or more hours per night regularly for optimal health, while recognizing individual variation and circumstances.', ['sleep'])}, though individual needs vary. Use this as context for your training—not as a score or diagnosis.</p>
     ${lowRecovery ? `<div class="section-note">Recovery looks lower today. Consider a lighter load, fewer sets, easier cardio, or an extra rest day if your warm-up also feels unusually difficult. One low check-in does not mean you must skip movement.</div>` : ''}
   </div>`;
 }
@@ -220,7 +242,8 @@ function ensureLogDate(date) {
 function openAddExerciseLog() {
   UI.logAddOpen = true;
   UI.editingExercise = null;
-  UI.addExerciseCategory = 'Chest';
+  UI.addExerciseCategory = 'All';
+  UI.exerciseQuery = '';
   _weightIsPerSide = false;
   render();
 }

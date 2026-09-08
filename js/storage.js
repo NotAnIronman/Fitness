@@ -407,6 +407,11 @@ function normalizeStateShape(state) {
 
 function normalizeHabits(habits) {
   const source = isPlainObject(habits) ? habits : {};
+  const legacyHabitIcons = {
+    '\u2713': '2705', '\u2705': '2705', '\ud83d\udcaa': '1F4AA', '\ud83d\udeb6': '1F6B6',
+    '\ud83e\udd57': '1F957', '\ud83d\udca7': '1F4A7', '\ud83e\uddd8': '1F9D8', '\ud83d\ude34': '1F6CC',
+    '\ud83d\udcda': '1F4DA', '\u2600\ufe0f': '2600', '\ud83c\udf19': '1F319',
+  };
   const seen = new Set();
   const items = (Array.isArray(source.items) ? source.items : []).slice(0, 100).filter(isPlainObject).map(item => {
     const id = safeStateId(item.id);
@@ -414,7 +419,7 @@ function normalizeHabits(habits) {
     return {
       id,
       name: String(item.name || 'Habit').trim().slice(0, 80) || 'Habit',
-      icon: String(item.icon || '✓').slice(0, 8),
+      icon: legacyHabitIcons[String(item.icon || '')] || (/^[0-9A-F-]{4,20}$/i.test(String(item.icon || '')) ? String(item.icon).toUpperCase() : '2705'),
       cue: String(item.cue || '').trim().slice(0, 100),
       difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'easy',
       target: Math.max(1, Math.min(20, Math.round(Number(item.target) || 1))),
@@ -495,6 +500,12 @@ function normalizeOptionalWorkoutLocations(state) {
       if (validIds.has(value.locationId)) normalized.locationId = value.locationId;
       const note = String(value.note || '').trim().slice(0, 2000);
       if (note) normalized.note = note;
+      const elapsed = Math.max(0, Math.min(86400, Math.round(Number(value.sessionElapsedSeconds) || 0)));
+      if (elapsed) normalized.sessionElapsedSeconds = elapsed;
+      if (typeof value.sessionStartedAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value.sessionStartedAt) && Number.isFinite(Date.parse(value.sessionStartedAt))) normalized.sessionStartedAt = value.sessionStartedAt.slice(0, 40);
+      if (typeof value.sessionEndedAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value.sessionEndedAt) && Number.isFinite(Date.parse(value.sessionEndedAt))) normalized.sessionEndedAt = value.sessionEndedAt.slice(0, 40);
+      const rpe = Math.round(Number(value.sessionRpe));
+      if (rpe >= 1 && rpe <= 10) normalized.sessionRpe = rpe;
       if (Object.keys(normalized).length) meta[date] = normalized;
     });
   }

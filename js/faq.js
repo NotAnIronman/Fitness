@@ -77,10 +77,15 @@ function renderFAQ() {
     <div class="card faq-intro">
       <div class="card-title">How to use these guides</div>
       <p class="hint">These are general education, not diagnosis or individualized rehabilitation. Stop for sharp, sudden, or escalating pain and get qualified help when needed. Videos will be added only when a reviewed demonstration is available.</p>
-      <p class="hint">Programming notes follow the current evidence that consistency and goal-specific load/volume matter more than unnecessary complexity. <a href="https://acsm.org/resistance-training-guidelines-update-2026/" target="_blank" rel="noopener noreferrer">ACSM 2026 resistance-training overview</a>.</p>
+      <p class="hint">Programming notes follow the current evidence that consistency and goal-specific load/volume matter more than unnecessary complexity. <a href="${SCIENCE_SOURCES.resistanceTraining.url}" target="_blank" rel="noopener noreferrer">ACSM 2026 position stand</a>.</p>
       <div class="field"><label>Find an exercise</label><input type="search" value="${escapeAttr(UI.faqQuery || '')}" placeholder="Bench Press, legs, mobility…" oninput="setFaqQuery(this.value)"></div>
     </div>
     ${renderGeneralFAQ()}
+    <details class="card evidence-library">
+      <summary>Scientific source library (${Object.keys(SCIENCE_SOURCES).length})</summary>
+      <div class="evidence-library-list">${Object.values(SCIENCE_SOURCES).map(source => `<article><a href="${source.url}" target="_blank" rel="noopener noreferrer">${escapeAttr(source.label)}</a><p>${escapeAttr(source.note)}</p></article>`).join('')}</div>
+      <p class="hint">A citation supports the method or planning range; it does not make a prediction an individual measurement. Values labeled “Forge model” expose the app's own assumptions separately.</p>
+    </details>
     <div class="section-heading"><h2>Exercise guides</h2><p class="hint">Choose an exercise to open its reference outline.</p></div>
     <div class="faq-guide-list">
       ${exercises.map(renderExerciseGuide).join('') || '<div class="card empty-state">No exercises match that search.</div>'}

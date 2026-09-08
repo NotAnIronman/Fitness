@@ -178,6 +178,39 @@ const EXERCISE_LIBRARY = [
   { id: 'football',    name: 'Football (American)',             bodyPart: 'Sports',  category: 'Sports', met: 8.0, inputMode: 'duration' },
   { id: 'skiing',      name: 'Skiing (downhill)',               bodyPart: 'Sports',  category: 'Sports', met: 6.0, inputMode: 'duration' },
   { id: 'martial_arts',name: 'Martial Arts / MMA training',     bodyPart: 'Sports',  category: 'Sports', met: 10.3,inputMode: 'duration' },
+  // ---- Expanded selection ----
+  { id: 'incline_db_press', name: 'Incline Dumbbell Press', bodyPart: 'Chest', category: 'Strength', met: 5.0, inputMode: 'setsRepsWeight' },
+  { id: 'single_cable_press', name: 'Single-Arm Cable Press', bodyPart: 'Chest', category: 'Strength', met: 4.0, inputMode: 'setsRepsWeight' },
+  { id: 'chest_supported_row', name: 'Chest-Supported Row', bodyPart: 'Back', category: 'Strength', met: 5.0, inputMode: 'setsRepsWeight' },
+  { id: 'machine_high_row', name: 'Machine High Row', bodyPart: 'Back', category: 'Strength', met: 5.0, inputMode: 'setsRepsWeight' },
+  { id: 'cable_pullover', name: 'Cable Pullover', bodyPart: 'Back', category: 'Strength', met: 4.0, inputMode: 'setsRepsWeight' },
+  { id: 'db_shoulder_press', name: 'Dumbbell Shoulder Press', bodyPart: 'Shoulders', category: 'Strength', met: 5.0, inputMode: 'setsRepsWeight' },
+  { id: 'cable_y_raise', name: 'Cable Y Raise', bodyPart: 'Shoulders', category: 'Strength', met: 3.5, inputMode: 'setsRepsWeight' },
+  { id: 'shoulder_external_rotation', name: 'Cable External Rotation', bodyPart: 'Shoulders', category: 'Strength', met: 3.0, inputMode: 'setsRepsWeight' },
+  { id: 'incline_db_curl', name: 'Incline Dumbbell Curl', bodyPart: 'Arms', category: 'Strength', met: 4.0, inputMode: 'setsRepsWeight' },
+  { id: 'reverse_curl', name: 'Reverse Curl', bodyPart: 'Arms', category: 'Strength', met: 4.0, inputMode: 'setsRepsWeight' },
+  { id: 'overhead_cable_triceps', name: 'Overhead Cable Triceps Extension', bodyPart: 'Arms', category: 'Strength', met: 4.0, inputMode: 'setsRepsWeight' },
+  { id: 'wrist_curl', name: 'Wrist Curl', bodyPart: 'Arms', category: 'Strength', met: 3.0, inputMode: 'setsRepsWeight' },
+  { id: 'pendulum_squat', name: 'Pendulum Squat', bodyPart: 'Legs', category: 'Strength', met: 5.5, inputMode: 'setsRepsWeight' },
+  { id: 'belt_squat', name: 'Belt Squat', bodyPart: 'Legs', category: 'Strength', met: 5.5, inputMode: 'setsRepsWeight' },
+  { id: 'reverse_lunge', name: 'Reverse Lunge', bodyPart: 'Legs', category: 'Strength', met: 5.0, inputMode: 'setsRepsWeight' },
+  { id: 'single_leg_rdl', name: 'Single-Leg Romanian Deadlift', bodyPart: 'Legs', category: 'Strength', met: 5.0, inputMode: 'setsRepsWeight' },
+  { id: 'hip_abduction', name: 'Hip Abduction Machine', bodyPart: 'Legs', category: 'Strength', met: 3.5, inputMode: 'setsRepsWeight' },
+  { id: 'hip_adduction', name: 'Hip Adduction Machine', bodyPart: 'Legs', category: 'Strength', met: 3.5, inputMode: 'setsRepsWeight' },
+  { id: 'copenhagen_plank', name: 'Copenhagen Plank', bodyPart: 'Core', category: 'Strength', met: 4.0, inputMode: 'duration' },
+  { id: 'cable_wood_chop', name: 'Cable Wood Chop', bodyPart: 'Core', category: 'Strength', met: 4.0, inputMode: 'setsRepsWeight' },
+  { id: 'suitcase_carry', name: 'Suitcase Carry', bodyPart: 'Core', category: 'Strength', met: 5.0, inputMode: 'duration' },
+  { id: 'hollow_hold', name: 'Hollow Body Hold', bodyPart: 'Core', category: 'Strength', met: 3.8, inputMode: 'duration' },
+  { id: 'ski_erg', name: 'Ski Erg', bodyPart: 'Cardio', category: 'Cardio', met: 7.0, inputMode: 'duration' },
+  { id: 'recumbent_bike', name: 'Recumbent Bike', bodyPart: 'Cardio', category: 'Cardio', met: 5.5, inputMode: 'duration' },
+  { id: 'water_aerobics', name: 'Water Aerobics', bodyPart: 'Cardio', category: 'Cardio', met: 5.5, inputMode: 'duration' },
+  { id: 'tai_chi', name: 'Tai Chi', bodyPart: 'Mobility', category: 'Mobility', met: 3.0, inputMode: 'duration' },
+  { id: 'dynamic_warmup', name: 'Dynamic Warm-up', bodyPart: 'Mobility', category: 'Mobility', met: 3.5, inputMode: 'duration' },
+  { id: 'badminton', name: 'Badminton', bodyPart: 'Sports', category: 'Sports', met: 5.5, inputMode: 'duration' },
+  { id: 'table_tennis', name: 'Table Tennis', bodyPart: 'Sports', category: 'Sports', met: 4.0, inputMode: 'duration' },
+  { id: 'racquetball', name: 'Racquetball', bodyPart: 'Sports', category: 'Sports', met: 7.0, inputMode: 'duration' },
+  { id: 'kayaking', name: 'Kayaking', bodyPart: 'Sports', category: 'Sports', met: 5.0, inputMode: 'duration' },
+  { id: 'ice_skating', name: 'Ice Skating', bodyPart: 'Sports', category: 'Sports', met: 7.0, inputMode: 'duration' },
 ];
 
 // Activity multipliers used for TDEE, keyed to a 0-4 "auto-detected" activity score.
@@ -191,10 +224,6 @@ const ACTIVITY_LEVELS = [
   { key: 'active',      label: 'Active',           desc: '6-7 sessions/week or ~10-12k steps/day', multiplier: 1.725, baselineSteps: 10000 },
   { key: 'very_active', label: 'Very active',      desc: 'Daily intense training or 12k+ steps/day, physical job', multiplier: 1.9, baselineSteps: 12500 },
 ];
-
-// Exercise IDs whose calorie burn can overlap with a daily step count (walking/running
-// naturally adds steps). Used to show a "don't double count" reminder when adding these.
-const STEP_OVERLAP_EXERCISE_IDS = ['run_easy', 'run_moderate', 'run_fast', 'walk_casual', 'walk_brisk', 'hiking'];
 
 // Rough public-health reference points for "is this a lot of exercise calories?"
 // feedback. The CDC's Physical Activity Guidelines for Americans recommend
@@ -304,10 +333,10 @@ const FOOD_FALLBACK_DB = [
 
 /* ============================================================
    PET COMPANION
-   Defaults to native Unicode emoji characters (zero hosting dependency,
-   zero licensing question). Every entry below can optionally be upgraded
-   to real art by adding an `img` field, no other code changes needed,
-   js/pet.js already checks for it and falls back to the emoji if absent.
+   Uses OpenMoji artwork (CC BY-SA 4.0). The `emoji` fields below are Unicode
+   lookup keys only; js/pet.js converts them to OpenMoji image URLs and never
+   inserts the native platform glyph into the interface. An explicit `img`
+   can pin or override the artwork for an entry.
 
    PER-SPECIES ACCESSORY POSITIONING:
    Wearable position (hat/eyewear/face/neck/accessory) defaults to the same

@@ -182,3 +182,91 @@ function renderRestTimerWidget() {
 function quickStartRestTimer(label) {
   startRestTimer(STATE.workoutPlan.restTimerSeconds || 90, label);
 }
+
+// The gym-session clock is persisted, unlike the short rest timer. Storing an
+// accumulated duration plus a start timestamp makes it survive reloads, PWA
+// suspension, and a locked screen without keeping a fragile background timer.
+let _gymTimerTickHandle = null;
+
+function gymSessionMeta(date) {
+  return STATE.workoutLogMeta?.[date] || {};
+}
+
+function gymSessionElapsedSeconds(date, nowMs) {
+  const meta = gymSessionMeta(date);
+  const saved = Math.max(0, Number(meta.sessionElapsedSeconds) || 0);
+  const started = Date.parse(meta.sessionStartedAt || '');
+  const live = Number.isFinite(started) ? Math.max(0, ((nowMs || Date.now()) - started) / 1000) : 0;
+  return Math.min(86400, Math.round(saved + live));
+}
+
+function gymSessionLoad(date) {
+  const minutes = gymSessionElapsedSeconds(date) / 60;
+  const rpe = Number(gymSessionMeta(date).sessionRpe) || 0;
+  return rpe ? Math.round(minutes * rpe) : null;
+}
+
+function startGymSession(date) {
+  const meta = ensureWorkoutLogMeta(date);
+  if (!meta.sessionStartedAt) meta.sessionStartedAt = new Date().toISOString();
+  delete meta.sessionEndedAt;
+  persist(); syncGymTimerTicker(); render();
+}
+
+function pauseGymSession(date, finished) {
+  const meta = ensureWorkoutLogMeta(date);
+  meta.sessionElapsedSeconds = gymSessionElapsedSeconds(date);
+  delete meta.sessionStartedAt;
+  if (finished) meta.sessionEndedAt = new Date().toISOString(); else delete meta.sessionEndedAt;
+  pruneWorkoutLogMeta(date);
+  persist(); syncGymTimerTicker(); render();
+}
+
+function clearGymSession(date) {
+  const meta = gymSessionMeta(date);
+  delete meta.sessionStartedAt;
+  delete meta.sessionElapsedSeconds;
+  delete meta.sessionEndedAt;
+  delete meta.sessionRpe;
+  pruneWorkoutLogMeta(date);
+  persist(); syncGymTimerTicker(); render();
+}
+
+function saveGymSessionRpe(date, rawValue) {
+  const meta = ensureWorkoutLogMeta(date);
+  if (rawValue === '') delete meta.sessionRpe;
+  else meta.sessionRpe = Math.max(1, Math.min(10, Math.round(Number(rawValue) || 1)));
+  pruneWorkoutLogMeta(date);
+  persist(); render();
+}
+
+function gymEffortLabel(rpe) {
+  if (!rpe) return 'Add effort after the session';
+  if (rpe <= 2) return 'Very easy';
+  if (rpe <= 4) return 'Moderate';
+  if (rpe <= 6) return 'Hard';
+  if (rpe <= 8) return 'Very hard';
+  return 'Near-maximal';
+}
+
+function updateGymTimerDisplay() {
+  const date = UI.logDate;
+  const el = document.getElementById('gym-session-time');
+  if (el) el.textContent = formatGymTime(gymSessionElapsedSeconds(date));
+  const load = document.getElementById('gym-session-load');
+  if (load) load.textContent = gymSessionLoad(date) ?? '-';
+}
+
+function formatGymTime(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function syncGymTimerTicker() {
+  if (_gymTimerTickHandle) { clearInterval(_gymTimerTickHandle); _gymTimerTickHandle = null; }
+  const hasRunningSession = Object.values(STATE.workoutLogMeta || {}).some(meta => meta?.sessionStartedAt);
+  if (hasRunningSession) _gymTimerTickHandle = setInterval(updateGymTimerDisplay, 1000);
+  updateGymTimerDisplay();
+}

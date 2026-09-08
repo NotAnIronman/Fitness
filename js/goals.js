@@ -124,24 +124,24 @@ function renderHealthyWeightGainPlan(maintenanceCalories, isImperial) {
 }
 
 const WEIGHT_COMPARISONS = [
-  { kg: 0.45, name: 'a loaf of bread', emoji: '🍞' },
-  { kg: 0.62, name: 'a basketball', emoji: '🏀' },
-  { kg: 1.1, name: 'a pineapple', emoji: '🍍' },
-  { kg: 2.3, name: 'a 5 lb bag of flour', emoji: '🛍️' },
-  { kg: 3.8, name: 'a gallon of water', emoji: '💧' },
-  { kg: 5, name: 'an average watermelon', emoji: '🍉' },
-  { kg: 7.3, name: 'a bowling ball', emoji: '🎳' },
-  { kg: 10, name: 'a passenger-car tire', emoji: '🛞' },
-  { kg: 15, name: 'a countertop microwave', emoji: '📻' },
-  { kg: 20, name: 'a full water-cooler bottle', emoji: '💧' },
-  { kg: 23, name: 'a packed checked suitcase', emoji: '🧳' },
+  { kg: 0.45, name: 'a loaf of bread', emoji: '1F35E' },
+  { kg: 0.62, name: 'a basketball', emoji: '1F3C0' },
+  { kg: 1.1, name: 'a pineapple', emoji: '1F34D' },
+  { kg: 2.3, name: 'a 5 lb bag of flour', emoji: '1F6CD' },
+  { kg: 3.8, name: 'a gallon of water', emoji: '1F4A7' },
+  { kg: 5, name: 'an average watermelon', emoji: '1F349' },
+  { kg: 7.3, name: 'a bowling ball', emoji: '1F3B3' },
+  { kg: 10, name: 'a passenger-car tire', emoji: '1F6DE' },
+  { kg: 15, name: 'a countertop microwave', emoji: '1F4FB' },
+  { kg: 20, name: 'a full water-cooler bottle', emoji: '1F4A7' },
+  { kg: 23, name: 'a packed checked suitcase', emoji: '1F9F3' },
 ];
 
 function weightLossComparison(lostKg) {
   if (!Number.isFinite(lostKg) || lostKg < 0.45) return null;
   if (lostKg > 27.5) {
     const count = Math.max(2, Math.round(lostKg / 5));
-    return { kg: count * 5, name: `${count} average watermelons`, emoji: '🍉' };
+    return { kg: count * 5, name: `${count} average watermelons`, emoji: '1F349' };
   }
   return WEIGHT_COMPARISONS.reduce((best, item) => Math.abs(item.kg - lostKg) < Math.abs(best.kg - lostKg) ? item : best);
 }
@@ -153,7 +153,7 @@ function renderWeightLossCelebration(startKg, currentKg, imperial) {
   const lost = imperial ? kgToLb(lostKg) : lostKg;
   const unit = imperial ? 'lb' : 'kg';
   return `<div class="card weight-loss-celebration" role="status">
-    <div class="weight-loss-object" aria-hidden="true">${comparison.emoji}</div>
+    <div class="weight-loss-object">${openMojiIcon(comparison.emoji, comparison.name)}</div>
     <div><div class="card-title">That progress has real weight</div>
       <p><strong>Congratulations—you are ${lost.toFixed(1)} ${unit} down from this goal's starting point.</strong></p>
       <p class="hint">That is roughly the weight of ${escapeAttr(comparison.name)}. Object sizes vary, but the progress is yours.</p>
@@ -280,9 +280,9 @@ function renderFeasibilityCard(evalResult, isImperial, tdee, effTdee) {
     <div class="card">
       <div class="card-title">Feasibility check <span class="badge ${badgeClass}">${badgeText}</span></div>
       <div class="grid grid-3" style="margin-bottom:12px;">
-        <div class="stat"><div class="stat-label">Required rate</div><div class="stat-value">${rateDisplay}</div><div class="hint">${ratePctBodyWeightPerWeek != null ? ratePctBodyWeightPerWeek.toFixed(2) : '-'}% of starting weight/week</div></div>
-        <div class="stat"><div class="stat-label">Timeframe</div><div class="stat-value">${weeks.toFixed(1)}<span class="unit">wks</span></div></div>
-        <div class="stat"><div class="stat-label">Starting intake midpoint</div><div class="stat-value accent">${suggestedIntake ? Math.round(suggestedIntake) : 'Not provided'}${suggestedIntake ? '<span class="unit">kcal</span>' : ''}</div>${targetLow ? `<div class="hint">Estimated range ${Math.round(targetLow)}-${Math.round(targetHigh)}</div>` : ''}</div>
+        <div class="stat"><div class="stat-label">Required rate</div><div class="stat-value">${calculationTip(rateDisplay, 'How required rate is calculated', `Absolute change of ${Math.abs(deltaLb).toFixed(1)} lb divided by ${weeks.toFixed(1)} weeks. The percentage below divides that weekly change by starting body weight.`, ['gradualLoss'], 'Calendar arithmetic + planning reference')}</div><div class="hint">${ratePctBodyWeightPerWeek != null ? ratePctBodyWeightPerWeek.toFixed(2) : '-'}% of starting weight/week</div></div>
+        <div class="stat"><div class="stat-label">Timeframe</div><div class="stat-value">${calculationTip(`${weeks.toFixed(1)}<span class="unit">wks</span>`, 'How timeframe is calculated', 'Target date minus start date, divided by seven days.', [], 'Calendar arithmetic')}</div></div>
+        <div class="stat"><div class="stat-label">Starting intake midpoint</div><div class="stat-value accent">${suggestedIntake ? calculationTip(`${Math.round(suggestedIntake)}<span class="unit">kcal</span>`, 'How starting intake is estimated', `Maintenance midpoint ${Math.round(effTdee)} kcal/day plus the first-pass energy adjustment needed for ${rateDisplay}. The adjustment uses the familiar 3,500 kcal-per-pound approximation; real weight change is dynamic, so trend data should replace this estimate over time.`, ['mifflin','energyPlanner','gradualLoss'], 'Published BMR + Forge planning model') : 'Not provided'}</div>${targetLow ? `<div class="hint">${calculationTip(`Estimated range ${Math.round(targetLow)}-${Math.round(targetHigh)}`, 'Why intake is a range', 'The planned energy adjustment is applied to both ends of the maintenance estimate. This is uncertainty, not a promise that every value in the band produces the same result.', ['energyPlanner'], 'Forge uncertainty allowance')}</div>` : ''}</div>
       </div>
       <p class="hint" style="font-size:13px; line-height:1.6;">${messages[feasibility]}
         ${unsafeTarget ? ' This timeline would require an intake or deficit that Forge should not prescribe. Extend the target date; the Food page will keep showing estimated maintenance rather than turning an unsafe calculation into a target.' : ''}

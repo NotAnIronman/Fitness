@@ -62,7 +62,7 @@ function renderAchievementRow(a, ctx) {
   return `
     <div class="exercise-row" style="${unlocked ? '' : 'opacity:0.6;'}">
       <div>
-        <div class="name">${unlocked ? '\u2713 ' : ''}${escapeAttr(a.name)}</div>
+        <div class="name">${unlocked ? appIcon('check', '') : ''}${escapeAttr(a.name)}</div>
         <div class="meta">${escapeAttr(a.desc)}${unlocked ? ` \u00b7 unlocked ${unlockedDate}` : ''}</div>
         ${prog ? `
           <div class="macro-bar-track" style="margin-top:6px; max-width:180px;">

@@ -123,11 +123,11 @@ function updatePetHappinessDecay() {
 }
 
 function happinessMood(h) {
-  if (h >= 80) return { label: 'Thrilled', emoji: '✨' };
-  if (h >= 60) return { label: 'Happy', emoji: '' };
-  if (h >= 35) return { label: 'Okay', emoji: '' };
-  if (h >= 15) return { label: 'Missing you', emoji: '' };
-  return { label: 'Lonely', emoji: '💧' };
+  if (h >= 80) return { label: 'Thrilled' };
+  if (h >= 60) return { label: 'Happy' };
+  if (h >= 35) return { label: 'Okay' };
+  if (h >= 15) return { label: 'Missing you' };
+  return { label: 'Lonely' };
 }
 
 // ---------- Shop / equip actions ----------
@@ -221,7 +221,7 @@ function petVisual(entry, altText, sizePx) {
   if (entry && entry.img) {
     return `<img src="${escapeAttr(entry.img)}" alt="${escapeAttr(altText)}" style="width:${sizePx}px; height:${sizePx}px; object-fit:contain; display:block;" loading="lazy">`;
   }
-  return entry ? entry.emoji : '';
+  return entry ? openMojiIcon(entry.emoji, altText, 'pet-openmoji') : '';
 }
 
 function renderPetSprite(size) {
@@ -265,7 +265,7 @@ function petIconSmall(entry) {
   if (entry && entry.img) {
     return `<img src="${escapeAttr(entry.img)}" alt="${escapeAttr(entry.name)}" style="width:1.1em; height:1.1em; vertical-align:-0.2em; object-fit:contain;" loading="lazy">`;
   }
-  return entry ? entry.emoji : '';
+  return entry ? openMojiIcon(entry.emoji, entry.name, 'pet-small-openmoji') : '';
 }
 
 /* ---------- Travel minigame ---------- */
@@ -346,11 +346,11 @@ function renderTravelCard() {
       <div class="card-title">Travel <span style="font-family:var(--font-mono); font-size:12px; color:var(--text-dim);">${progress.visited.length} / ${US_STATES.length} states</span></div>
       <p class="hint" style="margin-bottom:10px;">Your steps count ${PET_STEP_MULTIPLIER}x toward ${escapeAttr(STATE.pet.name)}'s own journey, walking a route through all 50 states and bringing back a souvenir from each.</p>
       ${progress.complete ? `
-        <div class="empty-state"><div class="big">\ud83c\udf89</div>${escapeAttr(STATE.pet.name)} has visited every state! International trips may be next.</div>
+        <div class="empty-state"><div class="big">Complete</div>${escapeAttr(STATE.pet.name)} has visited every state! International trips may be next.</div>
       ` : `
         <div class="stat" style="margin-bottom:8px;">
           <div class="stat-label">Currently walking to</div>
-          <div class="stat-value" style="font-size:20px;">${progress.next.souvenir.emoji} ${escapeAttr(progress.next.name)}</div>
+          <div class="stat-value" style="font-size:20px;">${openMojiIcon(progress.next.souvenir.emoji, progress.next.souvenir.name)} ${escapeAttr(progress.next.name)}</div>
         </div>
         <div class="macro-bar-track"><div class="macro-bar-fill" style="width:${progress.legPct}%; background:var(--accent);"></div></div>
         <p class="hint" style="margin-top:6px;">${Math.round(progress.legProgress / STEPS_PER_MILE).toLocaleString()} of ${Math.round(progress.legTotal / STEPS_PER_MILE).toLocaleString()} pet-miles there.</p>
@@ -358,7 +358,7 @@ function renderTravelCard() {
       ${progress.visited.length ? `
         <p class="hint" style="margin: 12px 0 6px;">Souvenirs collected:</p>
         <div class="chip-row">
-          ${progress.visited.map(s => `<span class="chip" title="${escapeAttr(s.name)}">${s.souvenir.emoji} ${escapeAttr(s.name)}</span>`).join('')}
+          ${progress.visited.map(s => `<span class="chip" title="${escapeAttr(s.name)}">${openMojiIcon(s.souvenir.emoji, s.souvenir.name)} ${escapeAttr(s.name)}</span>`).join('')}
         </div>
       ` : ''}
     </div>
@@ -509,7 +509,7 @@ function renderTravelMap(travel) {
     const pos = PET_US_MAP_POINTS[state.key];
     const tierKey = travel.medals[state.key], tier = tierKey ? travelTier(tierKey) : null;
     const status = state.key === travel.currentState ? 'Here' : tier ? tier.label : 'Not completed';
-    return `<button class="pet-map-state ${tier ? `completed tier-${tierKey}` : ''} ${state.key === travel.currentState ? 'current' : ''} ${state.key === travel.targetState ? 'target' : ''}" style="left:${pos[0]}%;top:${pos[1]}%;" onclick="selectPetTravelTarget('${state.key}')" title="${escapeAttr(state.name)}: ${status}" aria-label="${escapeAttr(state.name)}, ${status}"><span>${state.key}</span><small>${state.key === travel.currentState ? '●' : tier ? tier.medal : '○'}</small></button>`;
+    return `<button class="pet-map-state ${tier ? `completed tier-${tierKey}` : ''} ${state.key === travel.currentState ? 'current' : ''} ${state.key === travel.targetState ? 'target' : ''}" style="left:${pos[0]}%;top:${pos[1]}%;" onclick="selectPetTravelTarget('${state.key}')" title="${escapeAttr(state.name)}: ${status}" aria-label="${escapeAttr(state.name)}, ${status}"><span>${state.key}</span><small>${state.key === travel.currentState ? 'Here' : tier ? openMojiIcon(tier.medal, `${tier.label} medal`) : ''}</small></button>`;
   }).join('')}</div></div></div>
   <div class="pet-map-destination-control">
     <label for="pet-travel-state-select">Accessible destination selector</label>
@@ -538,13 +538,13 @@ function renderTravelCard() {
   return `<div class="card ${['travel_info','travel_difficulty','travel_target'].some(onboardingStepIs) ? 'onboarding-focus' : ''}">
     <div class="card-title">Pet Travel <span class="travel-count">${Object.keys(travel.medals).length} / ${US_STATES.length} completed</span></div>
     <p class="hint">Choose any state on the map. Up to ${PET_TRAVEL_DAILY_STEP_CAP.toLocaleString()} logged steps per calendar day can move your pet; future entries wait until their date.</p>
-    <div class="travel-difficulty">${Object.entries(PET_TRAVEL_DIFFICULTIES).map(([key,tier]) => `<button class="chip ${travel.difficulty === key ? 'active' : ''}" onclick="setPetTravelDifficulty('${key}')">${tier.medal} ${tier.label} 1:${tier.multiplier}</button>`).join('')}</div>
+    <div class="travel-difficulty">${Object.entries(PET_TRAVEL_DIFFICULTIES).map(([key,tier]) => `<button class="chip ${travel.difficulty === key ? 'active' : ''}" onclick="setPetTravelDifficulty('${key}')">${openMojiIcon(tier.medal, '')} ${tier.label} 1:${tier.multiplier}</button>`).join('')}</div>
     <p class="hint">The arrival medal is the lowest tier used for the entire trip. Souvenirs require Silver or higher.</p>
     ${renderTravelMap(travel)}
     <div class="travel-route-summary"><strong>${escapeAttr(current.name)}</strong> ${target ? `→ <strong>${escapeAttr(target.name)}</strong>` : '· Select a destination'}
-      ${travel.leg ? `<div class="macro-bar-track"><div class="macro-bar-fill" style="width:${pct}%;background:var(--accent);"></div></div><p class="hint">${Math.round(travel.leg.progressSteps/STEPS_PER_MILE).toLocaleString()} of ${Math.round(travel.leg.distanceSteps/STEPS_PER_MILE).toLocaleString()} pet-miles · ${travelTier(travel.leg.medalTier).medal} ${travelTier(travel.leg.medalTier).label} medal</p>` : ''}</div>
-    ${locked ? `<div class="notice travel-paused"><div class="notice-body">💤 Travel paused: happiness must be at least ${PET_TRAVEL_MIN_HAPPINESS}%. Care for ${escapeAttr(STATE.pet.name)} and saved eligible steps can move them again.</div></div>` : ''}
-    ${travel.souvenirs.length ? `<p class="hint souvenir-title">Souvenirs collected:</p><div class="chip-row">${travel.souvenirs.map(getState).filter(Boolean).map(s => `<span class="chip" title="${escapeAttr(s.name)}">${s.souvenir.emoji} ${escapeAttr(s.name)}</span>`).join('')}</div>` : ''}
+      ${travel.leg ? `<div class="macro-bar-track"><div class="macro-bar-fill" style="width:${pct}%;background:var(--accent);"></div></div><p class="hint">${Math.round(travel.leg.progressSteps/STEPS_PER_MILE).toLocaleString()} of ${Math.round(travel.leg.distanceSteps/STEPS_PER_MILE).toLocaleString()} pet-miles · ${openMojiIcon(travelTier(travel.leg.medalTier).medal, '')} ${travelTier(travel.leg.medalTier).label} medal</p>` : ''}</div>
+    ${locked ? `<div class="notice travel-paused"><div class="notice-body">Travel paused: happiness must be at least ${PET_TRAVEL_MIN_HAPPINESS}%. Care for ${escapeAttr(STATE.pet.name)} and saved eligible steps can move them again.</div></div>` : ''}
+    ${travel.souvenirs.length ? `<p class="hint souvenir-title">Souvenirs collected:</p><div class="chip-row">${travel.souvenirs.map(getState).filter(Boolean).map(s => `<span class="chip" title="${escapeAttr(s.name)}">${openMojiIcon(s.souvenir.emoji, s.souvenir.name)} ${escapeAttr(s.name)}</span>`).join('')}</div>` : ''}
   </div>`;
 }
 
@@ -592,14 +592,14 @@ function renderPetTab() {
 
       ${(STATE.pet.foodInventory > 0 || STATE.pet.waterInventory > 0) ? `
         <div class="pet-tray">
-          ${Array.from({ length: STATE.pet.foodInventory }).map(() => `<button class="pet-tray-item" onclick="feedPetItem()" title="Feed">🍗</button>`).join('')}
-          ${Array.from({ length: STATE.pet.waterInventory }).map(() => `<button class="pet-tray-item" onclick="waterPetItem()" title="Give water">💧</button>`).join('')}
+          ${Array.from({ length: STATE.pet.foodInventory }).map(() => `<button class="pet-tray-item" onclick="feedPetItem()" title="Feed">${openMojiIcon('1F357', 'Food')}</button>`).join('')}
+          ${Array.from({ length: STATE.pet.waterInventory }).map(() => `<button class="pet-tray-item" onclick="waterPetItem()" title="Give water">${openMojiIcon('1F4A7', 'Water')}</button>`).join('')}
         </div>
         <p class="hint">Tap an item to feed or water ${escapeAttr(STATE.pet.name)}. Logging meals and water on the Food page adds more here.</p>
       ` : `<p class="hint">Log a meal or some water on the Food page, it'll show up here to feed ${escapeAttr(STATE.pet.name)}.</p>`}
 
       <div class="grid grid-3" style="margin-top:14px;">
-        <div class="stat"><div class="stat-label">Happiness</div><div class="stat-value" style="font-size:18px;">${mood.label} ${mood.emoji}</div></div>
+        <div class="stat"><div class="stat-label">Happiness</div><div class="stat-value" style="font-size:18px;">${mood.label}</div></div>
         <div class="stat"><div class="stat-label">Hunger</div><div class="stat-value" style="font-size:18px; color:${STATE.pet.hunger < 30 ? 'var(--danger)' : 'var(--text)'};">${Math.round(STATE.pet.hunger)}%</div></div>
         <div class="stat"><div class="stat-label">Thirst</div><div class="stat-value" style="font-size:18px; color:${STATE.pet.thirst < 30 ? 'var(--danger)' : 'var(--text)'};">${Math.round(STATE.pet.thirst)}%</div></div>
       </div>

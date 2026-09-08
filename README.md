@@ -78,6 +78,11 @@ normal camera autofocus and decodes the image locally; it does not upload it.
 On multi-camera phones, a browser may initially select an ultrawide rear lens
 that cannot focus closely. Try **Refocus**, **Try next camera**, or take a photo.
 
+## Interface artwork
+
+- Color pictographs are designed by [OpenMoji](https://openmoji.org/) and used under CC BY-SA 4.0.
+- Monochrome interface icons are adapted from [Lucide](https://lucide.dev/) under the ISC License.
+
 ## Running locally
 
 Serve the folder over HTTP rather than opening `index.html` with `file://` so the
@@ -87,13 +92,19 @@ service worker and browser APIs behave normally:
 node tests/dev-server.js
 ```
 
-Run the calculation and habit checks with:
+Run the full local checks with:
 
 ```powershell
+node tests/assets.test.js
 node tests/calculations.test.js
 node tests/habits.test.js
 node tests/barcode.test.js
+node tests/science-ui.test.js
 ```
+
+The asset check keeps the offline cache and release versions in sync, rejects
+missing or duplicate browser assets, and ensures the chart, QR, and scanner
+libraries remain on-demand instead of slowing every launch.
 
 When app files change, bump both `APP_VERSION` in `js/app.js` and
 `CACHE_VERSION` in `sw.js`.

@@ -157,7 +157,7 @@ function renderStandingCard(standing, exerciseId) {
     <div class="card">
       <div class="card-title">
         Where you rank
-        ${tip('ⓘ', 'About these standards', 'These are rough bodyweight-ratio reference points, not a measured fact about you. Use them as motivation and a general sense of direction, not a precise ranking, individual factors (training history, limb length, age) shift things a lot.')}
+        ${tip(appIcon('learn', ''), 'About these standards', 'These are Forge-authored, rough bodyweight-ratio reference points—not a published clinical standard or a measured fact about you. Use them for broad context only; training history, technique, range of motion, limb length, age, and equipment can shift comparisons substantially.')}
       </div>
       <div class="stat" style="margin-bottom:10px;">
         <div class="stat-label">Estimated level</div>

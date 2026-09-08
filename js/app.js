@@ -26,6 +26,7 @@ let UI = {
   addExerciseOpenFor: null,
   copyDayOpenFor: null,
   addExerciseCategory: 'Chest',
+  exerciseQuery: '',
   foodDate: todayISO(),
   foodQuery: '',
   foodResults: [],
@@ -81,7 +82,40 @@ let UI = {
 // tap tooltip on the FORGE logo, the most direct way to confirm a deploy
 // actually reached the browser (vs. the browser/service worker still serving
 // something older), since it's visible without opening dev tools.
-const APP_VERSION = 'forge-v28';
+const APP_VERSION = 'forge-v30';
+
+// Large, occasional-use libraries stay out of the startup path. They remain
+// precached by the service worker for offline use, then execute only when the
+// feature that needs them is opened.
+const OPTIONAL_SCRIPT_LOADS = new Map();
+function loadOptionalScript(src, globalName) {
+  if (typeof window[globalName] !== 'undefined') return Promise.resolve(window[globalName]);
+  const key = `${src}|${globalName}`;
+  if (OPTIONAL_SCRIPT_LOADS.has(key)) return OPTIONAL_SCRIPT_LOADS.get(key);
+
+  const pending = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      if (typeof window[globalName] === 'undefined') {
+        OPTIONAL_SCRIPT_LOADS.delete(key);
+        script.remove();
+        reject(new Error(`${globalName} loaded but did not initialize.`));
+        return;
+      }
+      resolve(window[globalName]);
+    };
+    script.onerror = () => {
+      OPTIONAL_SCRIPT_LOADS.delete(key);
+      script.remove();
+      reject(new Error(`Could not load ${src}.`));
+    };
+    document.head.appendChild(script);
+  });
+  OPTIONAL_SCRIPT_LOADS.set(key, pending);
+  return pending;
+}
 
 function todayISO() {
   return dateToLocalISO(new Date());
@@ -310,6 +344,43 @@ function getBMR() {
   return calcBMR({ ...STATE.profile, weightKg: currentWeightKg() });
 }
 
+// Small interface icons use Lucide's open-source visual language. OpenMoji is
+// reserved for the colorful habit/pet illustrations; native emoji are never
+// used as interface glyphs.
+const APP_ICON_PATHS = Object.freeze({
+  home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10.5V21h14V10.5"/><path d="M9 21v-6h6v6"/>',
+  workout: '<path d="M6.5 6.5h11v11h-11z"/><path d="m9 12 2 2 4-5"/>',
+  food: '<path d="M7 3v8"/><path d="M4 3v4a3 3 0 0 0 6 0V3"/><path d="M7 11v10"/><path d="M16 3v18"/><path d="M16 3c3 2 4 5 4 8h-4"/>',
+  progress: '<path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V2"/>',
+  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  habits: '<path d="m4 12 4 4L20 4"/><path d="M4 6h8"/><path d="M12 20H4"/>',
+  plan: '<path d="M6 3v3"/><path d="M18 3v3"/><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 11h8M8 15h5"/>',
+  calculator: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  award: '<circle cx="12" cy="8" r="5"/><path d="m8.5 12-2 9 5.5-3 5.5 3-2-9"/>',
+  pet: '<circle cx="12" cy="13" r="4"/><circle cx="5" cy="8" r="2"/><circle cx="19" cy="8" r="2"/><circle cx="9" cy="4" r="2"/><circle cx="15" cy="4" r="2"/>',
+  learn: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5z"/><path d="M4 6.5v13"/>',
+  appearance: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z"/>',
+  transfer: '<path d="m7 7-4 4 4 4"/><path d="M3 11h14"/><path d="m17 17 4-4-4-4"/><path d="M21 13H7"/>',
+  note: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/>',
+  timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
+  check: '<path d="m5 12 4 4L19 6"/>',
+  camera: '<path d="M14.5 4 16 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3l1.5-3z"/><circle cx="12" cy="13" r="3"/>',
+});
+
+function appIcon(name, label, className) {
+  const path = APP_ICON_PATHS[name] || APP_ICON_PATHS.more;
+  return `<svg class="app-icon ${escapeAttr(className || '')}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${label ? `role="img" aria-label="${escapeAttr(label)}"` : 'aria-hidden="true"'}>${path}</svg>`;
+}
+
+function openMojiIcon(code, label, className) {
+  const input = String(code || '2705');
+  const safeCode = /^[0-9A-F-]{2,30}$/i.test(input)
+    ? input.toUpperCase()
+    : Array.from(input).map(char => char.codePointAt(0)).filter(point => point !== 0xFE0F && point !== 0x200D).map(point => point.toString(16).toUpperCase()).join('-') || '2705';
+  return `<img class="openmoji-icon ${escapeAttr(className || '')}" src="https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji@15.1.0/color/svg/${safeCode}.svg" alt="${escapeAttr(label || '')}" loading="lazy" referrerpolicy="no-referrer">`;
+}
+
 function getTDEE() {
   return getMaintenanceEstimate()?.midpoint || null;
 }
@@ -518,11 +589,11 @@ function cssEscape(s) {
 // ============================================================
 
 const NAV_ITEMS = [
-  { key: 'yourpage', label: 'Today', icon: '⌂' },
-  { key: 'log', label: 'Workout', icon: '✓' },
-  { key: 'food', label: 'Food', icon: '+' },
-  { key: 'progress', label: 'Progress', icon: '↗' },
-  { key: 'more', label: 'More', icon: '•••' },
+  { key: 'yourpage', label: 'Today', icon: 'home' },
+  { key: 'log', label: 'Workout', icon: 'workout' },
+  { key: 'food', label: 'Food', icon: 'food' },
+  { key: 'progress', label: 'Progress', icon: 'progress' },
+  { key: 'more', label: 'More', icon: 'more' },
 ];
 
 const MORE_ROUTES = new Set(['home', 'workouts', 'goals', 'bodyfat', 'achievements', 'pet', 'faq', 'themes', 'utilities', 'more']);
@@ -544,7 +615,7 @@ function doRender() {
     updatePetHappinessDecay();
     evaluatePetDailyRewards().forEach(g => toast(`+${g.points} pts: ${g.label}`));
     if (typeof evaluateTravelArrivals === 'function') {
-      evaluateTravelArrivals().forEach(s => toast(`${STATE.pet.name || 'Your pet'} arrived in ${s.name} with a ${travelTier(s.medalTier).label} medal${s.gotSouvenir ? ` and ${s.souvenir.name.toLowerCase()} souvenir ${s.souvenir.emoji}` : ''}!`));
+      evaluateTravelArrivals().forEach(s => toast(`${STATE.pet.name || 'Your pet'} arrived in ${s.name} with a ${travelTier(s.medalTier).label} medal${s.gotSouvenir ? ` and ${s.souvenir.name.toLowerCase()} souvenir` : ''}!`));
     }
   }
   evaluateAchievements().forEach(a => toast(`Achievement unlocked: ${a.name} (+${a.points}${STATE.pet.enabled ? ' pet pts' : ' pts'})`));
@@ -560,7 +631,7 @@ function doRender() {
         </div>
         ${NAV_ITEMS.map(item => `
           <button class="nav-item ${navItemIsActive(item.key) ? 'active' : ''}" onclick="navigate('${item.key}')">
-            <span class="num" aria-hidden="true">${item.icon}</span><span>${item.label}</span>
+            <span class="num">${appIcon(item.icon, '')}</span><span>${item.label}</span>
           </button>
         `).join('')}
         <div class="sidebar-foot">
@@ -608,16 +679,16 @@ function doRender() {
 
 function renderMore() {
   const items = [
-    { route: 'habits', title: 'Habits', copy: 'Build small routines, check in once, and see your momentum.', icon: '✓' },
-    { route: 'workouts', title: 'Workout plan', copy: 'Build reusable training days and starter routines.', icon: '▤' },
-    { route: 'home', title: 'Profile & calories', copy: 'Update your stats and review the maintenance estimate.', icon: '◎' },
-    { route: 'goals', title: 'Weight goal', copy: 'Choose a direction, pace, and starting calorie target.', icon: '◇' },
-    { route: 'bodyfat', title: 'Body-fat estimate', copy: 'Optional tape-measure estimate and education.', icon: '%' },
-    { route: 'achievements', title: 'Achievements', copy: 'Milestones earned from the habits you log.', icon: '★' },
-    ...(STATE.pet.enabled ? [{ route: 'pet', title: 'Pet & travel', copy: 'Rewards, customization, and step-powered travel.', icon: '●' }] : []),
-    { route: 'faq', title: 'Learn', copy: 'Short answers, methods, and exercise reference.', icon: '?' },
-    { route: 'themes', title: 'Appearance', copy: 'Theme, type, and interface preferences.', icon: '◐' },
-    { route: 'utilities', title: 'Data & support', copy: 'Backup, transfer, share, and contact tools.', icon: '⇄' },
+    { route: 'habits', title: 'Habits', copy: 'Build small routines, check in once, and see your momentum.', icon: 'habits' },
+    { route: 'workouts', title: 'Workout plan', copy: 'Build reusable training days and starter routines.', icon: 'plan' },
+    { route: 'home', title: 'Profile & calories', copy: 'Update your stats and review the maintenance estimate.', icon: 'calculator' },
+    { route: 'goals', title: 'Weight goal', copy: 'Choose a direction, pace, and starting calorie target.', icon: 'target' },
+    { route: 'bodyfat', title: 'Body-fat estimate', copy: 'Optional tape-measure estimate and education.', icon: 'calculator' },
+    { route: 'achievements', title: 'Achievements', copy: 'Milestones earned from the habits you log.', icon: 'award' },
+    ...(STATE.pet.enabled ? [{ route: 'pet', title: 'Pet & travel', copy: 'Rewards, customization, and step-powered travel.', icon: 'pet' }] : []),
+    { route: 'faq', title: 'Learn', copy: 'Short answers, methods, and exercise reference.', icon: 'learn' },
+    { route: 'themes', title: 'Appearance', copy: 'Theme, type, and interface preferences.', icon: 'appearance' },
+    { route: 'utilities', title: 'Data & support', copy: 'Backup, transfer, share, and contact tools.', icon: 'transfer' },
   ];
   return `
     <div class="page-head">
@@ -627,7 +698,7 @@ function renderMore() {
     </div>
     <div class="more-grid">
       ${items.map(item => `<button class="more-link" onclick="navigate('${item.route}')">
-        <span class="more-link-icon" aria-hidden="true">${item.icon}</span>
+        <span class="more-link-icon">${appIcon(item.icon, '')}</span>
         <span><strong>${item.title}</strong><small>${item.copy}</small></span>
         <span class="more-link-arrow" aria-hidden="true">›</span>
       </button>`).join('')}
@@ -648,6 +719,7 @@ function navigate(route) {
 
 function afterRenderHooks() {
   if (typeof applyPageModularity === 'function') applyPageModularity(UI.route);
+  if (typeof syncGymTimerTicker === 'function') syncGymTimerTicker();
   const tourStep = typeof getActiveOnboardingStep === 'function' ? getActiveOnboardingStep() : null;
   if (tourStep?.autoRoute && tourStep.route !== UI.route) {
     requestAnimationFrame(() => {
@@ -665,9 +737,18 @@ function afterRenderHooks() {
     if (!control.id) control.id = `forge-field-${UI.route}-${index}`;
     label.htmlFor = control.id;
   });
-  if (UI.route === 'goals') drawGoalChart();
-  if (UI.route === 'progress') { drawProgressChart(); drawStepsChart(); }
-  if (UI.route === 'yourpage' && document.getElementById('steps-chart')) drawStepsChart();
+  const chartRoute = UI.route;
+  const needsCharts = chartRoute === 'goals'
+    || chartRoute === 'progress'
+    || (chartRoute === 'yourpage' && document.getElementById('steps-chart'));
+  if (needsCharts) {
+    loadOptionalScript('js/vendor/chart.umd.min.js', 'Chart').then(() => {
+      if (UI.route !== chartRoute) return;
+      if (chartRoute === 'goals') drawGoalChart();
+      if (chartRoute === 'progress') { drawProgressChart(); drawStepsChart(); }
+      if (chartRoute === 'yourpage') drawStepsChart();
+    }).catch(error => console.warn('Charts are unavailable:', error));
+  }
   if (UI.route === 'faq' && UI.faqExerciseId) {
     requestAnimationFrame(() => document.getElementById(exerciseGuideAnchor(UI.faqExerciseId))?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
@@ -776,12 +857,12 @@ function renderHome() {
           <div class="grid grid-2" style="margin-bottom:16px;">
             <div class="stat">
               <div class="stat-label">BMR: resting burn</div>
-              <div class="stat-value">${Math.round(bmr)}<span class="unit">kcal/day</span></div>
+              <div class="stat-value">${calculationTip(`${Math.round(bmr)}<span class="unit">kcal/day</span>`, 'How BMR is calculated', `Mifflin-St Jeor: 10 × ${p.weightKg.toFixed(1)} kg + 6.25 × ${p.heightCm.toFixed(1)} cm − 5 × ${p.age}, then ${p.sex === 'male' ? '+ 5' : '− 161'}. This predicts resting energy expenditure; it does not measure your metabolism.`, ['mifflin'])}</div>
             </div>
             <div class="stat">
               <div class="stat-label">Estimated maintenance</div>
-              <div class="stat-value accent">${Math.round(tdee)}<span class="unit">kcal/day</span></div>
-              <div class="hint">Likely range ${Math.round(maintenance.low)}-${Math.round(maintenance.high)}</div>
+              <div class="stat-value accent">${calculationTip(`${Math.round(tdee)}<span class="unit">kcal/day</span>`, 'How maintenance is estimated', `${Math.round(maintenance.baseDaily)} sedentary baseline + ${Math.round(maintenance.stepDaily)} walking estimate + ${Math.round(maintenance.exerciseDaily)} daily exercise estimate. Forge applies a 25% discount to planned/exercise energy because wearable and MET estimates are noisy and may overlap. Validate this midpoint against 2–4 weeks of weight and intake trends.`, ['mifflin','compendium','energyPlanner'], 'Forge model estimate')}</div>
+              <div class="hint">${calculationTip(`Likely range ${Math.round(maintenance.low)}-${Math.round(maintenance.high)}`, 'Why a range is shown', `Forge places an uncertainty band of about ${Math.round((maintenance.high / maintenance.midpoint - 1) * 100)}% around the midpoint${Object.keys(STATE.dailyCheckins).length >= 5 ? ' because some step history is available' : ' because activity history is still sparse'}. This band is a transparent modeling allowance, not a confidence interval from a clinical test.`, ['energyPlanner'], 'Forge uncertainty allowance')}</div>
             </div>
           </div>
           <hr class="div">
@@ -803,11 +884,11 @@ function renderHome() {
       <div class="card-title">How Forge got this number</div>
       ${maintenance ? `
         <div class="estimate-equation">
-          <div class="estimate-part"><strong>${Math.round(maintenance.baseDaily)}</strong><span>Sedentary baseline<br><small>BMR × 1.2</small></span></div>
+          <div class="estimate-part"><strong>${calculationTip(Math.round(maintenance.baseDaily), 'Sedentary baseline', `${Math.round(bmr)} BMR × 1.2 = ${Math.round(maintenance.baseDaily)} kcal/day. The 1.2 multiplier is a Forge starting assumption, not an individual measurement.`, ['mifflin'], 'Forge model assumption')}</strong><span>Sedentary baseline<br><small>BMR × 1.2</small></span></div>
           <span class="estimate-op">+</span>
-          <div class="estimate-part"><strong>${Math.round(maintenance.stepDaily)}</strong><span>Walking above<br><small>${maintenance.baselineSteps.toLocaleString()} steps</small></span></div>
+          <div class="estimate-part"><strong>${calculationTip(Math.round(maintenance.stepDaily), 'Walking estimate', `Steps above the ${maintenance.baselineSteps.toLocaleString()}-step sedentary baseline × body-weight walking coefficient. This is a Forge approximation; terrain, pace, stride, and overlap can change the real cost.`, [], 'Forge model assumption')}</strong><span>Walking above<br><small>${maintenance.baselineSteps.toLocaleString()} steps</small></span></div>
           <span class="estimate-op">+</span>
-          <div class="estimate-part"><strong>${Math.round(maintenance.exerciseDaily)}</strong><span>${maintenance.exerciseSource === 'recent' ? 'Recent exercise' : 'Planned exercise'}<br><small>daily average</small></span></div>
+          <div class="estimate-part"><strong>${calculationTip(Math.round(maintenance.exerciseDaily), 'Exercise estimate', 'Logged duration-based activities use published MET values. Rep-based lifting uses Forge timing/rest assumptions because sets and load alone do not directly determine energy expenditure. A 25% discount reduces false precision and overlap.', ['compendium'], 'Mixed published inputs + Forge model')}</strong><span>${maintenance.exerciseSource === 'recent' ? 'Recent exercise' : 'Planned exercise'}<br><small>daily average</small></span></div>
           <span class="estimate-op">=</span>
           <div class="estimate-part estimate-total"><strong>${Math.round(maintenance.midpoint)}</strong><span>Starting midpoint</span></div>
         </div>
@@ -924,13 +1005,6 @@ function isReasonableDateString(dateStr) {
   if (year < 1900 || year > 2200) return false;
   const parsed = new Date(dateStr + 'T00:00:00');
   return !Number.isNaN(parsed.getTime()) && dateToLocalISO(parsed) === dateStr;
-}
-
-function cmToFeetInches(cm) {
-  const roundedIn = Math.round(cmToIn(cm));
-  const ft = Math.floor(roundedIn / 12);
-  const inch = roundedIn % 12;
-  return `${ft}'${inch}"`;
 }
 
 function numOrNull(v) {

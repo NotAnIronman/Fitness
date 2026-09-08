@@ -22,14 +22,14 @@ function renderThemes() {
     { key: 'clean_system', label: 'Work Sans' },
     { key: 'editorial', label: 'Libre Baskerville / Nunito' },
     { key: 'playful', label: 'Baloo 2 / Nunito' },
-    { key: 'whimsical', label: 'Macondo / Nunito \u2728' },
-    { key: 'storybook', label: 'Leckerli One / Quicksand \u2728' },
-    { key: 'bubbly', label: 'Pacifico / Comfortaa \u2728' },
-    { key: 'handwritten', label: 'Dancing Script / Nunito \u2728' },
-    { key: 'cozy_note', label: 'Caveat / Inter \u2728' },
-    { key: 'soft_rounded', label: 'Comfortaa \u2728' },
-    { key: 'cheerful', label: 'Fredoka / Nunito \u2728' },
-    { key: 'candy', label: 'Chewy / Quicksand \u2728' },
+    { key: 'whimsical', label: 'Macondo / Nunito' },
+    { key: 'storybook', label: 'Leckerli One / Quicksand' },
+    { key: 'bubbly', label: 'Pacifico / Comfortaa' },
+    { key: 'handwritten', label: 'Dancing Script / Nunito' },
+    { key: 'cozy_note', label: 'Caveat / Inter' },
+    { key: 'soft_rounded', label: 'Comfortaa' },
+    { key: 'cheerful', label: 'Fredoka / Nunito' },
+    { key: 'candy', label: 'Chewy / Quicksand' },
   ];
 
   return `
@@ -119,7 +119,7 @@ function renderUtilities() {
 
       <p class="hint" style="margin-bottom:6px;"><strong style="color:var(--text);">Fastest, if supported:</strong> share directly to another device you're holding (AirDrop, Nearby Share, Bluetooth), no file to find and re-upload.</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
-        <button class="btn btn-primary" onclick="shareBackup()">\ud83d\udce4 Share to another device</button>
+        <button class="btn btn-primary" onclick="shareBackup()">${appIcon('transfer', '')} Share to another device</button>
       </div>
 
       <p class="hint" style="margin-bottom:6px;"><strong style="color:var(--text);">Works everywhere:</strong> copy a sync code on this device, paste it into Forge on the other one.</p>
@@ -231,7 +231,7 @@ function buildDayShareSnapshot(date, sections) {
     const scheduled = typeof habitsScheduledForDate === 'function' ? habitsScheduledForDate(date) : [];
     const completed = scheduled.filter(habit => habitIsDone(habit, date));
     lines.push('', 'HABITS', ...(scheduled.length
-      ? scheduled.map(habit => `${habitIsDone(habit, date) ? '✓' : '○'} ${habit.name}${habit.target > 1 ? ` (${habitCount(habit.id, date)}/${habit.target})` : ''}`)
+      ? scheduled.map(habit => `${habitIsDone(habit, date) ? '[done]' : '[ ]'} ${habit.name}${habit.target > 1 ? ` (${habitCount(habit.id, date)}/${habit.target})` : ''}`)
       : ['No habits scheduled']), scheduled.length ? `${completed.length} of ${scheduled.length} complete` : '');
   }
   if (selected.has('steps')) {
@@ -289,11 +289,11 @@ async function copyDaySnapshot() {
 
 function renderSecretSettings() {
   if (!UI.secretPanelOpen) {
-    return `<div style="text-align:center; margin-top:8px;"><button class="notice-pill" onclick="toggleSecretPanel()" style="opacity:0.5;">🥚 ???</button></div>`;
+    return `<div style="text-align:center; margin-top:8px;"><button class="notice-pill" onclick="toggleSecretPanel()" style="opacity:0.5;">Hidden settings</button></div>`;
   }
   return `
     <div class="card">
-      <div class="card-title">🥚 Secret settings</div>
+      <div class="card-title">Secret settings</div>
       <div class="field-row" style="align-items:center;">
         <div class="field" style="margin-bottom:0;">
           <label>Pet companion</label>
@@ -617,6 +617,7 @@ async function startQrTransferSend(historyDays = null) {
       render();
       return;
     }
+    await loadOptionalScript('js/vendor/qrcode-generator.js', 'qrcode');
     UI.qrPayloadParts = chunks.map((chunk, index) => `${QR_TRANSFER_PREFIX}|${transferId}|${index + 1}|${chunks.length}|${chunk}`);
     UI.qrPartIndex = 0;
     UI.qrTransferMode = 'send';

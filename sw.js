@@ -24,7 +24,7 @@
    in sync with this).
    ============================================================ */
 
-const CACHE_VERSION = 'forge-v28';
+const CACHE_VERSION = 'forge-v30';
 
 const PRECACHE_URLS = [
   './',
@@ -78,7 +78,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k.startsWith('forge-v') && k !== CACHE_VERSION).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -90,13 +90,15 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // let cross-origin requests pass through untouched
 
-  event.respondWith(
-    fetch(req).then((res) => {
-      if (res && res.ok) {
-        const copy = res.clone();
-        caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
-      }
-      return res;
-    }).catch(() => caches.match(req)) // offline fallback only
+  const networkResponse = fetch(req);
+  // Keep the worker alive until the refreshed copy is safely stored. Without
+  // waitUntil(), the browser may terminate the worker after returning the
+  // response and abandon the cache write midway through.
+  event.waitUntil(
+    networkResponse.then((res) => {
+      if (!res.ok) return undefined;
+      return caches.open(CACHE_VERSION).then((cache) => cache.put(req, res.clone()));
+    }).catch(() => undefined)
   );
+  event.respondWith(networkResponse.catch(() => caches.match(req))); // offline fallback only
 });
