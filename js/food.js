@@ -180,12 +180,12 @@ function renderFood() {
       </div>
 
       <div class="card">
-        <div class="card-title">Today's starting target</div>
+        <div class="card-title">${targetContext.goalApplied ? 'Your calorie target for this goal' : 'Estimated maintenance — not a loss target'}</div>
         ${goalAdjustedTarget ? `
           <div class="stat" style="margin-bottom:10px;">
-            <div class="stat-label">Midpoint</div>
+            <div class="stat-label">${targetContext.goalApplied ? 'Start near this daily intake' : 'Estimated intake to maintain weight'}</div>
             <div class="stat-value accent">${calculationTip(`${Math.round(goalAdjustedTarget)}<span class="unit">kcal</span>`, 'How the calorie target is calculated', `Estimated maintenance midpoint plus the daily energy adjustment implied by your selected weight and date. This is a starting prescription, not a measured requirement; Forge will not prescribe below its adult safety floor.`, ['mifflin','energyPlanner','gradualLoss'], 'Published BMR + Forge planning model')}</div>
-            <div class="hint">${calculationTip(`Estimated range ${Math.round(targetContext.targetLow)}-${Math.round(targetContext.targetHigh)} kcal`, 'Why the target has a range', 'The same goal adjustment is applied to both ends of your maintenance range. Treat the midpoint as a consistent starting point and the range as uncertainty—not a daily pass/fail zone.', ['energyPlanner'], 'Forge uncertainty allowance')}</div>
+            <div class="hint">${calculationTip(`Model uncertainty: ${Math.round(targetContext.targetLow)}-${Math.round(targetContext.targetHigh)} kcal`, 'What this range means', 'This is not a menu of targets and the lower number is not automatically better. Forge applies the same goal adjustment to both ends of the uncertain maintenance estimate. Start near the displayed daily target, then use your 2–4 week weight trend to decide whether it needs a small change.', ['energyPlanner'], 'Forge uncertainty allowance')}</div>
           </div>
           <div class="stat">
             <div class="stat-label">Logged so far</div>
@@ -193,7 +193,7 @@ function renderFood() {
           </div>
           <hr class="div">
           ${safety ? renderSafetyWarning(safety, totals.kcal) : renderFoodFeedback(totals.kcal, goalAdjustedTarget)}
-          <p class="hint" style="margin-top:10px;">Aim near the midpoint consistently, then adjust from your two-to-four-week weight trend. The range reflects estimation uncertainty, not a daily score.</p>
+          <p class="hint" style="margin-top:10px;">${targetContext.goalApplied ? `<strong>Start by eating about ${Math.round(goalAdjustedTarget)} kcal/day.</strong> Do not automatically choose the lower edge of the range. Adjust only after reviewing two to four weeks of comparable weigh-ins and reasonably complete food logs.` : '<strong>This is a maintenance estimate, not a weight-loss prescription.</strong> Set a target weight and date on Weight Goal to calculate a goal-adjusted daily intake.'}</p>
         ` : `<div class="hint">Set your profile stats (Home) and optionally a weight goal to see a personalized target.</div>`}
       </div>
     </div>

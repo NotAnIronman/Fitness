@@ -860,9 +860,9 @@ function renderHome() {
               <div class="stat-value">${calculationTip(`${Math.round(bmr)}<span class="unit">kcal/day</span>`, 'How BMR is calculated', `Mifflin-St Jeor: 10 × ${p.weightKg.toFixed(1)} kg + 6.25 × ${p.heightCm.toFixed(1)} cm − 5 × ${p.age}, then ${p.sex === 'male' ? '+ 5' : '− 161'}. This predicts resting energy expenditure; it does not measure your metabolism.`, ['mifflin'])}</div>
             </div>
             <div class="stat">
-              <div class="stat-label">Estimated maintenance</div>
+              <div class="stat-label">Estimated intake to maintain weight</div>
               <div class="stat-value accent">${calculationTip(`${Math.round(tdee)}<span class="unit">kcal/day</span>`, 'How maintenance is estimated', `${Math.round(maintenance.baseDaily)} sedentary baseline + ${Math.round(maintenance.stepDaily)} walking estimate + ${Math.round(maintenance.exerciseDaily)} daily exercise estimate. Forge applies a 25% discount to planned/exercise energy because wearable and MET estimates are noisy and may overlap. Validate this midpoint against 2–4 weeks of weight and intake trends.`, ['mifflin','compendium','energyPlanner'], 'Forge model estimate')}</div>
-              <div class="hint">${calculationTip(`Likely range ${Math.round(maintenance.low)}-${Math.round(maintenance.high)}`, 'Why a range is shown', `Forge places an uncertainty band of about ${Math.round((maintenance.high / maintenance.midpoint - 1) * 100)}% around the midpoint${Object.keys(STATE.dailyCheckins).length >= 5 ? ' because some step history is available' : ' because activity history is still sparse'}. This band is a transparent modeling allowance, not a confidence interval from a clinical test.`, ['energyPlanner'], 'Forge uncertainty allowance')}</div>
+              <div class="hint">${calculationTip(`Uncertainty range ${Math.round(maintenance.low)}-${Math.round(maintenance.high)}`, 'Why a range is shown', `Forge places an uncertainty band of about ${Math.round((maintenance.high / maintenance.midpoint - 1) * 100)}% around the midpoint${Object.keys(STATE.dailyCheckins).length >= 5 ? ' because some step history is available' : ' because activity history is still sparse'}. This band is a transparent modeling allowance, not a confidence interval from a clinical test.`, ['energyPlanner'], 'Forge uncertainty allowance')}</div>
             </div>
           </div>
           <hr class="div">
@@ -876,7 +876,7 @@ function renderHome() {
             Fill in your age, height, and weight to estimate resting burn and maintenance.
           </div>
         `}
-        <p class="hint" style="margin-top:12px;">The midpoint is useful for choosing a starting target; the range is the honest part. Compare two to four weeks of consistent intake and weight trends before adjusting. These estimates are for adults and are not intended for pregnancy, breastfeeding, or medical nutrition therapy.</p>
+        <p class="hint" style="margin-top:12px;"><strong>This maintenance number is not your weight-loss calorie target.</strong> It estimates the intake that may hold your current weight. Your goal-adjusted number appears on Food and Weight Goal. Compare two to four weeks of consistent intake and weight trends before adjusting. These estimates are for adults and are not intended for pregnancy, breastfeeding, or medical nutrition therapy.</p>
       </div>
     </div>
 
@@ -890,7 +890,7 @@ function renderHome() {
           <span class="estimate-op">+</span>
           <div class="estimate-part"><strong>${calculationTip(Math.round(maintenance.exerciseDaily), 'Exercise estimate', 'Logged duration-based activities use published MET values. Rep-based lifting uses Forge timing/rest assumptions because sets and load alone do not directly determine energy expenditure. A 25% discount reduces false precision and overlap.', ['compendium'], 'Mixed published inputs + Forge model')}</strong><span>${maintenance.exerciseSource === 'recent' ? 'Recent exercise' : 'Planned exercise'}<br><small>daily average</small></span></div>
           <span class="estimate-op">=</span>
-          <div class="estimate-part estimate-total"><strong>${Math.round(maintenance.midpoint)}</strong><span>Starting midpoint</span></div>
+          <div class="estimate-part estimate-total"><strong>${Math.round(maintenance.midpoint)}</strong><span>Maintenance estimate<br><small>before any goal deficit</small></span></div>
         </div>
         <p class="hint" style="margin-top:12px;">Forge no longer jumps between broad activity multipliers. Walking uses your body weight and steps; planned exercise is discounted because activity estimates are noisy and can overlap with baseline burn.</p>
       ` : `<div class="empty-state">Fill in your profile above to see the calculation.</div>`}
